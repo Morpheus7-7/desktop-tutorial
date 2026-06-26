@@ -1,0 +1,22 @@
+# --- Core ---
+pandas>=2.0
+numpy>=1.24
+PyYAML>=6.0
+python-dotenv>=1.0
+requests>=2.31
+
+# --- Machine Learning ---
+scikit-learn>=1.3
+xgboost>=2.0
+joblib>=1.3
+
+# --- MetaTrader 5 (SOLO Windows / Linux via Wine) ---
+# Installalo solo sulla macchina che esegue il trading reale:
+#   pip install MetaTrader5
+MetaTrader5>=5.0.45 ; platform_system == "Windows"
+
+# --- TradingView (segnali tecnici, opzionale) ---
+tradingview-ta>=3.3
+
+# --- Dev / test ---
+pytest>=7.4

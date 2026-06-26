@@ -1,0 +1,92 @@
+# ============================================================
+#  Configurazione del trading bot
+#  I segreti (login, password) stanno nel file .env, NON qui.
+# ============================================================
+
+# Modalità operativa:
+#   "demo"     -> opera su account demo MT5 (consigliato)
+#   "paper"    -> simulazione locale, nessuna connessione MT5 (per sviluppo/backtest)
+#   "live"     -> account reale (richiede ALLOW_LIVE_TRADING=true nel .env)
+mode: demo
+
+# Strumenti su cui operare (nomi come compaiono nel Market Watch del tuo broker)
+symbols:
+  - EURUSD
+  - GBPUSD
+  - US30      # indice Dow Jones (il simbolo può variare a seconda del broker)
+  - NAS100    # Nasdaq
+
+# Timeframe principale per le decisioni
+timeframe: M15        # M1, M5, M15, M30, H1, H4, D1
+bars_history: 500     # quante candele caricare per gli indicatori/ML
+
+# Ogni quanti secondi gira il loop principale
+loop_interval_seconds: 30
+
+# --- Motore strategie ---
+strategies:
+  rsi:
+    enabled: true
+    weight: 1.0
+    period: 14
+    oversold: 30
+    overbought: 70
+  macd:
+    enabled: true
+    weight: 1.0
+    fast: 12
+    slow: 26
+    signal: 9
+  ma_crossover:
+    enabled: true
+    weight: 1.0
+    fast: 20
+    slow: 50
+  bollinger:
+    enabled: true
+    weight: 0.8
+    period: 20
+    std: 2.0
+
+# --- Modello ML ---
+ml:
+  enabled: true
+  model_path: models/xgb_direction.joblib
+  weight: 1.5            # peso del segnale ML rispetto alle strategie classiche
+  min_proba: 0.55        # probabilità minima per considerare valido il segnale ML
+
+# --- Supervisore LLM (Ollama) ---
+llm:
+  enabled: true
+  weight: 0              # il LLM non "vota": approva o pone il veto (vedi sotto)
+  veto_enabled: true     # se true, il LLM può bloccare un'operazione
+  on_error: approve      # cosa fare se Ollama non è raggiungibile: approve | reject
+  timeout_seconds: 20
+
+# --- Motore decisionale ---
+decision:
+  entry_threshold: 0.4   # |punteggio combinato| sopra cui si apre una posizione
+  min_confidence: 0.4    # confidenza minima richiesta
+
+# --- Gestione del rischio ---
+risk:
+  risk_per_trade: 0.01       # 1% dell'equity rischiato per operazione
+  max_open_positions: 4      # posizioni aperte contemporaneamente
+  max_positions_per_symbol: 1
+  max_daily_loss: 0.05       # stop giornaliero al -5% dell'equity iniziale
+  atr_period: 14
+  sl_atr_mult: 2.0           # stop loss = 2 * ATR
+  tp_rr: 1.5                 # take profit = 1.5 * rischio (risk/reward)
+  min_volume: 0.01
+  max_volume: 2.0
+
+# --- TradingView (opzionale, segnali tecnici aggregati) ---
+tradingview:
+  enabled: false
+  exchange: FX_IDC           # es. FX_IDC per forex, OANDA, ecc.
+  interval: 15m
+
+# --- Logging ---
+logging:
+  level: INFO
+  file: logs/trading.log

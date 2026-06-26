@@ -1,0 +1,27 @@
+# Segreti / credenziali
+.env
+
+# Modelli ML addestrati e dati
+models/*.joblib
+models/*.pkl
+data/*.csv
+data/*.parquet
+
+# Log
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
