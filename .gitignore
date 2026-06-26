@@ -21,6 +21,11 @@ env/
 .pytest_cache/
 .ipynb_checkpoints/
 
+# TradingAgents (clonato in locale dallo script di setup, non versionato)
+tradingagents-setup/TradingAgents/
+tradingagents-setup/.venv/
+tradingagents-setup/.env
+
 # OS / editor
 .DS_Store
 .vscode/
