@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
+  <meta name="theme-color" content="#7c3aed" />
+  <meta name="description" content="Gin Pass — la tessera fedeltà digitale della tua gintoneria. Punti, livelli e premi." />
+  <title>Gin Pass — Gintoneria Club</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Gin Pass" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <!-- ===== ONBOARDING ===== -->
+  <section id="onboarding" class="onboarding hidden">
+    <div class="onboarding-inner">
+      <div class="logo-badge">🍸</div>
+      <h1 class="brand">Gin Pass</h1>
+      <p class="tagline">Il club della tua gintoneria.<br />Bevi. Accumula. Sblocca.</p>
+      <form id="signup-form" class="signup">
+        <label for="name-input">Come ti chiami?</label>
+        <input id="name-input" type="text" placeholder="Il tuo nome o nickname" autocomplete="given-name" maxlength="24" required />
+        <label for="bday-input" class="opt">Compleanno <span>(per il drink omaggio 🎂)</span></label>
+        <input id="bday-input" type="date" />
+        <button type="submit" class="btn-primary">Entra nel club →</button>
+      </form>
+      <p class="fineprint">Demo locale: i dati restano sul tuo telefono.</p>
+    </div>
+  </section>
+
+  <!-- ===== APP ===== -->
+  <main id="app" class="app hidden">
+    <!-- TESSERA -->
+    <section id="tab-card" class="tab active">
+      <header class="topbar">
+        <div>
+          <p class="hello">Ciao,</p>
+          <h2 id="member-name">—</h2>
+        </div>
+        <button id="install-btn" class="chip-install hidden">⤓ Installa</button>
+      </header>
+
+      <div class="card" id="loyalty-card">
+        <div class="card-shine"></div>
+        <div class="card-top">
+          <span class="card-brand">🍸 GIN PASS</span>
+          <span id="level-badge" class="level-pill">Apprendista</span>
+        </div>
+        <div class="points-wrap">
+          <span class="points-num" id="points-num">0</span>
+          <span class="points-label">punti</span>
+        </div>
+        <div class="progress">
+          <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <p class="progress-text" id="progress-text">—</p>
+        <div class="card-bottom">
+          <span class="member-id" id="member-id">GTN-000000</span>
+          <button id="show-qr" class="qr-mini">Mostra QR</button>
+        </div>
+      </div>
+
+      <div class="quick-actions">
+        <button class="action" id="checkin-btn">
+          <span class="action-emoji">🥃</span>
+          <span class="action-label">Registra<br />consumazione</span>
+        </button>
+        <button class="action" data-goto="rewards">
+          <span class="action-emoji">🎁</span>
+          <span class="action-label">Premi<br />disponibili</span>
+        </button>
+        <button class="action" data-goto="badges">
+          <span class="action-emoji">🏆</span>
+          <span class="action-label">I tuoi<br />badge</span>
+        </button>
+      </div>
+
+      <h3 class="section-title">Ultima attività</h3>
+      <ul id="activity-list" class="activity"></ul>
+    </section>
+
+    <!-- PREMI -->
+    <section id="tab-rewards" class="tab">
+      <h2 class="page-title">🎁 Premi</h2>
+      <p class="page-sub">Riscatta i tuoi punti al bancone.</p>
+      <div id="rewards-grid" class="rewards-grid"></div>
+    </section>
+
+    <!-- BADGE -->
+    <section id="tab-badges" class="tab">
+      <h2 class="page-title">🏆 Badge & Livelli</h2>
+      <div id="levels-track" class="levels-track"></div>
+      <h3 class="section-title">Obiettivi</h3>
+      <div id="badges-grid" class="badges-grid"></div>
+    </section>
+
+    <!-- MENU GIN -->
+    <section id="tab-menu" class="tab">
+      <h2 class="page-title">🍃 Carta dei Gin</h2>
+      <p class="page-sub">Tocca per i dettagli. Ogni assaggio vale punti!</p>
+      <div id="gin-list" class="gin-list"></div>
+    </section>
+
+    <!-- NAV -->
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-tab="card"><span>🪪</span>Tessera</button>
+      <button class="nav-btn" data-tab="rewards"><span>🎁</span>Premi</button>
+      <button class="nav-btn" data-tab="badges"><span>🏆</span>Badge</button>
+      <button class="nav-btn" data-tab="menu"><span>🍃</span>Carta</button>
+    </nav>
+  </main>
+
+  <!-- ===== QR MODAL ===== -->
+  <div id="qr-modal" class="modal hidden">
+    <div class="modal-card">
+      <button class="modal-close" id="qr-close">✕</button>
+      <h3>La tua tessera</h3>
+      <p class="modal-sub">Fai scansionare questo codice al barista.</p>
+      <div id="qr-box" class="qr-box"></div>
+      <p class="qr-id" id="qr-id">GTN-000000</p>
+    </div>
+  </div>
+
+  <!-- ===== TOAST ===== -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/vendor/qrcode.min.js" defer></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>

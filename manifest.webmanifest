@@ -1,0 +1,20 @@
+{
+  "name": "Gin Pass — Gintoneria Club",
+  "short_name": "Gin Pass",
+  "description": "La tessera fedeltà digitale della tua gintoneria: punti, livelli e premi.",
+  "lang": "it",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0820",
+  "theme_color": "#7c3aed",
+  "categories": ["food", "lifestyle", "loyalty"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
