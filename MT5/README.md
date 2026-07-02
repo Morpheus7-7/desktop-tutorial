@@ -1,3 +1,85 @@
+# Expert Advisor per MetaTrader 5
+
+Questo modulo contiene due Expert Advisor:
+
+1. **`Experts/SMC_Confluence_EA.mq5`** — strategia a confluenza costruita sui concetti
+   dell'indicatore combinato *SMC + OscDiv + TickProfile + LDP* (vedi la sezione dedicata
+   più in basso). **È l'EA principale del progetto.**
+2. **`Experts/StatisticalDayTrader.mq5`** — EA di base con strategie statistiche classiche
+   (Opening Range Breakout + RSI(2) Mean Reversion), documentato nelle sezioni seguenti.
+
+---
+
+# SMC_Confluence_EA — La strategia costruita sui concetti dell'indicatore
+
+L'EA riprende i quattro moduli dell'indicatore `SMC_OscDiv_TickProfile_LDP_Combined` e li
+ricalcola internamente su barre chiuse (senza oggetti grafici), trasformandoli in una
+strategia operativa a confluenza.
+
+## I quattro moduli di segnale
+
+### 1. Struttura SMC (Smart Money Concepts)
+- Pivot **swing** (default 50 barre) e **internal** (default 5 barre).
+- Rottura di un pivot high/low in chiusura ⇒ **BOS** (continuazione) o **CHoCH**
+  (cambio di carattere, se contro il trend precedente) ⇒ definisce il **trend strutturale**.
+- Il range tra ultimo swing high e swing low definisce le zone **Premium / Discount**:
+  i long sono ammessi solo sotto l'equilibrio (discount), gli short solo sopra (premium).
+
+### 2. Order Blocks
+- A ogni break di struttura interna viene salvato l'**order block** del leg (la barra con
+  l'estremo opposto tra il pivot rotto e la barra di rottura), come nell'indicatore.
+- Mitigazione in modalità high/low: l'OB muore se il prezzo lo attraversa dal lato opposto.
+- **Trigger di ingresso**: il prezzo rientra nella zona OB con il wick e chiude fuori dal
+  suo bordo (retest confermato).
+
+### 3. Liquidity Zones (concetti LDP)
+- Sui pivot (default 15 barre) vengono create zone **BSL** (buy-side liquidity sopra i
+  pivot high) e **SSL** (sell-side sotto i pivot low), con altezza minima 0,1× ATR e
+  filtro sovrapposizioni.
+- Ogni barra distribuisce il proprio **delta stimato** (`volume × (close−open)/range`)
+  nei 4 quadranti della zona in proporzione all'overlap, come nel profiler.
+- Su sweep/test della zona l'EA classifica il reversal con le stesse regole del dashboard:
+  - **ABS** – absorption: sweep con delta esterno contrario forte (ratio > 0,2)
+  - **EXH** – exhaustion: sweep "secco" senza partecipazione (ratio < 0,1)
+  - **DIV** – delta divergence: chiusura dentro la zona con FOMO intrappolato (ratio > 0,6)
+  - **REJ** – snapback rejection: sweep + chiusura di rifiuto + delta barra contrario
+- **Trigger di ingresso**: sweep di BSL ⇒ short, sweep di SSL ⇒ long (ogni tipo di
+  segnale è attivabile/disattivabile singolarmente).
+
+### 4. Divergenze RSI
+- Pivot dell'RSI(14) con lookback 5/5 (stessa logica pivot dell'indicatore).
+- **Divergenza regolare rialzista**: prezzo fa un minimo più basso, RSI un minimo più
+  alto (sotto 50). Ribassista speculare sopra 50 (filtro mediana come `InpMiddleFilter`).
+- La divergenza resta valida per N barre (default 12) e alimenta la confluenza; può
+  essere resa obbligatoria con `InpRequireDivergence`.
+
+## Punteggio di confluenza
+
+Ogni trigger (sweep LDP o retest OB) apre il trade solo se raggiunge il punteggio minimo
+(`InpMinConfluence`, default 2 su 3):
+
+| Fattore | Punto |
+|---|---|
+| Trend strutturale swing concorde con la direzione | +1 |
+| Prezzo in discount (long) / premium (short) | +1 |
+| Divergenza RSI attiva nella direzione del trade | +1 |
+
+## Gestione del trade
+
+- **SL** oltre l'estremo dello sweep o dell'order block + buffer 0,2× ATR.
+- **TP** a 2R (configurabile). **Breakeven** dopo 1R.
+- Rischio fisso % per trade, limite di perdita giornaliero, max trade/giorno,
+  filtro spread, finestra oraria, chiusura forzata a fine giornata.
+- **Warm-up automatico**: al primo avvio ricostruisce struttura, OB e zone dallo
+  storico (default 1000 barre) senza aprire trade.
+
+## Timeframe consigliati
+
+M15–H1. Sui timeframe più bassi aumentare `InpMinConfluence` a 3 e/o attivare
+`InpRequireDivergence` per filtrare il rumore.
+
+---
+
 # StatisticalDayTrader — Expert Advisor per MetaTrader 5
 
 Expert Advisor multi-strategia per il **day trading**, costruito sulla base di una ricerca
