@@ -1,0 +1,122 @@
+//@version=5
+// SMC Confluence Alerts — compagno TradingView del cervello Python (smc_mt5).
+//
+// Replica in forma leggera i segnali della strategia: break di struttura
+// (BOS/CHoCH), sweep di liquidita' con rejection e divergenze RSI.
+// Ogni segnale puo' inviare un webhook JSON al server Python:
+//
+//   Impostazioni alert -> Webhook URL:  https://TUO-HOST:8642/webhook
+//   Message: usa il placeholder {{strategy.order.alert_message}} oppure
+//   il testo generato da alert() qui sotto (Any alert() function call).
+//
+indicator("SMC Confluence Alerts (smc_mt5)", overlay=true, max_lines_count=100, max_labels_count=100)
+
+//============================ INPUT =================================
+grpG    = "Generale"
+secret  = input.string("CAMBIAMI-subito", "Webhook secret", group=grpG)
+symOut  = input.string("EURUSD", "Simbolo MT5 (nel JSON)", group=grpG)
+
+grpS    = "Struttura"
+swingLen  = input.int(50, "Swing length", minval=10, group=grpS)
+intLen    = input.int(5,  "Internal length", minval=2, group=grpS)
+
+grpL    = "Liquidita'"
+liqLen    = input.int(15, "Pivot liquidita'", minval=5, group=grpL)
+
+grpD    = "Divergenze RSI"
+rsiLen    = input.int(14, "Periodo RSI", group=grpD)
+divLb     = input.int(5,  "Pivot lookback", group=grpD)
+
+//======================= STRUTTURA (BOS/CHoCH) ======================
+var float swHigh   = na
+var float swLow    = na
+var bool  swHiDone = true
+var bool  swLoDone = true
+var int   swTrend  = 0
+
+ph = ta.pivothigh(high, swingLen, swingLen)
+pl = ta.pivotlow(low,  swingLen, swingLen)
+if not na(ph)
+    swHigh   := ph
+    swHiDone := false
+if not na(pl)
+    swLow    := pl
+    swLoDone := false
+
+bullBreak = not swHiDone and not na(swHigh) and close > swHigh and close[1] <= swHigh
+bearBreak = not swLoDone and not na(swLow)  and close < swLow  and close[1] >= swLow
+
+bullChoch = bullBreak and swTrend == -1
+bearChoch = bearBreak and swTrend == 1
+if bullBreak
+    swHiDone := true
+    swTrend  := 1
+if bearBreak
+    swLoDone := true
+    swTrend  := -1
+
+plotshape(bullBreak, "BOS/CHoCH up",  shape.triangleup,   location.belowbar, color.new(color.teal, 0), size=size.tiny)
+plotshape(bearBreak, "BOS/CHoCH down", shape.triangledown, location.abovebar, color.new(color.red, 0),  size=size.tiny)
+
+//==================== SWEEP DI LIQUIDITA' + REJECTION ================
+var float liqHigh = na
+var float liqLow  = na
+lph = ta.pivothigh(high, liqLen, liqLen)
+lpl = ta.pivotlow(low,  liqLen, liqLen)
+if not na(lph)
+    liqHigh := lph
+if not na(lpl)
+    liqLow := lpl
+
+// sweep del massimo (BSL) con chiusura di rifiuto sotto => segnale short
+sweepShort = not na(liqHigh) and high > liqHigh and close < liqHigh and close < (high + low) / 2
+// sweep del minimo (SSL) con chiusura di rifiuto sopra => segnale long
+sweepLong  = not na(liqLow)  and low  < liqLow  and close > liqLow  and close > (high + low) / 2
+
+plotshape(sweepLong,  "Sweep long",  shape.labelup,   location.belowbar, color.new(color.green, 20), text="SWP", textcolor=color.white, size=size.tiny)
+plotshape(sweepShort, "Sweep short", shape.labeldown, location.abovebar, color.new(color.maroon, 20), text="SWP", textcolor=color.white, size=size.tiny)
+
+//========================= DIVERGENZE RSI ===========================
+rsiV = ta.rsi(close, rsiLen)
+rsiPl = ta.pivotlow(rsiV,  divLb, divLb)
+rsiPh = ta.pivothigh(rsiV, divLb, divLb)
+
+var float prevRsiPl = na
+var float prevPriceLow = na
+var float prevRsiPh = na
+var float prevPriceHigh = na
+
+bullDiv = false
+bearDiv = false
+if not na(rsiPl)
+    curPrice = low[divLb]
+    if not na(prevRsiPl) and curPrice < prevPriceLow and rsiPl > prevRsiPl and rsiPl < 50
+        bullDiv := true
+    prevRsiPl    := rsiPl
+    prevPriceLow := curPrice
+if not na(rsiPh)
+    curPrice = high[divLb]
+    if not na(prevRsiPh) and curPrice > prevPriceHigh and rsiPh < prevRsiPh and rsiPh > 50
+        bearDiv := true
+    prevRsiPh     := rsiPh
+    prevPriceHigh := curPrice
+
+plotshape(bullDiv, "Bull div", shape.diamond, location.belowbar, color.new(color.lime, 0),    size=size.tiny)
+plotshape(bearDiv, "Bear div", shape.diamond, location.abovebar, color.new(color.fuchsia, 0), size=size.tiny)
+
+//====================== ALERT WEBHOOK (JSON) ========================
+mkJson(action, signal) =>
+    '{"secret":"' + secret + '","symbol":"' + symOut + '","action":"' + action + '","signal":"' + signal + '","price":' + str.tostring(close) + '}'
+
+if bullBreak
+    alert(mkJson("buy",  bullChoch ? "SMC-CHoCH" : "SMC-BOS"), alert.freq_once_per_bar_close)
+if bearBreak
+    alert(mkJson("sell", bearChoch ? "SMC-CHoCH" : "SMC-BOS"), alert.freq_once_per_bar_close)
+if sweepLong
+    alert(mkJson("buy",  "LIQ-SWEEP"), alert.freq_once_per_bar_close)
+if sweepShort
+    alert(mkJson("sell", "LIQ-SWEEP"), alert.freq_once_per_bar_close)
+if bullDiv
+    alert(mkJson("buy",  "RSI-DIV"), alert.freq_once_per_bar_close)
+if bearDiv
+    alert(mkJson("sell", "RSI-DIV"), alert.freq_once_per_bar_close)

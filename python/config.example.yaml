@@ -1,0 +1,57 @@
+# Copia questo file in config.yaml e personalizza.
+
+mt5:
+  # Percorso terminal64.exe (vuoto = terminale gia' avviato / default)
+  terminal_path: ""
+  login: 0            # 0 = usa il conto gia' loggato nel terminale
+  password: ""
+  server: ""
+
+trading:
+  symbol: "EURUSD"
+  timeframe: "M15"          # M1 M5 M15 M30 H1 H4 D1
+  magic: 260704
+  risk_percent: 1.0          # % del saldo rischiata per trade
+  reward_risk: 2.0           # take profit in multipli del rischio
+  breakeven_at_1r: true
+  max_spread_points: 30
+  max_trades_per_day: 3
+  daily_loss_limit_percent: 3.0
+  session_start_hour: 8      # ora del BROKER (server time)
+  entry_cutoff_hour: 19
+  close_all_hour: 21
+  close_all_minute: 30
+  close_end_of_day: true
+
+strategy:
+  entry_model: "both"        # sweep | ob | both
+  min_confluence: 2          # 0-3
+  require_divergence: false
+  sl_buffer_atr: 0.20
+  swing_length: 50
+  internal_length: 5
+  use_premium_discount: true
+  max_order_blocks: 10
+  ob_max_age_bars: 300
+  ldp_length: 15
+  ldp_max_zones: 10
+  signals: ["ABS", "EXH", "DIV", "REJ"]
+  rsi_period: 14
+  div_lookback: 5
+  div_valid_bars: 12
+  atr_period: 14
+  warmup_bars: 1000
+
+tradingview:
+  enabled: false
+  # "off"     = ignora TradingView
+  # "confirm" = il segnale Python scatta solo se TV ha mandato un alert
+  #             concorde nelle ultime N barre
+  # "trigger" = un alert TV e' un trigger aggiuntivo (passa comunque dai
+  #             filtri di confluenza e risk management Python)
+  mode: "confirm"
+  confirm_valid_bars: 3
+  webhook_host: "0.0.0.0"
+  webhook_port: 8642
+  # Stringa segreta che DEVE essere presente nel JSON dell'alert TV
+  secret: "CAMBIAMI-subito"

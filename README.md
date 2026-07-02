@@ -6,7 +6,11 @@ Write your name on line 6, save it, and then head back to GitHub Desktop.
 
 ## Progetti
 
-- **[MT5/](MT5/)** — *StatisticalDayTrader*: Expert Advisor per MetaTrader 5 basato su
-  strategie di day trading con evidenza statistica (Opening Range Breakout + RSI(2)
-  Mean Reversion di Larry Connors), con risk management integrato. Vedi
-  [MT5/README.md](MT5/README.md) per strategie, fonti, installazione e validazione.
+- **[python/](python/)** — *SMC-MT5*: sistema di trading a tre componenti — **Python
+  pensa** (struttura SMC, order block, liquidity zones LDP, divergenze RSI, confluenza,
+  risk management, backtest), **TradingView conferma** (alert Pine via webhook),
+  **MetaTrader 5 esegue** (ordini, SL/TP, breakeven). Vedi
+  [python/README.md](python/README.md).
+- **[MT5/](MT5/)** — Expert Advisor nativi MQL5: *SMC_Confluence_EA* (stessa strategia a
+  confluenza, tutta dentro MT5) e *StatisticalDayTrader* (Opening Range Breakout + RSI(2)
+  Mean Reversion di Larry Connors). Vedi [MT5/README.md](MT5/README.md).
