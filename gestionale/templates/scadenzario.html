@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Scadenzario — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-calendar-event me-2"></i>Scadenzario</h1>
+  <form class="d-flex gap-2" method="get">
+    <select class="form-select" name="giorni" onchange="this.form.submit()">
+      {% for g in [30, 60, 90, 180, 365] %}
+      <option value="{{ g }}" {% if giorni == g %}selected{% endif %}>Prossimi {{ g }} giorni</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-file-earmark-text me-1"></i> Scadenze polizze</div>
+      <div class="card-body p-0">
+        {% if polizze %}
+        <table class="table table-hover mb-0">
+          <thead><tr><th>Scadenza</th><th>Cliente</th><th>Polizza</th><th>Ramo</th><th>Premio</th><th>Rinnovo</th></tr></thead>
+          <tbody>
+          {% for p in polizze %}
+            <tr class="urgenza-{{ p.urgenza_scadenza }}">
+              <td>
+                <strong>{{ p.data_scadenza | data_it }}</strong><br>
+                {% if p.giorni_alla_scadenza < 0 %}
+                  <span class="badge bg-danger">scaduta da {{ -p.giorni_alla_scadenza }} gg</span>
+                {% else %}
+                  <span class="badge bg-secondary">tra {{ p.giorni_alla_scadenza }} gg</span>
+                {% endif %}
+              </td>
+              <td><a href="{{ url_for('clients.detail', client_id=p.client_id) }}">{{ p.cliente.ragione_sociale }}</a></td>
+              <td>{{ p.numero_polizza }}<br><span class="small text-muted">{{ p.compagnia }}</span></td>
+              <td class="small">{{ p.ramo_label }}</td>
+              <td>{{ p.premio_annuo | euro }}</td>
+              <td>{% if p.tacito_rinnovo %}<span class="badge bg-info text-dark">tacito</span>{% else %}<span class="badge bg-warning text-dark">da rinnovare</span>{% endif %}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted p-3 mb-0">Nessuna polizza in scadenza nel periodo selezionato.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-check2-square me-1"></i> Follow-up in scadenza</div>
+      <div class="card-body p-0">
+        {% if followups %}
+        <table class="table table-hover mb-0">
+          <thead><tr><th>Data</th><th>Cliente</th><th>Attività</th><th></th></tr></thead>
+          <tbody>
+          {% for f in followups %}
+            <tr {% if f.in_ritardo %}class="urgenza-scaduta"{% endif %}>
+              <td>{{ f.data_scadenza | data_it }}
+                {% if f.in_ritardo %}<br><span class="badge bg-danger">in ritardo</span>{% endif %}
+              </td>
+              <td><a href="{{ url_for('clients.detail', client_id=f.client_id) }}">{{ f.cliente.ragione_sociale }}</a></td>
+              <td>{{ f.titolo }}<br><span class="badge bg-light text-dark">{{ f.tipo_label }}</span></td>
+              <td class="text-end">
+                <form method="post" action="{{ url_for('followups.complete', followup_id=f.id) }}">
+                  <button class="btn btn-sm btn-outline-success" title="Completa"><i class="bi bi-check-lg"></i></button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted p-3 mb-0">Nessun follow-up nel periodo selezionato.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

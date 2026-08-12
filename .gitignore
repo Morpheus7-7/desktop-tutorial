@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Dati locali dell'applicazione (database e documenti caricati)
+instance/
+*.db
+
+# Editor / sistema
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,11 @@
+/* Rifiniture sopra Bootstrap */
+.stat-card .display-6 { font-weight: 700; }
+.severita-alta { border-left: 4px solid #dc3545; }
+.severita-media { border-left: 4px solid #fd7e14; }
+.severita-bassa { border-left: 4px solid #ffc107; }
+.severita-baseline { border-left: 4px solid #0d6efd; }
+.urgenza-scaduta { background-color: #f8d7da !important; }
+.urgenza-critica { background-color: #fff3cd !important; }
+.table td, .table th { vertical-align: middle; }
+.nav-tabs .nav-link { color: #495057; }
+.keyword-badge { font-weight: 400; }

@@ -1,0 +1,272 @@
+"""Modelli del database (SQLAlchemy)."""
+import json
+from datetime import date, datetime
+
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+
+# ----------------------------------------------------------------------
+# Vocabolari condivisi (usati da form, motore di analisi e report)
+# ----------------------------------------------------------------------
+CLIENT_TYPES = [
+    ("azienda", "Azienda"),
+    ("professionista", "Professionista"),
+]
+
+POLICY_BRANCHES = [
+    ("rc_professionale", "RC Professionale"),
+    ("rct_rco", "RC Terzi e Prestatori d'Opera (RCT/RCO)"),
+    ("rc_prodotti", "RC Prodotti"),
+    ("rc_ambientale", "RC Inquinamento Ambientale"),
+    ("incendio", "Incendio / All Risks Beni"),
+    ("furto", "Furto e Rapina"),
+    ("catastrofali", "Eventi Catastrofali (CatNat)"),
+    ("guasti_macchine", "Guasti Macchine / Elettronica"),
+    ("cyber", "Cyber Risk"),
+    ("infortuni", "Infortuni"),
+    ("malattia", "Malattia / Rimborso Spese Mediche"),
+    ("vita", "Vita / Temporanea Caso Morte"),
+    ("do", "D&O — Responsabilità Amministratori"),
+    ("tutela_legale", "Tutela Legale"),
+    ("trasporti", "Trasporti / Merci"),
+    ("auto", "Auto / Flotte (RCA)"),
+    ("cauzioni", "Cauzioni e Fideiussioni"),
+    ("credito", "Credito Commerciale"),
+    ("key_man", "Key Man"),
+    ("altro", "Altro"),
+]
+BRANCH_LABELS = dict(POLICY_BRANCHES)
+
+POLICY_STATUSES = [
+    ("attiva", "Attiva"),
+    ("in_rinnovo", "In rinnovo"),
+    ("sospesa", "Sospesa"),
+    ("disdetta", "Disdetta"),
+    ("scaduta", "Scaduta"),
+]
+
+PAYMENT_FREQUENCIES = [
+    ("annuale", "Annuale"),
+    ("semestrale", "Semestrale"),
+    ("quadrimestrale", "Quadrimestrale"),
+    ("trimestrale", "Trimestrale"),
+    ("mensile", "Mensile"),
+]
+
+FOLLOWUP_TYPES = [
+    ("chiamata", "Chiamata"),
+    ("incontro", "Incontro"),
+    ("email", "Email"),
+    ("preventivo", "Preventivo"),
+    ("rinnovo", "Rinnovo polizza"),
+    ("sinistro", "Gestione sinistro"),
+    ("documenti", "Raccolta documenti"),
+    ("altro", "Altro"),
+]
+FOLLOWUP_TYPE_LABELS = dict(FOLLOWUP_TYPES)
+
+FOLLOWUP_PRIORITIES = [
+    ("alta", "Alta"),
+    ("media", "Media"),
+    ("bassa", "Bassa"),
+]
+
+DOCUMENT_CATEGORIES = [
+    ("polizza", "Polizza / Contratto"),
+    ("preventivo", "Preventivo"),
+    ("identita", "Documento d'identità"),
+    ("visura", "Visura camerale"),
+    ("bilancio", "Bilancio / Dichiarazione"),
+    ("sinistro", "Documentazione sinistro"),
+    ("adeguatezza", "Questionario di adeguatezza"),
+    ("privacy", "Privacy / GDPR"),
+    ("altro", "Altro"),
+]
+DOCUMENT_CATEGORY_LABELS = dict(DOCUMENT_CATEGORIES)
+
+
+class Client(db.Model):
+    __tablename__ = "clients"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tipo = db.Column(db.String(20), nullable=False, default="azienda")
+    ragione_sociale = db.Column(db.String(200), nullable=False)
+    referente = db.Column(db.String(120))
+    codice_fiscale = db.Column(db.String(16))
+    partita_iva = db.Column(db.String(11))
+    codice_ateco = db.Column(db.String(10))
+    professione = db.Column(db.String(120))
+    settore = db.Column(db.String(120))
+    indirizzo = db.Column(db.String(200))
+    citta = db.Column(db.String(100))
+    cap = db.Column(db.String(5))
+    provincia = db.Column(db.String(2))
+    email = db.Column(db.String(120))
+    pec = db.Column(db.String(120))
+    telefono = db.Column(db.String(30))
+    numero_dipendenti = db.Column(db.Integer)
+    fatturato_annuo = db.Column(db.Float)
+    descrizione_attivita = db.Column(db.Text)
+    note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    polizze = db.relationship(
+        "Policy", backref="cliente", cascade="all, delete-orphan", lazy=True
+    )
+    documenti = db.relationship(
+        "Document", backref="cliente", cascade="all, delete-orphan", lazy=True
+    )
+    followups = db.relationship(
+        "FollowUp", backref="cliente", cascade="all, delete-orphan", lazy=True
+    )
+    analisi = db.relationship(
+        "RiskAnalysis",
+        backref="cliente",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="RiskAnalysis.created_at.desc()",
+    )
+
+    @property
+    def tipo_label(self):
+        return dict(CLIENT_TYPES).get(self.tipo, self.tipo)
+
+    @property
+    def polizze_attive(self):
+        return [p for p in self.polizze if p.stato in ("attiva", "in_rinnovo")]
+
+    @property
+    def ultima_analisi(self):
+        return self.analisi[0] if self.analisi else None
+
+    def __repr__(self):  # pragma: no cover
+        return f"<Client {self.ragione_sociale!r}>"
+
+
+class Policy(db.Model):
+    __tablename__ = "policies"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(
+        db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
+    )
+    compagnia = db.Column(db.String(120), nullable=False)
+    numero_polizza = db.Column(db.String(60), nullable=False)
+    ramo = db.Column(db.String(40), nullable=False, default="altro")
+    massimale = db.Column(db.Float)
+    premio_annuo = db.Column(db.Float)
+    frazionamento = db.Column(db.String(20), default="annuale")
+    data_decorrenza = db.Column(db.Date)
+    data_scadenza = db.Column(db.Date, index=True)
+    tacito_rinnovo = db.Column(db.Boolean, default=False)
+    stato = db.Column(db.String(20), nullable=False, default="attiva")
+    note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    documenti = db.relationship("Document", backref="polizza", lazy=True)
+
+    @property
+    def ramo_label(self):
+        return BRANCH_LABELS.get(self.ramo, self.ramo)
+
+    @property
+    def stato_label(self):
+        return dict(POLICY_STATUSES).get(self.stato, self.stato)
+
+    @property
+    def giorni_alla_scadenza(self):
+        if not self.data_scadenza:
+            return None
+        return (self.data_scadenza - date.today()).days
+
+    @property
+    def urgenza_scadenza(self):
+        """Classe di urgenza per lo scadenzario: scaduta / critica / attenzione / ok."""
+        giorni = self.giorni_alla_scadenza
+        if giorni is None:
+            return "ok"
+        if giorni < 0:
+            return "scaduta"
+        if giorni <= 7:
+            return "critica"
+        if giorni <= 30:
+            return "attenzione"
+        return "ok"
+
+    def __repr__(self):  # pragma: no cover
+        return f"<Policy {self.numero_polizza!r} {self.ramo}>"
+
+
+class Document(db.Model):
+    __tablename__ = "documents"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(
+        db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
+    )
+    policy_id = db.Column(db.Integer, db.ForeignKey("policies.id"), index=True)
+    categoria = db.Column(db.String(40), nullable=False, default="altro")
+    filename = db.Column(db.String(300), nullable=False)  # nome su disco (sicuro)
+    original_name = db.Column(db.String(300), nullable=False)
+    note = db.Column(db.Text)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def categoria_label(self):
+        return DOCUMENT_CATEGORY_LABELS.get(self.categoria, self.categoria)
+
+
+class FollowUp(db.Model):
+    __tablename__ = "followups"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(
+        db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
+    )
+    tipo = db.Column(db.String(30), nullable=False, default="chiamata")
+    titolo = db.Column(db.String(200), nullable=False)
+    descrizione = db.Column(db.Text)
+    data_scadenza = db.Column(db.Date, nullable=False, index=True)
+    priorita = db.Column(db.String(10), nullable=False, default="media")
+    stato = db.Column(db.String(20), nullable=False, default="aperto")
+    completed_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def tipo_label(self):
+        return FOLLOWUP_TYPE_LABELS.get(self.tipo, self.tipo)
+
+    @property
+    def in_ritardo(self):
+        return self.stato == "aperto" and self.data_scadenza < date.today()
+
+
+class RiskAnalysis(db.Model):
+    __tablename__ = "risk_analyses"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(
+        db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
+    )
+    input_text = db.Column(db.Text, nullable=False)
+    results_json = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def results(self):
+        return json.loads(self.results_json)
+
+
+class Notification(db.Model):
+    __tablename__ = "notifications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tipo = db.Column(db.String(30), nullable=False)  # scadenza_polizza | followup | info
+    livello = db.Column(db.String(10), nullable=False, default="info")  # danger|warning|info
+    messaggio = db.Column(db.String(500), nullable=False)
+    link = db.Column(db.String(300))
+    dedup_key = db.Column(db.String(120), unique=True, nullable=False)
+    letta = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

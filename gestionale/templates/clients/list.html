@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Clienti — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-people me-2"></i>Clienti</h1>
+  <a class="btn btn-primary" href="{{ url_for('clients.new_client') }}">
+    <i class="bi bi-person-plus"></i> Nuovo cliente
+  </a>
+</div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-5">
+    <input type="text" class="form-control" name="q" value="{{ q }}"
+           placeholder="Cerca per nome, P.IVA, CF, città o settore…">
+  </div>
+  <div class="col-md-3">
+    <select class="form-select" name="tipo">
+      <option value="">Tutti i tipi</option>
+      {% for value, label in client_types %}
+      <option value="{{ value }}" {% if tipo == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <button class="btn btn-outline-primary w-100"><i class="bi bi-search"></i> Cerca</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if clienti %}
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Cliente</th><th>Tipo</th><th>Settore / Professione</th>
+          <th>Città</th><th>P.IVA / CF</th><th>Polizze attive</th><th>Contatti</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for c in clienti %}
+        <tr>
+          <td><a href="{{ url_for('clients.detail', client_id=c.id) }}" class="fw-semibold">{{ c.ragione_sociale }}</a></td>
+          <td><span class="badge {% if c.tipo == 'azienda' %}bg-primary{% else %}bg-success{% endif %}">{{ c.tipo_label }}</span></td>
+          <td class="small">{{ c.settore or c.professione or '—' }}</td>
+          <td class="small">{{ c.citta or '—' }}{% if c.provincia %} ({{ c.provincia }}){% endif %}</td>
+          <td class="small">{{ c.partita_iva or c.codice_fiscale or '—' }}</td>
+          <td>{{ c.polizze_attive | length }}</td>
+          <td class="small">
+            {% if c.email %}<div><i class="bi bi-envelope"></i> {{ c.email }}</div>{% endif %}
+            {% if c.telefono %}<div><i class="bi bi-telephone"></i> {{ c.telefono }}</div>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted p-4 mb-0">Nessun cliente trovato.
+      <a href="{{ url_for('clients.new_client') }}">Inserisci un nuovo cliente</a>.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

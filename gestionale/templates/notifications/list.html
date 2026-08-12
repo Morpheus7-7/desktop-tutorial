@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Notifiche — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h3 mb-0"><i class="bi bi-bell me-2"></i>Centro notifiche</h1>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary {% if solo_non_lette %}active{% endif %}"
+       href="{{ url_for('notifications.list_notifications', filtro='non_lette') }}">Da leggere</a>
+    <a class="btn btn-outline-secondary {% if not solo_non_lette %}active{% endif %}"
+       href="{{ url_for('notifications.list_notifications', filtro='tutte') }}">Tutte</a>
+    <form method="post" action="{{ url_for('notifications.mark_all_read') }}">
+      <button class="btn btn-primary"><i class="bi bi-check2-all"></i> Segna tutte come lette</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <ul class="list-group list-group-flush">
+    {% for n in notifiche %}
+    <li class="list-group-item d-flex justify-content-between align-items-start gap-3 {% if not n.letta %}fw-semibold{% endif %}">
+      <div class="d-flex align-items-start gap-2">
+        <span class="badge bg-{{ n.livello }} mt-1">
+          {% if n.tipo == 'scadenza_polizza' %}<i class="bi bi-calendar-x"></i>
+          {% elif n.tipo == 'followup' %}<i class="bi bi-check2-square"></i>
+          {% else %}<i class="bi bi-info-circle"></i>{% endif %}
+        </span>
+        <div>
+          {% if n.link %}<a href="{{ n.link }}" class="text-decoration-none">{{ n.messaggio }}</a>
+          {% else %}{{ n.messaggio }}{% endif %}
+          <div class="small text-muted fw-normal">{{ n.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+        </div>
+      </div>
+      {% if not n.letta %}
+      <form method="post" action="{{ url_for('notifications.mark_read', notification_id=n.id) }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <button class="btn btn-sm btn-outline-secondary" title="Segna come letta"><i class="bi bi-check-lg"></i></button>
+      </form>
+      {% endif %}
+    </li>
+    {% else %}
+    <li class="list-group-item text-muted p-4">Nessuna notifica{% if solo_non_lette %} da leggere{% endif %}.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

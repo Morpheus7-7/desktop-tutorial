@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Documenti — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-folder2-open me-2"></i>Archivio documenti</h1>
+</div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-4">
+    <select class="form-select" name="categoria" onchange="this.form.submit()">
+      <option value="">Tutte le categorie</option>
+      {% for value, label in document_categories %}
+      <option value="{{ value }}" {% if categoria == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if documenti %}
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Documento</th><th>Cliente</th><th>Categoria</th><th>Polizza</th><th>Caricato il</th><th></th></tr></thead>
+      <tbody>
+      {% for d in documenti %}
+        <tr>
+          <td><i class="bi bi-file-earmark me-1"></i>{{ d.original_name }}
+            {% if d.note %}<br><span class="small text-muted">{{ d.note }}</span>{% endif %}
+          </td>
+          <td><a href="{{ url_for('clients.detail', client_id=d.client_id) }}">{{ d.cliente.ragione_sociale }}</a></td>
+          <td><span class="badge bg-light text-dark">{{ d.categoria_label }}</span></td>
+          <td class="small">{% if d.polizza %}{{ d.polizza.numero_polizza }}{% else %}—{% endif %}</td>
+          <td class="small">{{ d.uploaded_at.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}"><i class="bi bi-download"></i></a>
+            <form class="d-inline" method="post" action="{{ url_for('documents.delete', document_id=d.id) }}"
+                  onsubmit="return confirm('Eliminare il documento {{ d.original_name }}?');">
+              <input type="hidden" name="da_archivio" value="1">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted p-4 mb-0">Nessun documento. I documenti si caricano dalla scheda del cliente.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
