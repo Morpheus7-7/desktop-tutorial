@@ -1,12 +1,13 @@
 name: Test e build
 
+# Avvio manuale (Actions → «Test e build» → Run workflow) o su tag di release
+# (es. v1.0.0). NON scatta a ogni push/PR: così non genera check rossi se
+# GitHub Actions non è abilitato sull'account. Vedi PACKAGING.md.
 on:
-  push:
-    branches:
-      - main
-      - "claude/**"
-  pull_request:
   workflow_dispatch:
+  push:
+    tags:
+      - "v*"
 
 jobs:
   test:

@@ -13,24 +13,34 @@ restano tra un avvio e l'altro e sono facili da spostare o salvare.
 
 ---
 
-## Opzione A — Build automatica su GitHub (consigliata)
+## Opzione A — Build su GitHub (senza Windows né Python)
 
-È il modo più semplice per ottenere il `.exe` **senza avere Windows né Python**.
+Il workflow [`.github/workflows/build.yml`](.github/workflows/build.yml) è già
+incluso e, quando viene eseguito, compila l'eseguibile Windows su un runner
+GitHub e lo pubblica come *artifact* scaricabile.
 
-1. Il workflow [`.github/workflows/build.yml`](.github/workflows/build.yml) è già
-   incluso. A ogni push (o manualmente da **Actions → Test e build →
-   Run workflow**) GitHub:
+> **Serve avere GitHub Actions abilitato sull'account/repository.** Se Actions è
+> disattivato o l'account ha esaurito i minuti/fatturazione, i job vengono
+> interrotti all'avvio (senza runner) e non producono l'eseguibile: in quel caso
+> usa l'**Opzione B** qui sotto. Abilita/verifica Actions da
+> *Settings → Actions* del repository e *Settings → Billing* dell'account.
+
+Per lanciarlo:
+
+1. Vai su **Actions → «Test e build» → Run workflow** e scegli il branch
+   (in alternativa, il workflow parte da solo quando pubblichi un **tag** di
+   release, es. `v1.0.0`). GitHub allora:
    - esegue i test su Linux;
    - compila l'eseguibile su un runner **Windows**;
    - pubblica il risultato come *artifact*.
-2. Apri la scheda **Actions** del repository, entra nell'ultima esecuzione
-   riuscita e scarica l'artifact **`GestionaleAssicurativo-windows`**.
+2. Apri l'esecuzione riuscita e scarica l'artifact **`GestionaleAssicurativo-windows`**.
 3. Dentro lo zip trovi `GestionaleAssicurativo.exe`: doppio clic e si apre il
    browser sull'applicazione.
 
-> Nota: l'artifact resta disponibile per il periodo di retention impostato da
-> GitHub (di norma 90 giorni). Per una distribuzione stabile puoi allegarlo a
-> una *Release*.
+> Nota: il workflow **non** parte a ogni push, per non generare esiti rossi
+> quando Actions non è disponibile. L'artifact resta scaricabile per il periodo
+> di retention di GitHub (di norma 90 giorni); per una distribuzione stabile
+> puoi allegarlo a una *Release*.
 
 ---
 
