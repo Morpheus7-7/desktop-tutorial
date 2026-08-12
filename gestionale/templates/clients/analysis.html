@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Analisi rischi — {{ client.ragione_sociale }}{% endblock %}
+{% block content %}
+{% set r = analysis.results %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('clients.list_clients') }}">Clienti</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.ragione_sociale }}</a></li>
+    <li class="breadcrumb-item active">Analisi rischi del {{ analysis.created_at.strftime('%d/%m/%Y %H:%M') }}</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0"><i class="bi bi-clipboard2-pulse me-2"></i>Report analisi dei rischi</h1>
+  <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card text-center"><div class="card-body">
+      <div class="display-6 fw-bold">{{ r.sintesi.rischi_rilevati }}</div>
+      <div class="text-muted small">Rischi rilevati dal testo</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card text-center"><div class="card-body">
+      <div class="display-6 fw-bold">{{ r.sintesi.raccomandazioni_base }}</div>
+      <div class="text-muted small">Raccomandazioni di base</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card text-center {% if r.sintesi.rami_scoperti %}border-danger{% endif %}"><div class="card-body">
+      <div class="display-6 fw-bold {% if r.sintesi.rami_scoperti %}text-danger{% endif %}">{{ r.sintesi.rami_scoperti }}</div>
+      <div class="text-muted small">Coperture consigliate scoperte</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card text-center"><div class="card-body">
+      <div class="display-6 fw-bold text-success">{{ r.sintesi.rami_coperti }}</div>
+      <div class="text-muted small">Coperture già in essere</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-card-text me-1"></i> Descrizione analizzata</div>
+  <div class="card-body"><p class="mb-0 fst-italic">{{ analysis.input_text }}</p></div>
+</div>
+
+<h2 class="h5 mb-3">Pericoli individuati e coperture consigliate</h2>
+<div class="row g-3 mb-4">
+  {% for rischio in r.rischi %}
+  <div class="col-lg-6">
+    <div class="card h-100 severita-{{ 'baseline' if rischio.baseline else rischio.severita }}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <h3 class="h6 mb-1">{{ rischio.nome }}</h3>
+          {% if rischio.baseline %}
+          <span class="badge bg-primary">raccomandazione di base</span>
+          {% else %}
+          <span class="badge {% if rischio.severita == 'alta' %}bg-danger{% elif rischio.severita == 'media' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+            severità {{ rischio.severita }}
+          </span>
+          {% endif %}
+        </div>
+        <p class="small text-muted mb-2">{{ rischio.descrizione }}</p>
+        {% if rischio.parole_chiave %}
+        <div class="mb-2">
+          {% for kw in rischio.parole_chiave %}
+          <span class="badge bg-light text-dark border keyword-badge">{{ kw }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="small">
+          <strong>Coperture consigliate:</strong>
+          <ul class="mb-0">
+            {% for cop in rischio.coperture_consigliate %}<li>{{ cop }}</li>{% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><p class="text-muted">Nessun pericolo rilevato: arricchisci la descrizione dell'attività.</p></div>
+  {% endfor %}
+</div>
+
+<h2 class="h5 mb-3">Gap analysis rispetto alle polizze attive</h2>
+<div class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="card border-danger h-100">
+      <div class="card-header text-danger"><i class="bi bi-exclamation-triangle me-1"></i> Coperture consigliate ma SCOPERTE</div>
+      <ul class="list-group list-group-flush">
+        {% for gap in r.coperture_scoperte %}
+        <li class="list-group-item">
+          <strong>{{ gap.nome_ramo }}</strong>
+          <div class="small text-muted">Per: {{ gap.rischi | join(', ') }}</div>
+        </li>
+        {% else %}
+        <li class="list-group-item text-success">Tutte le coperture consigliate risultano già attive.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card border-success h-100">
+      <div class="card-header text-success"><i class="bi bi-shield-check me-1"></i> Coperture già in essere</div>
+      <ul class="list-group list-group-flush">
+        {% for ok in r.coperture_presenti %}
+        <li class="list-group-item">
+          <strong>{{ ok.nome_ramo }}</strong>
+          <div class="small text-muted">Copre: {{ ok.rischi | join(', ') }}</div>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">Nessuna polizza attiva copre i rami consigliati.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="alert alert-secondary small">
+  <i class="bi bi-info-circle me-1"></i>
+  Report generato automaticamente da un motore a regole: è un supporto alla consulenza,
+  non sostituisce la valutazione professionale dell'intermediario.
+</div>
+{% endblock %}

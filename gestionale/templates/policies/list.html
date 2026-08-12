@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Polizze — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-file-earmark-text me-2"></i>Polizze</h1>
+</div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-4">
+    <select class="form-select" name="ramo" onchange="this.form.submit()">
+      <option value="">Tutti i rami</option>
+      {% for value, label in policy_branches %}
+      <option value="{{ value }}" {% if ramo == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <select class="form-select" name="stato" onchange="this.form.submit()">
+      <option value="">Tutti gli stati</option>
+      {% for value, label in policy_statuses %}
+      <option value="{{ value }}" {% if stato == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-body p-0">
+    {% if polizze %}
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Cliente</th><th>Numero</th><th>Compagnia</th><th>Ramo</th><th>Premio annuo</th><th>Scadenza</th><th>Stato</th><th></th></tr></thead>
+      <tbody>
+      {% for p in polizze %}
+        <tr class="urgenza-{{ p.urgenza_scadenza if p.stato in ('attiva', 'in_rinnovo') else 'ok' }}">
+          <td><a href="{{ url_for('clients.detail', client_id=p.client_id) }}">{{ p.cliente.ragione_sociale }}</a></td>
+          <td class="fw-semibold">{{ p.numero_polizza }}</td>
+          <td>{{ p.compagnia }}</td>
+          <td class="small">{{ p.ramo_label }}</td>
+          <td>{{ p.premio_annuo | euro }}</td>
+          <td>{{ p.data_scadenza | data_it }}
+            {% if p.giorni_alla_scadenza is not none and p.stato in ('attiva', 'in_rinnovo') %}
+              {% if p.giorni_alla_scadenza < 0 %}<span class="badge bg-danger">scaduta</span>
+              {% elif p.giorni_alla_scadenza <= 30 %}<span class="badge bg-warning text-dark">{{ p.giorni_alla_scadenza }} gg</span>{% endif %}
+            {% endif %}
+          </td>
+          <td><span class="badge {% if p.stato == 'attiva' %}bg-success{% elif p.stato == 'in_rinnovo' %}bg-info text-dark{% elif p.stato == 'scaduta' %}bg-danger{% else %}bg-secondary{% endif %}">{{ p.stato_label }}</span></td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('policies.edit_policy', policy_id=p.id) }}"><i class="bi bi-pencil"></i></a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted p-4 mb-0">Nessuna polizza trovata. Le polizze si registrano dalla scheda del cliente.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

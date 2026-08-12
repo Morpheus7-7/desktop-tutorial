@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+{% block title %}{{ client.ragione_sociale }} — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 mb-1">
+      {{ client.ragione_sociale }}
+      <span class="badge {% if client.tipo == 'azienda' %}bg-primary{% else %}bg-success{% endif %}">{{ client.tipo_label }}</span>
+    </h1>
+    <div class="text-muted small">
+      {% if client.settore %}{{ client.settore }} · {% endif %}
+      {% if client.professione %}{{ client.professione }} · {% endif %}
+      {% if client.citta %}{{ client.citta }}{% if client.provincia %} ({{ client.provincia }}){% endif %}{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-primary" href="{{ url_for('clients.edit_client', client_id=client.id) }}">
+      <i class="bi bi-pencil"></i> Modifica anagrafica
+    </a>
+    <form method="post" action="{{ url_for('clients.delete_client', client_id=client.id) }}"
+          onsubmit="return confirm('Eliminare il cliente e tutti i dati collegati (polizze, documenti, follow-up)?');">
+      <button class="btn btn-outline-danger"><i class="bi bi-trash"></i> Elimina</button>
+    </form>
+  </div>
+</div>
+
+<ul class="nav nav-tabs" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-info">Anagrafica</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-polizze">Polizze <span class="badge bg-secondary">{{ client.polizze | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-documenti">Documenti <span class="badge bg-secondary">{{ client.documenti | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-followup">Follow-up <span class="badge bg-secondary">{{ client.followups | selectattr('stato', 'equalto', 'aperto') | list | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-analisi">Analisi rischi <span class="badge bg-secondary">{{ client.analisi | length }}</span></button></li>
+</ul>
+
+<div class="tab-content bg-white border border-top-0 rounded-bottom p-4">
+
+  <!-- ============ ANAGRAFICA ============ -->
+  <div class="tab-pane fade show active" id="tab-info">
+    <div class="row g-4">
+      <div class="col-md-6">
+        <h2 class="h6 text-uppercase text-muted">Dati fiscali</h2>
+        <dl class="row mb-4">
+          <dt class="col-sm-4">Partita IVA</dt><dd class="col-sm-8">{{ client.partita_iva or '—' }}</dd>
+          <dt class="col-sm-4">Codice fiscale</dt><dd class="col-sm-8">{{ client.codice_fiscale or '—' }}</dd>
+          <dt class="col-sm-4">Codice ATECO</dt><dd class="col-sm-8">{{ client.codice_ateco or '—' }}</dd>
+          <dt class="col-sm-4">Referente</dt><dd class="col-sm-8">{{ client.referente or '—' }}</dd>
+        </dl>
+        <h2 class="h6 text-uppercase text-muted">Contatti</h2>
+        <dl class="row">
+          <dt class="col-sm-4">Indirizzo</dt>
+          <dd class="col-sm-8">{{ client.indirizzo or '—' }}{% if client.cap %}, {{ client.cap }}{% endif %}
+            {% if client.citta %} {{ client.citta }}{% endif %}{% if client.provincia %} ({{ client.provincia }}){% endif %}</dd>
+          <dt class="col-sm-4">Email</dt><dd class="col-sm-8">{{ client.email or '—' }}</dd>
+          <dt class="col-sm-4">PEC</dt><dd class="col-sm-8">{{ client.pec or '—' }}</dd>
+          <dt class="col-sm-4">Telefono</dt><dd class="col-sm-8">{{ client.telefono or '—' }}</dd>
+        </dl>
+      </div>
+      <div class="col-md-6">
+        <h2 class="h6 text-uppercase text-muted">Attività</h2>
+        <dl class="row mb-3">
+          <dt class="col-sm-4">Settore</dt><dd class="col-sm-8">{{ client.settore or '—' }}</dd>
+          <dt class="col-sm-4">Professione</dt><dd class="col-sm-8">{{ client.professione or '—' }}</dd>
+          <dt class="col-sm-4">Dipendenti</dt><dd class="col-sm-8">{{ client.numero_dipendenti if client.numero_dipendenti is not none else '—' }}</dd>
+          <dt class="col-sm-4">Fatturato annuo</dt><dd class="col-sm-8">{{ client.fatturato_annuo | euro }}</dd>
+        </dl>
+        <h2 class="h6 text-uppercase text-muted">Descrizione attività</h2>
+        <p class="border rounded p-3 bg-light">{{ client.descrizione_attivita or 'Nessuna descrizione inserita: aggiungila per poter eseguire l\'analisi automatica dei rischi.' }}</p>
+        {% if client.note %}
+        <h2 class="h6 text-uppercase text-muted">Note interne</h2>
+        <p>{{ client.note }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ POLIZZE ============ -->
+  <div class="tab-pane fade" id="tab-polizze">
+    {% if client.polizze %}
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Numero</th><th>Compagnia</th><th>Ramo</th><th>Premio</th><th>Decorrenza</th><th>Scadenza</th><th>Stato</th><th></th></tr></thead>
+      <tbody>
+      {% for p in client.polizze %}
+        <tr class="urgenza-{{ p.urgenza_scadenza if p.stato in ('attiva', 'in_rinnovo') else 'ok' }}">
+          <td class="fw-semibold">{{ p.numero_polizza }}</td>
+          <td>{{ p.compagnia }}</td>
+          <td class="small">{{ p.ramo_label }}</td>
+          <td>{{ p.premio_annuo | euro }}<br><span class="small text-muted">{{ p.frazionamento }}</span></td>
+          <td>{{ p.data_decorrenza | data_it }}</td>
+          <td>{{ p.data_scadenza | data_it }}
+            {% if p.giorni_alla_scadenza is not none and p.stato in ('attiva', 'in_rinnovo') %}
+              {% if p.giorni_alla_scadenza < 0 %}<br><span class="badge bg-danger">scaduta</span>
+              {% elif p.giorni_alla_scadenza <= 30 %}<br><span class="badge bg-warning text-dark">{{ p.giorni_alla_scadenza }} gg</span>{% endif %}
+            {% endif %}
+          </td>
+          <td><span class="badge {% if p.stato == 'attiva' %}bg-success{% elif p.stato == 'in_rinnovo' %}bg-info text-dark{% elif p.stato == 'scaduta' %}bg-danger{% else %}bg-secondary{% endif %}">{{ p.stato_label }}</span></td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('policies.edit_policy', policy_id=p.id) }}"><i class="bi bi-pencil"></i></a>
+            <form class="d-inline" method="post" action="{{ url_for('policies.delete_policy', policy_id=p.id) }}"
+                  onsubmit="return confirm('Eliminare la polizza {{ p.numero_polizza }}?');">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">Nessuna polizza registrata per questo cliente.</p>
+    {% endif %}
+
+    <hr>
+    <h2 class="h6 text-uppercase text-muted">Aggiungi polizza</h2>
+    <form method="post" action="{{ url_for('policies.new_policy', client_id=client.id) }}" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Compagnia *</label>
+        <input class="form-control" name="compagnia" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Numero polizza *</label>
+        <input class="form-control" name="numero_polizza" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Ramo</label>
+        <select class="form-select" name="ramo">
+          {% for value, label in policy_branches %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Stato</label>
+        <select class="form-select" name="stato">
+          {% for value, label in policy_statuses %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Premio annuo (€)</label>
+        <input class="form-control" name="premio_annuo">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Massimale (€)</label>
+        <input class="form-control" name="massimale">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Frazionamento</label>
+        <select class="form-select" name="frazionamento">
+          {% for value, label in payment_frequencies %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Decorrenza</label>
+        <input type="date" class="form-control" name="data_decorrenza">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Scadenza</label>
+        <input type="date" class="form-control" name="data_scadenza">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="tacito_rinnovo" id="tacito">
+          <label class="form-check-label" for="tacito">Tacito rinnovo</label>
+        </div>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Note</label>
+        <input class="form-control" name="note">
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary"><i class="bi bi-plus-lg"></i> Registra polizza</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ============ DOCUMENTI ============ -->
+  <div class="tab-pane fade" id="tab-documenti">
+    {% if client.documenti %}
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Documento</th><th>Categoria</th><th>Polizza collegata</th><th>Note</th><th>Caricato il</th><th></th></tr></thead>
+      <tbody>
+      {% for d in client.documenti %}
+        <tr>
+          <td><i class="bi bi-file-earmark me-1"></i>{{ d.original_name }}</td>
+          <td><span class="badge bg-light text-dark">{{ d.categoria_label }}</span></td>
+          <td class="small">{% if d.polizza %}{{ d.polizza.numero_polizza }} ({{ d.polizza.ramo_label }}){% else %}—{% endif %}</td>
+          <td class="small">{{ d.note or '—' }}</td>
+          <td class="small">{{ d.uploaded_at.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}"><i class="bi bi-download"></i></a>
+            <form class="d-inline" method="post" action="{{ url_for('documents.delete', document_id=d.id) }}"
+                  onsubmit="return confirm('Eliminare il documento {{ d.original_name }}?');">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">Nessun documento caricato per questo cliente.</p>
+    {% endif %}
+
+    <hr>
+    <h2 class="h6 text-uppercase text-muted">Carica documento</h2>
+    <form method="post" action="{{ url_for('documents.upload', client_id=client.id) }}"
+          enctype="multipart/form-data" class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">File *</label>
+        <input type="file" class="form-control" name="file" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Categoria</label>
+        <select class="form-select" name="categoria">
+          {% for value, label in document_categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Polizza collegata</label>
+        <select class="form-select" name="policy_id">
+          <option value="">Nessuna</option>
+          {% for p in client.polizze %}<option value="{{ p.id }}">{{ p.numero_polizza }} — {{ p.ramo_label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">Note</label>
+        <input class="form-control" name="note">
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary"><i class="bi bi-upload"></i> Carica</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ============ FOLLOW-UP ============ -->
+  <div class="tab-pane fade" id="tab-followup">
+    {% if client.followups %}
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Data</th><th>Attività</th><th>Tipo</th><th>Priorità</th><th>Stato</th><th></th></tr></thead>
+      <tbody>
+      {% for f in client.followups | sort(attribute='data_scadenza') %}
+        <tr {% if f.in_ritardo %}class="urgenza-scaduta"{% endif %}>
+          <td>{{ f.data_scadenza | data_it }}{% if f.in_ritardo %}<br><span class="badge bg-danger">in ritardo</span>{% endif %}</td>
+          <td>{{ f.titolo }}{% if f.descrizione %}<br><span class="small text-muted">{{ f.descrizione }}</span>{% endif %}</td>
+          <td><span class="badge bg-light text-dark">{{ f.tipo_label }}</span></td>
+          <td><span class="badge {% if f.priorita == 'alta' %}bg-danger{% elif f.priorita == 'media' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ f.priorita }}</span></td>
+          <td><span class="badge {% if f.stato == 'aperto' %}bg-info text-dark{% elif f.stato == 'completato' %}bg-success{% else %}bg-secondary{% endif %}">{{ f.stato }}</span></td>
+          <td class="text-end text-nowrap">
+            {% if f.stato == 'aperto' %}
+            <form class="d-inline" method="post" action="{{ url_for('followups.complete', followup_id=f.id) }}">
+              <button class="btn btn-sm btn-outline-success" title="Completa"><i class="bi bi-check-lg"></i></button>
+            </form>
+            {% else %}
+            <form class="d-inline" method="post" action="{{ url_for('followups.reopen', followup_id=f.id) }}">
+              <button class="btn btn-sm btn-outline-info" title="Riapri"><i class="bi bi-arrow-counterclockwise"></i></button>
+            </form>
+            {% endif %}
+            <form class="d-inline" method="post" action="{{ url_for('followups.delete', followup_id=f.id) }}"
+                  onsubmit="return confirm('Eliminare il follow-up?');">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">Nessun follow-up per questo cliente.</p>
+    {% endif %}
+
+    <hr>
+    <h2 class="h6 text-uppercase text-muted">Pianifica follow-up</h2>
+    <form method="post" action="{{ url_for('followups.new_followup', client_id=client.id) }}" class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Titolo *</label>
+        <input class="form-control" name="titolo" required placeholder="es. Richiamare per rinnovo RC">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Tipo</label>
+        <select class="form-select" name="tipo">
+          {% for value, label in followup_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Data *</label>
+        <input type="date" class="form-control" name="data_scadenza" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Priorità</label>
+        <select class="form-select" name="priorita">
+          {% for value, label in followup_priorities %}<option value="{{ value }}" {% if value == 'media' %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">Descrizione</label>
+        <input class="form-control" name="descrizione">
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary"><i class="bi bi-plus-lg"></i> Pianifica</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ============ ANALISI RISCHI ============ -->
+  <div class="tab-pane fade" id="tab-analisi">
+    <div class="row g-4">
+      <div class="col-lg-5">
+        <h2 class="h6 text-uppercase text-muted">Esegui nuova analisi</h2>
+        <p class="small text-muted">
+          L'analisi automatica legge la descrizione dell'attività (insieme a settore,
+          professione, dipendenti e fatturato in anagrafica), individua i pericoli,
+          propone le coperture e le confronta con le polizze attive.
+        </p>
+        <form method="post" action="{{ url_for('clients.run_analysis', client_id=client.id) }}">
+          <textarea class="form-control mb-2" name="descrizione" rows="6"
+                    placeholder="Descrizione dell'attività…">{{ client.descrizione_attivita or '' }}</textarea>
+          <button class="btn btn-primary"><i class="bi bi-magic"></i> Analizza i rischi</button>
+        </form>
+      </div>
+      <div class="col-lg-7">
+        <h2 class="h6 text-uppercase text-muted">Storico analisi</h2>
+        {% if client.analisi %}
+        <table class="table table-hover align-middle">
+          <thead><tr><th>Data</th><th>Rischi rilevati</th><th>Rami scoperti</th><th></th></tr></thead>
+          <tbody>
+          {% for a in client.analisi %}
+            <tr>
+              <td>{{ a.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td>{{ a.results['sintesi']['rischi_rilevati'] }}</td>
+              <td>
+                {% if a.results['sintesi']['rami_scoperti'] %}
+                <span class="badge bg-danger">{{ a.results['sintesi']['rami_scoperti'] }}</span>
+                {% else %}<span class="badge bg-success">0</span>{% endif %}
+              </td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-primary"
+                   href="{{ url_for('clients.view_analysis', client_id=client.id, analysis_id=a.id) }}">
+                  <i class="bi bi-eye"></i> Report
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted">Nessuna analisi eseguita finora.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Apre il tab indicato nell'ancora dell'URL (es. #polizze dopo un salvataggio).
+  document.addEventListener('DOMContentLoaded', function () {
+    const map = {polizze: '#tab-polizze', documenti: '#tab-documenti', followup: '#tab-followup', analisi: '#tab-analisi'};
+    const target = map[window.location.hash.replace('#', '')];
+    if (target) {
+      const trigger = document.querySelector(`[data-bs-target="${target}"]`);
+      if (trigger) new bootstrap.Tab(trigger).show();
+    }
+  });
+</script>
+{% endblock %}

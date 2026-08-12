@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}{% if client %}Modifica cliente{% else %}Nuovo cliente{% endif %} — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">
+  <i class="bi bi-person-plus me-2"></i>
+  {% if client %}Modifica “{{ client.ragione_sociale }}”{% else %}Nuovo cliente{% endif %}
+</h1>
+
+<form method="post" class="card">
+  <div class="card-body">
+    <h2 class="h6 text-uppercase text-muted">Dati anagrafici</h2>
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <label class="form-label">Tipo cliente *</label>
+        <select class="form-select" name="tipo" id="tipo-cliente">
+          {% for value, label in client_types %}
+          <option value="{{ value }}" {% if client and client.tipo == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label">Ragione sociale / Nominativo *</label>
+        <input type="text" class="form-control" name="ragione_sociale" required
+               value="{{ client.ragione_sociale if client else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Referente</label>
+        <input type="text" class="form-control" name="referente" value="{{ client.referente or '' if client else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Partita IVA</label>
+        <input type="text" class="form-control" name="partita_iva" maxlength="11" value="{{ client.partita_iva or '' if client else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Codice fiscale</label>
+        <input type="text" class="form-control" name="codice_fiscale" maxlength="16" value="{{ client.codice_fiscale or '' if client else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Codice ATECO</label>
+        <input type="text" class="form-control" name="codice_ateco" placeholder="es. 62.01" value="{{ client.codice_ateco or '' if client else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Professione <span class="text-muted small">(per professionisti)</span></label>
+        <input type="text" class="form-control" name="professione" placeholder="es. Ingegnere civile" value="{{ client.professione or '' if client else '' }}">
+      </div>
+    </div>
+
+    <h2 class="h6 text-uppercase text-muted">Contatti e sede</h2>
+    <div class="row g-3 mb-4">
+      <div class="col-md-5">
+        <label class="form-label">Indirizzo</label>
+        <input type="text" class="form-control" name="indirizzo" value="{{ client.indirizzo or '' if client else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Città</label>
+        <input type="text" class="form-control" name="citta" value="{{ client.citta or '' if client else '' }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">CAP</label>
+        <input type="text" class="form-control" name="cap" maxlength="5" value="{{ client.cap or '' if client else '' }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Provincia</label>
+        <input type="text" class="form-control" name="provincia" maxlength="2" placeholder="MI" value="{{ client.provincia or '' if client else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-control" name="email" value="{{ client.email or '' if client else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">PEC</label>
+        <input type="email" class="form-control" name="pec" value="{{ client.pec or '' if client else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Telefono</label>
+        <input type="text" class="form-control" name="telefono" value="{{ client.telefono or '' if client else '' }}">
+      </div>
+    </div>
+
+    <h2 class="h6 text-uppercase text-muted">Attività</h2>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Settore</label>
+        <input type="text" class="form-control" name="settore" placeholder="es. Metalmeccanico, Edilizia, Studio legale…"
+               value="{{ client.settore or '' if client else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Numero dipendenti</label>
+        <input type="number" min="0" class="form-control" name="numero_dipendenti"
+               value="{{ client.numero_dipendenti if client and client.numero_dipendenti is not none else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Fatturato annuo (€)</label>
+        <input type="text" class="form-control" name="fatturato_annuo"
+               value="{{ client.fatturato_annuo if client and client.fatturato_annuo is not none else '' }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label">
+          Descrizione dell'attività
+          <span class="text-muted small">— usata dall'analisi automatica dei rischi: più è dettagliata, migliore è il risultato</span>
+        </label>
+        <textarea class="form-control" name="descrizione_attivita" rows="5"
+                  placeholder="Es.: Falegnameria con capannone di 800 mq e magazzino legname. 6 dipendenti, uso di vernici e solventi. Produzione di mobili su misura venduti anche online, consegne con furgone aziendale…">{{ client.descrizione_attivita or '' if client else '' }}</textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Note interne</label>
+        <textarea class="form-control" name="note" rows="2">{{ client.note or '' if client else '' }}</textarea>
+      </div>
+      {% if not client %}
+      <div class="col-12 form-check ms-2">
+        <input class="form-check-input" type="checkbox" name="analizza_subito" id="analizza_subito" checked>
+        <label class="form-check-label" for="analizza_subito">
+          Esegui subito l'analisi automatica dei rischi dopo il salvataggio
+        </label>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card-footer d-flex gap-2">
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Salva</button>
+    <a class="btn btn-outline-secondary"
+       href="{{ url_for('clients.detail', client_id=client.id) if client else url_for('clients.list_clients') }}">Annulla</a>
+  </div>
+</form>
+{% endblock %}

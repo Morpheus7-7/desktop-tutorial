@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Modifica polizza — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=policy.client_id) }}">{{ policy.cliente.ragione_sociale }}</a></li>
+    <li class="breadcrumb-item active">Polizza {{ policy.numero_polizza }}</li>
+  </ol>
+</nav>
+<h1 class="h3 mb-4"><i class="bi bi-pencil me-2"></i>Modifica polizza {{ policy.numero_polizza }}</h1>
+
+<form method="post" class="card">
+  <div class="card-body row g-3">
+    <div class="col-md-4">
+      <label class="form-label">Compagnia *</label>
+      <input class="form-control" name="compagnia" required value="{{ policy.compagnia }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Numero polizza *</label>
+      <input class="form-control" name="numero_polizza" required value="{{ policy.numero_polizza }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Ramo</label>
+      <select class="form-select" name="ramo">
+        {% for value, label in policy_branches %}
+        <option value="{{ value }}" {% if policy.ramo == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Premio annuo (€)</label>
+      <input class="form-control" name="premio_annuo" value="{{ policy.premio_annuo if policy.premio_annuo is not none else '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Massimale (€)</label>
+      <input class="form-control" name="massimale" value="{{ policy.massimale if policy.massimale is not none else '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Frazionamento</label>
+      <select class="form-select" name="frazionamento">
+        {% for value, label in payment_frequencies %}
+        <option value="{{ value }}" {% if policy.frazionamento == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Stato</label>
+      <select class="form-select" name="stato">
+        {% for value, label in policy_statuses %}
+        <option value="{{ value }}" {% if policy.stato == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Decorrenza</label>
+      <input type="date" class="form-control" name="data_decorrenza"
+             value="{{ policy.data_decorrenza.isoformat() if policy.data_decorrenza else '' }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Scadenza</label>
+      <input type="date" class="form-control" name="data_scadenza"
+             value="{{ policy.data_scadenza.isoformat() if policy.data_scadenza else '' }}">
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="tacito_rinnovo" id="tacito" {% if policy.tacito_rinnovo %}checked{% endif %}>
+        <label class="form-check-label" for="tacito">Tacito rinnovo</label>
+      </div>
+    </div>
+    <div class="col-12">
+      <label class="form-label">Note</label>
+      <textarea class="form-control" name="note" rows="2">{{ policy.note or '' }}</textarea>
+    </div>
+  </div>
+  <div class="card-footer d-flex gap-2">
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Salva</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('clients.detail', client_id=policy.client_id) }}#polizze">Annulla</a>
+  </div>
+</form>
+{% endblock %}
