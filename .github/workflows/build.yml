@@ -1,0 +1,56 @@
+name: Test e build
+
+on:
+  push:
+    branches:
+      - main
+      - "claude/**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Installa dipendenze
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Esegui i test
+        run: python -m pytest -q
+
+  build-windows:
+    name: Build eseguibile Windows (.exe)
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Installa dipendenze di build
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-build.txt
+      - name: Compila con PyInstaller
+        run: pyinstaller gestionale.spec --noconfirm
+      - name: Verifica che l'eseguibile esista
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist/GestionaleAssicurativo.exe")) {
+            throw "Eseguibile non trovato in dist/"
+          }
+          Get-Item "dist/GestionaleAssicurativo.exe" | Format-List Name, Length
+      - name: Carica l'eseguibile come artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GestionaleAssicurativo-windows
+          path: dist/GestionaleAssicurativo.exe
+          if-no-files-found: error

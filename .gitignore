@@ -8,6 +8,12 @@ venv/
 # Dati locali dell'applicazione (database e documenti caricati)
 instance/
 *.db
+dati_gestionale/
+
+# Build PyInstaller
+build/
+dist/
+*.manifest
 
 # Editor / sistema
 .DS_Store

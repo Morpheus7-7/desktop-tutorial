@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Impostazioni — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h3 mb-0"><i class="bi bi-gear me-2"></i>Impostazioni</h1>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header bg-white">
+        <strong><i class="bi bi-envelope-at me-1"></i> Notifiche via email</strong>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('settings.save') }}">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="email_attive"
+                   name="email_attive" {% if s.email_attive %}checked{% endif %}>
+            <label class="form-check-label" for="email_attive">
+              Invia automaticamente le notifiche via email
+            </label>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label">Server SMTP</label>
+              <input class="form-control" name="smtp_host" value="{{ s.smtp_host or '' }}"
+                     placeholder="es. smtp.gmail.com">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Porta</label>
+              <input class="form-control" name="smtp_port" type="number" value="{{ s.smtp_port or 587 }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Sicurezza</label>
+              <select class="form-select" name="smtp_security">
+                {% for val, lab in security_choices %}
+                <option value="{{ val }}" {% if s.smtp_security == val %}selected{% endif %}>{{ lab }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Controllo automatico ogni (minuti)</label>
+              <input class="form-control" name="intervallo_minuti" type="number" min="1"
+                     value="{{ s.intervallo_minuti or 30 }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Utente SMTP</label>
+              <input class="form-control" name="smtp_user" value="{{ s.smtp_user or '' }}"
+                     placeholder="di solito il tuo indirizzo email" autocomplete="username">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Password SMTP</label>
+              <input class="form-control" name="smtp_password" type="password"
+                     placeholder="{% if s.smtp_password %}•••••••• (invariata){% else %}password o app password{% endif %}"
+                     autocomplete="new-password">
+              <div class="form-text">Lascia vuoto per non modificare la password già salvata.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Mittente (From)</label>
+              <input class="form-control" name="mail_from" value="{{ s.mail_from or '' }}"
+                     placeholder="es. gestionale@tuostudio.it">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Destinatari</label>
+              <input class="form-control" name="mail_to" value="{{ s.mail_to or '' }}"
+                     placeholder="uno o più indirizzi separati da virgola">
+            </div>
+          </div>
+
+          <div class="d-flex gap-2 mt-4 flex-wrap">
+            <button class="btn btn-primary" formaction="{{ url_for('settings.save') }}">
+              <i class="bi bi-save"></i> Salva
+            </button>
+            <button class="btn btn-outline-secondary" formaction="{{ url_for('settings.test_email') }}">
+              <i class="bi bi-send-check"></i> Salva e invia email di prova
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-4">
+      <div class="card-header bg-white"><strong><i class="bi bi-send me-1"></i> Invio manuale</strong></div>
+      <div class="card-body">
+        <p class="mb-2">Notifiche in attesa di invio: <span class="badge bg-{{ 'warning text-dark' if pending else 'secondary' }}">{{ pending }}</span></p>
+        <form method="post" action="{{ url_for('settings.send_now') }}">
+          <button class="btn btn-outline-primary w-100" {% if not pending %}disabled{% endif %}>
+            <i class="bi bi-envelope-arrow-up"></i> Invia ora il riepilogo
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header bg-white"><strong><i class="bi bi-info-circle me-1"></i> Stato configurazione</strong></div>
+      <div class="card-body small">
+        <ul class="list-unstyled mb-2">
+          <li>Email automatiche:
+            {% if s.email_attive %}<span class="text-success fw-semibold">attive</span>
+            {% else %}<span class="text-muted">disattivate</span>{% endif %}</li>
+          <li>SMTP: {% if cfg.host %}<code>{{ cfg.host }}:{{ cfg.port }}</code> ({{ cfg.security|upper }})
+              {% else %}<span class="text-muted">non configurato</span>{% endif %}</li>
+          <li>Destinatari: {% if cfg.destinatari %}{{ cfg.destinatari|join(', ') }}{% else %}<span class="text-muted">nessuno</span>{% endif %}</li>
+        </ul>
+        <hr>
+        <p class="text-muted mb-1">Suggerimenti rapidi:</p>
+        <ul class="text-muted ps-3 mb-2">
+          <li>Gmail: <code>smtp.gmail.com</code>, porta 587, STARTTLS, usa una <em>App Password</em>.</li>
+          <li>Outlook/Microsoft 365: <code>smtp.office365.com</code>, porta 587, STARTTLS.</li>
+          <li>Aruba: <code>smtps.aruba.it</code>, porta 465, SSL/TLS.</li>
+        </ul>
+        <p class="text-muted mb-0">
+          Le variabili d'ambiente <code>SMTP_HOST</code>, <code>SMTP_USER</code>,
+          <code>SMTP_PASSWORD</code>, <code>MAIL_TO</code>… se impostate hanno la
+          precedenza sui valori salvati qui.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -26,13 +26,16 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('followups.list_followups') }}"><i class="bi bi-check2-square"></i> Follow-up</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('documents.list_documents') }}"><i class="bi bi-folder2-open"></i> Documenti</a></li>
       </ul>
-      <a class="btn btn-outline-light position-relative" href="{{ url_for('notifications.list_notifications') }}">
+      <a class="btn btn-outline-light position-relative me-2" href="{{ url_for('notifications.list_notifications') }}">
         <i class="bi bi-bell"></i> Notifiche
         {% if notifiche_non_lette %}
         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
           {{ notifiche_non_lette }}
         </span>
         {% endif %}
+      </a>
+      <a class="btn btn-outline-light" href="{{ url_for('settings.edit') }}" title="Impostazioni">
+        <i class="bi bi-gear"></i>
       </a>
     </div>
   </div>

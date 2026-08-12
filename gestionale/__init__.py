@@ -8,8 +8,31 @@ import os
 from datetime import date
 
 from flask import Flask
+from sqlalchemy import inspect, text
 
 from .models import db
+
+
+def _ensure_schema() -> None:
+    """Micro-migrazione per i database SQLite creati prima delle novità.
+
+    `db.create_all()` crea le tabelle mancanti ma non aggiunge colonne alle
+    tabelle già esistenti: qui aggiungiamo in modo idempotente le colonne
+    introdotte dopo il primo rilascio, così chi ha già un database non deve
+    ricrearlo.
+    """
+    inspector = inspect(db.engine)
+    if "notifications" not in inspector.get_table_names():
+        return
+    esistenti = {c["name"] for c in inspector.get_columns("notifications")}
+    nuove = {
+        "inviata_email": "ALTER TABLE notifications ADD COLUMN inviata_email BOOLEAN NOT NULL DEFAULT 0",
+        "inviata_email_at": "ALTER TABLE notifications ADD COLUMN inviata_email_at DATETIME",
+    }
+    for colonna, ddl in nuove.items():
+        if colonna not in esistenti:
+            db.session.execute(text(ddl))
+    db.session.commit()
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -36,6 +59,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        _ensure_schema()
 
     from .routes import register_blueprints
 

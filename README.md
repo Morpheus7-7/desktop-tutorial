@@ -26,7 +26,20 @@ notifiche generate in automatico.
 - **Notifiche automatiche**: generate a ogni accesso per polizze in scadenza
   (preavviso a 60/30/7 giorni e polizze scadute) e per follow-up in arrivo,
   odierni o in ritardo. Deduplicate per non ripetersi.
+- **Notifiche via email**: oltre a quelle in-app, l'applicazione può inviare in
+  automatico un **riepilogo via email** (SMTP configurabile dalla pagina
+  *Impostazioni*, con email di prova e invio manuale). Uno scheduler in
+  background controlla le scadenze a intervalli regolabili. Vedi
+  [Notifiche via email](#notifiche-via-email).
 - **Dashboard** con indicatori chiave, prossime scadenze e follow-up.
+
+## Applicazione desktop (.exe)
+
+Vuoi provarla senza installare Python? È possibile impacchettare il gestionale
+in un **eseguibile unico** (`GestionaleAssicurativo.exe` su Windows) che avvia il
+server locale e apre il browser da solo. Il modo più semplice per ottenere il
+`.exe` è la build automatica su GitHub Actions. Tutti i dettagli in
+**[PACKAGING.md](PACKAGING.md)**.
 
 ## Requisiti
 
@@ -58,21 +71,51 @@ Variabili d'ambiente supportate:
 | `DATABASE_URL`   | `sqlite:///instance/gestionale.db`   | URI del database SQLAlchemy          |
 | `UPLOAD_FOLDER`  | `instance/uploads`                   | Cartella dei documenti caricati      |
 
+### Notifiche via email
+
+Le email si configurano dalla pagina **Impostazioni** (icona ingranaggio in alto
+a destra): server SMTP, porta, sicurezza (STARTTLS/SSL), utente, password,
+mittente e destinatari. Da lì puoi **attivare l'invio automatico**, mandare
+un'**email di prova** e **inviare subito** il riepilogo delle notifiche in
+attesa. Lo scheduler in background genera le notifiche e invia un unico *digest*
+delle novità con la cadenza scelta (campo «Controllo automatico ogni N minuti»).
+
+In alternativa (o in produzione) i parametri SMTP possono arrivare da variabili
+d'ambiente, che **hanno la precedenza** su quanto salvato nel database:
+
+| Variabile        | Esempio                     | Descrizione                                   |
+|------------------|-----------------------------|-----------------------------------------------|
+| `EMAIL_ATTIVE`   | `true`                      | Attiva l'invio automatico                     |
+| `SMTP_HOST`      | `smtp.gmail.com`            | Server SMTP                                    |
+| `SMTP_PORT`      | `587`                       | Porta                                          |
+| `SMTP_SECURITY`  | `tls`                       | `tls` (STARTTLS), `ssl` oppure `none`         |
+| `SMTP_USER`      | `mario@gmail.com`           | Utente SMTP                                    |
+| `SMTP_PASSWORD`  | `app-password`              | Password (per Gmail: *App Password*)          |
+| `MAIL_FROM`      | `gestionale@studio.it`      | Indirizzo mittente                            |
+| `MAIL_TO`        | `titolare@studio.it, ...`   | Destinatari (separati da virgola)             |
+| `APP_BASE_URL`   | `http://127.0.0.1:5000`     | Base per i link «Apri scheda» nelle email     |
+
 ## Struttura
 
 ```
-app.py                     # entry point
+app.py                     # entry point (server di sviluppo)
+run_desktop.py             # avvio «desktop»: server + browser (usato dall'exe)
 seed_demo.py               # dati di esempio
+gestionale.spec            # ricetta PyInstaller per l'eseguibile
 gestionale/
-  __init__.py              # application factory, filtri e notifiche
-  models.py                # modelli e vocabolari (rami, categorie…)
+  __init__.py              # application factory, filtri e micro-migrazioni
+  models.py                # modelli e vocabolari (rami, categorie, Settings…)
   risk_engine.py           # motore di analisi automatica dei rischi
   notifications.py         # generazione notifiche da scadenze e follow-up
+  mailer.py                # invio email (SMTP stdlib) e digest notifiche
+  scheduler.py             # thread in background per l'invio automatico
   routes/                  # blueprint: main, clients, policies, documents,
-                           #            followups, notifications
+                           #            followups, notifications, settings
   templates/               # interfaccia (Bootstrap 5)
   static/style.css
-tests/test_app.py          # test (pytest)
+tests/test_app.py          # test funzionali (pytest)
+tests/test_email.py        # test notifiche email e pagina impostazioni
+.github/workflows/build.yml # CI: test + build eseguibile Windows
 ```
 
 ## Test

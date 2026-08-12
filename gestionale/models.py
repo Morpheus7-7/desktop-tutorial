@@ -269,4 +269,58 @@ class Notification(db.Model):
     link = db.Column(db.String(300))
     dedup_key = db.Column(db.String(120), unique=True, nullable=False)
     letta = db.Column(db.Boolean, default=False, nullable=False)
+    # Invio via email: la notifica viene inclusa nel prossimo digest e poi
+    # marcata come inviata (una sola email per notifica).
+    inviata_email = db.Column(db.Boolean, default=False, nullable=False)
+    inviata_email_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# Livelli di preavviso per l'ordinamento del digest (dal più urgente).
+LIVELLO_ORDINE = {"danger": 0, "warning": 1, "info": 2}
+
+
+class Settings(db.Model):
+    """Configurazione applicativa (riga singola, id=1).
+
+    Contiene i parametri SMTP e i destinatari per le notifiche via email.
+    Le impostazioni sono modificabili dalla pagina «Impostazioni»; le
+    variabili d'ambiente omonime, se presenti, hanno la precedenza a runtime
+    (utile per il deploy senza salvare la password nel database).
+    """
+
+    __tablename__ = "settings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    email_attive = db.Column(db.Boolean, default=False, nullable=False)
+    smtp_host = db.Column(db.String(200))
+    smtp_port = db.Column(db.Integer, default=587)
+    smtp_security = db.Column(db.String(10), default="tls")  # tls | ssl | none
+    smtp_user = db.Column(db.String(200))
+    smtp_password = db.Column(db.String(300))
+    mail_from = db.Column(db.String(200))
+    mail_to = db.Column(db.String(500))  # destinatari separati da virgola/;
+    intervallo_minuti = db.Column(db.Integer, default=30)  # cadenza controllo automatico
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @staticmethod
+    def get() -> "Settings":
+        """Restituisce la riga di configurazione, creandola se assente."""
+        row = db.session.get(Settings, 1)
+        if row is None:
+            row = Settings(id=1)
+            db.session.add(row)
+            db.session.commit()
+        return row
+
+    @property
+    def destinatari(self) -> list[str]:
+        if not self.mail_to:
+            return []
+        parti = self.mail_to.replace(";", ",").split(",")
+        return [p.strip() for p in parti if p.strip()]
+
+    @property
+    def configurato(self) -> bool:
+        """True se ci sono i dati minimi per inviare (host + almeno un destinatario)."""
+        return bool(self.smtp_host and self.destinatari)

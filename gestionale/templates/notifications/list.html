@@ -8,6 +8,9 @@
        href="{{ url_for('notifications.list_notifications', filtro='non_lette') }}">Da leggere</a>
     <a class="btn btn-outline-secondary {% if not solo_non_lette %}active{% endif %}"
        href="{{ url_for('notifications.list_notifications', filtro='tutte') }}">Tutte</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('settings.edit') }}" title="Configura le email">
+      <i class="bi bi-envelope-gear"></i> Email
+    </a>
     <form method="post" action="{{ url_for('notifications.mark_all_read') }}">
       <button class="btn btn-primary"><i class="bi bi-check2-all"></i> Segna tutte come lette</button>
     </form>
