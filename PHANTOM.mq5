@@ -38,15 +38,28 @@
 //|  15) Rimossi: #property strict (MQL4), input sfondo P&L         |
 //|      inutilizzati, DeletePnLLabels (dead code), logica di reset |
 //|      giornaliero duplicata in CheckMaxDrawdown.                  |
+//|                                                                  |
+//| v4.01: Impostazioni verificabili e applicate subito.            |
+//|   - Log dei parametri applicati a ogni OnInit: dopo un cambio   |
+//|     input il tab Esperti mostra i valori realmente attivi.      |
+//|   - Nuova riga "Ora server" sulla board: il filtro orario usa   |
+//|     l'ORA DEL BROKER (TimeCurrent), non quella locale del PC.   |
+//|   - Filtro orario: supporto finestre a cavallo della mezzanotte |
+//|     (es. 22:00-02:00); ore/minuti fuori range vengono limitati. |
+//|   - OnTimer 1s: filtro orario e board aggiornati anche senza    |
+//|     tick (prima, a mercato fermo, la board restava congelata    |
+//|     sui vecchi valori dopo un cambio parametri).                 |
+//|   - Linee di trading ridisegnate da zero dopo cambio parametri  |
+//|     cosi' nuovi colori/etichette si applicano immediatamente.   |
 //+------------------------------------------------------------------+
 #property copyright "PHANTOM EA"
-#property version   "4.00"
+#property version   "4.01"
 #property description "Grid Martingale EA per XAU/USD M1 con filtri ADX/Stocastico/Volumi/OBV/VWAP"
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
 
-#define EA_VERSION "4.00"
+#define EA_VERSION "4.01"
 
 CTrade        trade;
 CPositionInfo posInfo;
@@ -312,6 +325,8 @@ int OnInit()
    // dopo un cambio parametri (OnDeinit con REASON_PARAMETERS non cancella)
    _boardReady = false;
    DeleteBoardObjects();
+   DeleteTradeLines();     // le linee vengono ridisegnate col prossimo tick
+                           // usando i NUOVI colori/etichette degli input
    DrawBoard();
    _boardReady = true;
 
@@ -319,7 +334,24 @@ int OnInit()
    UpdateVWAP();
    if(RefreshIndicators()) UpdateBoard();
 
+   // Timer 1s: filtro orario e board restano aggiornati anche senza tick
+   EventSetTimer(1);
+
+   // Log dei parametri realmente attivi: dopo ogni cambio input questo
+   // blocco compare nel tab Esperti e permette di verificare che le
+   // nuove impostazioni siano state applicate
+   MqlDateTime dtNow;
+   TimeToStruct(TimeCurrent(), dtNow);
    Print("PHANTOM EA v", EA_VERSION, " avviato su ", _Symbol);
+   PrintFormat("PHANTOM: filtro orario %s - finestra %s (ORA SERVER, adesso %02d:%02d)",
+               InpTimeFilter ? "ON" : "OFF", GetTimeString(), dtNow.hour, dtNow.min);
+   PrintFormat("PHANTOM: grid %d pt x %d livelli, mult %.2f | TP first %d / basket %d pt | lotto base %.2f",
+               InpGridStep, InpMaxGridOrders, InpLotMultiplier,
+               InpTP_First, InpTP_Basket, CalcBaseLot());
+   PrintFormat("PHANTOM: protezioni - DailyLoss %.1f%% | BasketSL %.1f%% | MaxDD %.1f%% | CB %s (%d liv/%dh) | ATR max %.1f pips",
+               InpDailyLossLimit, InpBasketStopLoss, InpMaxDrawdownPct,
+               InpCB_Enabled ? "ON" : "OFF", InpCB_TriggerLevels, InpCB_PauseHours,
+               InpATR_MaxPips);
    return INIT_SUCCEEDED;
 }
 
@@ -328,6 +360,7 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+   EventKillTimer();
    // Su cambio parametri gli oggetti restano: OnInit li ricrea comunque
    // e cosi' la board non "sparisce" durante la riconfigurazione
    if(reason != REASON_PARAMETERS)
@@ -440,6 +473,23 @@ void OnTick()
 }
 
 //+------------------------------------------------------------------+
+//| EXPERT TIMER (1s)                                                |
+//| Mantiene filtro orario, stato e board aggiornati anche in        |
+//| assenza di tick (mercato fermo, spread congelato, weekend):      |
+//| senza questo, dopo un cambio parametri la board mostrava i       |
+//| vecchi valori finche' non arrivava un tick.                      |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   CheckDayReset();
+   ScanBasket();
+   CheckTimeFilter();
+   CheckCircuitBreaker();
+   SnapshotBasket();
+   UpdateBoard();
+}
+
+//+------------------------------------------------------------------+
 //| SCAN BASKET - unica scansione posizioni per tick                 |
 //+------------------------------------------------------------------+
 void ScanBasket()
@@ -548,7 +598,29 @@ datetime GetDayStart(datetime t)
 
 //+------------------------------------------------------------------+
 //| FILTRO ORARIO                                                    |
+//| Gli orari sono in ORA DEL SERVER del broker (TimeCurrent), NON   |
+//| nell'ora locale del PC: la riga "Ora server" sulla board mostra  |
+//| il riferimento usato. Supporta finestre a cavallo della          |
+//| mezzanotte (es. 22:00-02:00).                                    |
 //+------------------------------------------------------------------+
+int ClampInt(int v, int lo, int hi)
+{
+   return (v < lo) ? lo : ((v > hi) ? hi : v);
+}
+
+bool IsInTradeWindow()
+{
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   int nowMins   = dt.hour * 60 + dt.min;
+   int startMins = ClampInt(InpStartHour,0,23)*60 + ClampInt(InpStartMin,0,59);
+   int endMins   = ClampInt(InpEndHour,  0,23)*60 + ClampInt(InpEndMin,  0,59);
+
+   if(startMins == endMins) return true;                          // finestra nulla = filtro di fatto off
+   if(startMins < endMins)  return (nowMins >= startMins && nowMins < endMins);
+   return (nowMins >= startMins || nowMins < endMins);            // a cavallo della mezzanotte
+}
+
 void CheckTimeFilter()
 {
    if(!InpTimeFilter)
@@ -558,12 +630,7 @@ void CheckTimeFilter()
       return;
    }
 
-   MqlDateTime dt;
-   TimeToStruct(TimeCurrent(), dt);
-   int nowMins   = dt.hour * 60 + dt.min;
-   int startMins = InpStartHour * 60 + InpStartMin;
-   int endMins   = InpEndHour   * 60 + InpEndMin;
-   bool inWindow = (nowMins >= startMins && nowMins < endMins);
+   bool inWindow = IsInTradeWindow();
 
    if(inWindow)
    {
@@ -1427,7 +1494,7 @@ void DrawBoard()
    int lh = 14;
    int cy = y+10;
 
-   CreateRect(objPrefix+"BOARD_BG",       x, y, w, 430, CLR_BG,  CLR_BORDER);
+   CreateRect(objPrefix+"BOARD_BG",       x, y, w, 444, CLR_BG,  CLR_BORDER);
    CreateRect(objPrefix+"BOARD_TITLE_BG", x, y, w,  26, CLR_BG2, CLR_BORDER);
    CreateLabel(objPrefix+"BOARD_DIAMOND", x+10, cy, "◈",                          CLR_ACCENT, fs+2, "Arial Bold");
    CreateLabel(objPrefix+"BOARD_TITLE",   x+24, cy, "PHANTOM  EA  v"+EA_VERSION,  CLR_ACCENT, fs+1, "Arial Bold");
@@ -1475,6 +1542,7 @@ void DrawBoard()
    CreateRowLabel(objPrefix+"LBL_BSL",  x+8, cy, "Basket SL",  fs); CreateLabelRight(objPrefix+"VAL_BSL",  x+w-6, cy, "--",     CLR_MUTED, fs); cy+=lh;
    CreateRowLabel(objPrefix+"LBL_ATR",    x+8, cy, "ATR (pips)",  fs); CreateLabelRight(objPrefix+"VAL_ATR",    x+w-6, cy, "--",            CLR_GREEN, fs); cy+=lh;
    CreateRowLabel(objPrefix+"LBL_CB",     x+8, cy, "Cir.Breaker", fs); CreateLabelRight(objPrefix+"VAL_CB",     x+w-6, cy, "OFF",           CLR_MUTED, fs); cy+=lh;
+   CreateRowLabel(objPrefix+"LBL_SRVTIME",x+8, cy, "Ora server",  fs); CreateLabelRight(objPrefix+"VAL_SRVTIME",x+w-6, cy, "--:--",         CLR_TEXT,  fs); cy+=lh;
    CreateRowLabel(objPrefix+"LBL_TIME",   x+8, cy, "Orario",      fs); CreateLabelRight(objPrefix+"VAL_TIME",   x+w-6, cy, GetTimeString(), CLR_TEXT,  fs); cy+=lh;
    CreateRowLabel(objPrefix+"LBL_STATUS", x+8, cy, "Stato",       fs); CreateLabelRight(objPrefix+"VAL_STATUS", x+w-6, cy, "ATTIVO",        CLR_GREEN, fs, "Arial Bold"); cy+=lh+8;
 
@@ -1490,7 +1558,21 @@ void DrawBoard()
 void UpdateBoard()
 {
    if(!_boardReady) return;
-   if(ArraySize(adxMain)<2 || ArraySize(stochMain)<2) return;
+
+   // Ora server e stato orario: aggiornati SEMPRE, anche se gli
+   // indicatori non sono ancora pronti (es. subito dopo l'avvio)
+   bool inWin = (!InpTimeFilter || IsInTradeWindow());
+   SetLabelText(objPrefix+"VAL_SRVTIME", TimeToString(TimeCurrent(), TIME_MINUTES));
+   SetLabelColor(objPrefix+"VAL_SRVTIME", inWin ? CLR_GREEN : CLR_YELLOW);
+   SetLabelText(objPrefix+"VAL_TIME", GetTimeString());
+   SetLabelColor(objPrefix+"VAL_TIME", (!InpTimeFilter || (!timeBlocked && !closingMode)) ?
+                                        CLR_GREEN : CLR_YELLOW);
+
+   if(ArraySize(adxMain)<2 || ArraySize(stochMain)<2)
+   {
+      ChartRedraw();
+      return;
+   }
 
    double adx      = adxMain[1];
    double stoch    = stochMain[1];
@@ -1579,10 +1661,6 @@ void UpdateBoard()
       SetLabelText(objPrefix+"VAL_DD",  DoubleToString(dayMaxDrawdown,2)+"%");
       SetLabelColor(objPrefix+"VAL_DD", ddCol);
    }
-
-   SetLabelText(objPrefix+"VAL_TIME", GetTimeString());
-   SetLabelColor(objPrefix+"VAL_TIME", (!InpTimeFilter || (!timeBlocked && !closingMode)) ?
-                                        CLR_GREEN : CLR_YELLOW);
 
    if(InpBasketStopLoss > 0 && basket.count > 0)
    {

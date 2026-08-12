@@ -1,4 +1,4 @@
-# PHANTOM EA v4.00 — Descrizione della strategia
+# PHANTOM EA v4.01 — Descrizione della strategia
 
 Expert Advisor per MetaTrader 5, progettato per **XAU/USD (oro) su timeframe M1**.
 Strategia: **mean-reversion con recupero a grid martingala**, filtrata da indicatori
@@ -85,7 +85,7 @@ profitto se il prezzo ritraccia di ~10 $ dal prezzo medio di carico.
 
 | Protezione | Default | Comportamento |
 |---|---|---|
-| **Filtro orario** | 09:00–11:00 | Fuori finestra: nessun nuovo ingresso; con basket aperto entra in *closing mode* (gestisce solo l'uscita; nuovi livelli grid solo se `InpCloseModeGrid=true`) |
+| **Filtro orario** | 09:00–11:00 | Orari in **ORA DEL SERVER del broker** (riga "Ora server" sulla board come riferimento). Supporta finestre a cavallo della mezzanotte (es. 22:00–02:00). Fuori finestra: nessun nuovo ingresso; con basket aperto entra in *closing mode* (gestisce solo l'uscita; nuovi livelli grid solo se `InpCloseModeGrid=true`) |
 | **Circuit breaker** | 4 livelli → pausa 4h | Raggiunti N livelli grid, blocca i **nuovi ingressi base** per N ore. Il basket aperto continua a essere gestito normalmente |
 | **Basket Stop** | 50% | Chiude tutto il basket se il suo floating loss supera la % del balance |
 | **Daily Loss Limit** | 50% | Chiude tutto e blocca l'EA fino a domani se l'equity perde la % dal balance di inizio giorno |
@@ -116,7 +116,28 @@ profitto se il prezzo ritraccia di ~10 $ dal prezzo medio di carico.
 - **Backtest**: "Ogni tick basato su tick reali", periodi con trend forti inclusi
   (es. rally o crolli dell'oro) per stress-testare la martingala.
 
-## 8. Novità della v4.00 (riscrittura)
+## 8. Come verificare che le impostazioni siano applicate (v4.01)
+
+Dopo ogni cambio di parametri l'EA scrive nel tab **Esperti** un riepilogo dei
+valori realmente attivi (finestra oraria con l'ora server attuale, grid, TP,
+protezioni). Se dopo un cambio input il log non compare, o la board non mostra
+`v4.01` nel titolo, **sul grafico sta girando ancora la versione vecchia**:
+
+1. Rimuovere l'EA dal grafico (tasto destro → *Lista Expert* → rimuovi).
+2. Ricompilare `PHANTOM.mq5` in MetaEditor (F7) senza errori.
+3. Riagganciare l'EA al grafico e impostare i valori nella **finestra Input**.
+
+Attenzione a due trappole comuni di MT5:
+
+- **Cambiare i default nel codice non basta**: l'istanza già attaccata al
+  grafico (e lo Strategy Tester) conservano gli input impostati in precedenza
+  nella finestra proprietà. I valori vanno cambiati lì (F7 sul grafico).
+- **Il filtro orario usa l'ora del server del broker**, non quella del PC:
+  se il broker è ad esempio GMT+3 e l'Italia è GMT+2, una finestra 9–11
+  server corrisponde alle 8–10 italiane. La riga "Ora server" sulla board
+  mostra il riferimento corretto.
+
+## 9. Novità della v4.00/v4.01 (riscrittura)
 
 Correzioni di bug rispetto alla v3.80:
 
@@ -139,7 +160,18 @@ Correzioni di bug rispetto alla v3.80:
 9. **Versione unificata** (prima: 3.80 nell'header, 3.73 su board e log) e pulizia
    di input inutilizzati e dead code.
 
-## 9. Parametri principali
+E nella v4.01:
+
+10. **Log dei parametri applicati** a ogni OnInit (verifica immediata dei valori
+    attivi dopo un cambio impostazioni).
+11. **Riga "Ora server" sulla board** e timer 1s: filtro orario e board aggiornati
+    anche senza tick.
+12. **Finestre orarie a cavallo della mezzanotte** supportate; ore/minuti fuori
+    range vengono limitati automaticamente.
+13. **Linee ridisegnate da zero dopo un cambio parametri**: nuovi colori ed
+    etichette si applicano subito.
+
+## 10. Parametri principali
 
 | Gruppo | Parametro | Default | Note |
 |---|---|---|---|
