@@ -374,21 +374,41 @@
         <form method="post" action="{{ url_for('clients.run_analysis', client_id=client.id) }}">
           <textarea class="form-control mb-2" name="descrizione" rows="6"
                     placeholder="Descrizione dell'attività…">{{ client.descrizione_attivita or '' }}</textarea>
-          <button class="btn btn-primary"><i class="bi bi-magic"></i> Analizza i rischi</button>
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-primary" formaction="{{ url_for('clients.run_analysis', client_id=client.id) }}">
+              <i class="bi bi-magic"></i> Analizza (regole)
+            </button>
+            {% if ai_pronta %}
+            <button class="btn btn-outline-primary" formaction="{{ url_for('clients.run_ai_analysis', client_id=client.id) }}">
+              <i class="bi bi-stars"></i> Analizza con l'AI
+            </button>
+            {% endif %}
+          </div>
         </form>
+        {% if not ai_pronta %}
+        <p class="small text-muted mt-2">
+          <i class="bi bi-robot"></i> Vuoi un'analisi più ricca su misura del cliente?
+          Attiva l'<a href="{{ url_for('settings.edit') }}">analisi con l'AI</a> nelle impostazioni.
+        </p>
+        {% endif %}
       </div>
       <div class="col-lg-7">
         <h2 class="h6 text-uppercase text-muted">Storico analisi</h2>
         {% if client.analisi %}
         <table class="table table-hover align-middle">
-          <thead><tr><th>Data</th><th>Rischi rilevati</th><th>Rami scoperti</th><th></th></tr></thead>
+          <thead><tr><th>Data</th><th>Tipo</th><th>Rischi</th><th>Scoperte</th><th></th></tr></thead>
           <tbody>
           {% for a in client.analisi %}
             <tr>
               <td>{{ a.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td>
+                {% if a.is_ai %}<span class="badge bg-primary"><i class="bi bi-stars"></i> AI</span>
+                {% else %}<span class="badge bg-light text-dark border">Regole</span>{% endif %}
+              </td>
               <td>{{ a.results['sintesi']['rischi_rilevati'] }}</td>
               <td>
-                {% if a.results['sintesi']['rami_scoperti'] %}
+                {% if a.is_ai %}<span class="text-muted">—</span>
+                {% elif a.results['sintesi']['rami_scoperti'] %}
                 <span class="badge bg-danger">{{ a.results['sintesi']['rami_scoperti'] }}</span>
                 {% else %}<span class="badge bg-success">0</span>{% endif %}
               </td>

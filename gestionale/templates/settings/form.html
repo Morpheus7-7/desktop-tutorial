@@ -68,6 +68,42 @@
             </div>
           </div>
 
+          <hr class="my-4">
+          <h2 class="h6 mb-3"><i class="bi bi-stars me-1"></i> Analisi dei rischi con l'AI (Claude)</h2>
+          <p class="small text-muted">
+            Affianca al motore a regole un'analisi generata da Claude, su misura del cliente.
+            Richiede connessione a Internet e una chiave API Anthropic (a consumo, pochi centesimi ad analisi).
+            Il motore a regole locale resta sempre disponibile.
+          </p>
+          {% if not ai_sdk %}
+          <div class="alert alert-warning py-2 small mb-3">
+            Il pacchetto <code>anthropic</code> non è installato: esegui
+            <code>pip install anthropic</code> per usare questa funzione.
+          </div>
+          {% endif %}
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="ai_attiva"
+                   name="ai_attiva" {% if s.ai_attiva %}checked{% endif %}>
+            <label class="form-check-label" for="ai_attiva">Attiva l'analisi con l'AI</label>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Chiave API Anthropic</label>
+              <input class="form-control" name="anthropic_api_key" type="password"
+                     placeholder="{% if s.anthropic_api_key %}•••••••• (invariata){% else %}sk-ant-…{% endif %}"
+                     autocomplete="new-password">
+              <div class="form-text">Ottienila da console.anthropic.com. Lascia vuoto per non modificarla.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Modello</label>
+              <select class="form-select" name="ai_modello">
+                {% for val, lab in ai_models %}
+                <option value="{{ val }}" {% if (s.ai_modello or 'claude-opus-5') == val %}selected{% endif %}>{{ lab }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
           <div class="d-flex gap-2 mt-4 flex-wrap">
             <button class="btn btn-primary" formaction="{{ url_for('settings.save') }}">
               <i class="bi bi-save"></i> Salva
@@ -104,6 +140,10 @@
           <li>SMTP: {% if cfg.host %}<code>{{ cfg.host }}:{{ cfg.port }}</code> ({{ cfg.security|upper }})
               {% else %}<span class="text-muted">non configurato</span>{% endif %}</li>
           <li>Destinatari: {% if cfg.destinatari %}{{ cfg.destinatari|join(', ') }}{% else %}<span class="text-muted">nessuno</span>{% endif %}</li>
+          <li class="mt-1">Analisi AI:
+            {% if ai_pronta %}<span class="text-success fw-semibold">pronta</span> (<code>{{ s.ai_modello or 'claude-opus-5' }}</code>)
+            {% elif s.ai_attiva %}<span class="text-warning">attiva ma non configurata</span>
+            {% else %}<span class="text-muted">disattivata</span>{% endif %}</li>
         </ul>
         <hr>
         <p class="text-muted mb-1">Suggerimenti rapidi:</p>

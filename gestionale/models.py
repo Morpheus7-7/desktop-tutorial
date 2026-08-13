@@ -362,11 +362,16 @@ class RiskAnalysis(db.Model):
     )
     input_text = db.Column(db.Text, nullable=False)
     results_json = db.Column(db.Text, nullable=False)
+    fonte = db.Column(db.String(20), nullable=False, default="regole")  # regole | ai
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     @property
     def results(self):
         return json.loads(self.results_json)
+
+    @property
+    def is_ai(self):
+        return self.fonte == "ai"
 
 
 class Notification(db.Model):
@@ -411,6 +416,10 @@ class Settings(db.Model):
     mail_from = db.Column(db.String(200))
     mail_to = db.Column(db.String(500))  # destinatari separati da virgola/;
     intervallo_minuti = db.Column(db.Integer, default=30)  # cadenza controllo automatico
+    # Analisi assistita da AI (Claude) — opzionale, richiede connessione.
+    ai_attiva = db.Column(db.Boolean, default=False, nullable=False)
+    anthropic_api_key = db.Column(db.String(200))
+    ai_modello = db.Column(db.String(60), default="claude-opus-5")
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     @staticmethod

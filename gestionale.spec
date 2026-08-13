@@ -41,8 +41,10 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     # L'app usa solo ssl/smtplib della stdlib: il pacchetto cryptography non
-    # serve. Escluderlo alleggerisce il bundle ed evita hook superflui.
-    excludes=["tkinter", "cryptography"],
+    # serve. anthropic (analisi AI) richiede comunque Internet: lo escludiamo
+    # per mantenere l'eseguibile leggero e offline — l'analisi AI è disponibile
+    # avviando con `python run_desktop.py`. Escluderli evita anche hook superflui.
+    excludes=["tkinter", "cryptography", "anthropic", "pydantic", "pydantic_core"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

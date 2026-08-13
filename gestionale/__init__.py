@@ -43,6 +43,14 @@ def _ensure_schema() -> None:
             "policy_id": "ALTER TABLE followups ADD COLUMN policy_id INTEGER",
             "auto_generato": "ALTER TABLE followups ADD COLUMN auto_generato BOOLEAN NOT NULL DEFAULT 0",
         },
+        "risk_analyses": {
+            "fonte": "ALTER TABLE risk_analyses ADD COLUMN fonte VARCHAR(20) NOT NULL DEFAULT 'regole'",
+        },
+        "settings": {
+            "ai_attiva": "ALTER TABLE settings ADD COLUMN ai_attiva BOOLEAN NOT NULL DEFAULT 0",
+            "anthropic_api_key": "ALTER TABLE settings ADD COLUMN anthropic_api_key VARCHAR(200)",
+            "ai_modello": "ALTER TABLE settings ADD COLUMN ai_modello VARCHAR(60)",
+        },
     }
 
     cambiato = False
@@ -108,7 +116,17 @@ def create_app(test_config: dict | None = None) -> Flask:
         from .models import Notification
 
         unread = Notification.query.filter_by(letta=False).count()
-        return {"notifiche_non_lette": unread, "oggi": date.today()}
+        try:
+            from .ai_analysis import ai_disponibile
+
+            ai_pronta = ai_disponibile()
+        except Exception:  # noqa: BLE001
+            ai_pronta = False
+        return {
+            "notifiche_non_lette": unread,
+            "oggi": date.today(),
+            "ai_pronta": ai_pronta,
+        }
 
     @app.before_request
     def refresh_notifications():

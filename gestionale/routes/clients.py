@@ -187,12 +187,48 @@ def run_analysis(client_id):
     )
 
 
+@bp.route("/<int:client_id>/analisi-ai", methods=["POST"])
+def run_ai_analysis(client_id):
+    from ..ai_analysis import analizza_cliente_ai
+
+    client = db.get_or_404(Client, client_id)
+    testo = request.form.get("descrizione") or client.descrizione_attivita
+    if not testo or not testo.strip():
+        flash("Inserisci prima una descrizione dell'attività per l'analisi AI.", "warning")
+        return redirect(url_for("clients.detail", client_id=client.id) + "#analisi")
+
+    if request.form.get("descrizione"):
+        client.descrizione_attivita = testo.strip()
+        db.session.commit()
+
+    try:
+        results = analizza_cliente_ai(client, testo)
+    except RuntimeError as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("clients.detail", client_id=client.id) + "#analisi")
+
+    analysis = RiskAnalysis(
+        client_id=client.id,
+        input_text=testo.strip(),
+        results_json=json.dumps(results, ensure_ascii=False),
+        fonte="ai",
+    )
+    db.session.add(analysis)
+    db.session.commit()
+    flash(
+        f"Analisi AI completata ({results['sintesi']['rischi_rilevati']} rischi individuati).",
+        "success",
+    )
+    return redirect(
+        url_for("clients.view_analysis", client_id=client.id, analysis_id=analysis.id)
+    )
+
+
 @bp.route("/<int:client_id>/analisi/<int:analysis_id>")
 def view_analysis(client_id, analysis_id):
     client = db.get_or_404(Client, client_id)
     analysis = db.get_or_404(RiskAnalysis, analysis_id)
     if analysis.client_id != client.id:
         abort(404)
-    return render_template(
-        "clients/analysis.html", client=client, analysis=analysis
-    )
+    template = "clients/analysis_ai.html" if analysis.is_ai else "clients/analysis.html"
+    return render_template(template, client=client, analysis=analysis)
