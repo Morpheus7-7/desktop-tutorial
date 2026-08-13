@@ -37,6 +37,7 @@ def _populate_from_form(policy: Policy, form) -> None:
     policy.ramo = form.get("ramo", "altro")
     policy.massimale = _parse_float(form.get("massimale"))
     policy.premio_annuo = _parse_float(form.get("premio_annuo"))
+    policy.provvigione_perc = _parse_float(form.get("provvigione_perc"))
     policy.frazionamento = form.get("frazionamento", "annuale")
     policy.data_decorrenza = _parse_date(form.get("data_decorrenza"))
     policy.data_scadenza = _parse_date(form.get("data_scadenza"))

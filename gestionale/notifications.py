@@ -4,12 +4,70 @@ Le notifiche vengono generate a partire dai dati (scadenze polizze e
 follow-up) a ogni richiesta: la chiave di deduplicazione garantisce che
 ogni evento produca una sola notifica per fascia di preavviso.
 """
-from datetime import date
+from datetime import date, timedelta
 
 from .models import FollowUp, Notification, Policy, db
 
 # Fasce di preavviso per le scadenze polizza (giorni prima della scadenza).
 POLICY_REMINDER_BUCKETS = [60, 30, 7]
+
+# Automazione rinnovi: quanti giorni prima della scadenza creare il follow-up
+# e con quale anticipo datarlo.
+RENEWAL_LEAD_DAYS = 45
+RENEWAL_FOLLOWUP_OFFSET = 15
+
+
+def auto_create_renewal_followups() -> int:
+    """Crea in automatico i follow-up di rinnovo per le polizze in scadenza.
+
+    Genera un solo follow-up per ciascun ciclo di scadenza (deduplicato sulla
+    data): quando la polizza viene rinnovata e la scadenza spostata in avanti,
+    al ciclo successivo ne verrà creato uno nuovo.
+    """
+    today = date.today()
+    limite = today + timedelta(days=RENEWAL_LEAD_DAYS)
+    created = 0
+
+    polizze = (
+        Policy.query.filter(
+            Policy.stato.in_(["attiva", "in_rinnovo"]),
+            Policy.data_scadenza.isnot(None),
+            Policy.data_scadenza >= today,
+            Policy.data_scadenza <= limite,
+        )
+        .all()
+    )
+    for policy in polizze:
+        target = policy.data_scadenza - timedelta(days=RENEWAL_FOLLOWUP_OFFSET)
+        if target < today:
+            target = today
+        gia_presente = (
+            FollowUp.query.filter_by(
+                policy_id=policy.id, tipo="rinnovo", auto_generato=True, data_scadenza=target
+            ).first()
+        )
+        if gia_presente:
+            continue
+        db.session.add(
+            FollowUp(
+                client_id=policy.client_id,
+                policy_id=policy.id,
+                tipo="rinnovo",
+                titolo=f"Rinnovo polizza {policy.numero_polizza} ({policy.ramo_label})",
+                descrizione=(
+                    f"Follow-up generato automaticamente: la polizza scade il "
+                    f"{policy.data_scadenza.strftime('%d/%m/%Y')}. Contattare il cliente per il rinnovo."
+                ),
+                data_scadenza=target,
+                priorita="alta",
+                auto_generato=True,
+            )
+        )
+        created += 1
+
+    if created:
+        db.session.commit()
+    return created
 
 
 def _add(tipo: str, livello: str, messaggio: str, link: str, dedup_key: str) -> bool:

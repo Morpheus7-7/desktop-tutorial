@@ -240,7 +240,231 @@ BASELINE_BY_TYPE = {
             "coperture": ["Tutela legale professionale"],
         },
     ],
+    "dipendente": [
+        {
+            "id": "infortuni_base",
+            "nome": "Infortuni 24 ore (anche extra-lavoro)",
+            "descrizione": "Il reddito della famiglia dipende dalla persona: un infortunio anche nel tempo libero può azzerarlo. L'INAIL copre solo l'ambito lavorativo.",
+            "rami": ["infortuni"],
+            "coperture": ["Infortuni 24h con diaria da ricovero e invalidità permanente"],
+        },
+        {
+            "id": "malattia_base",
+            "nome": "Salute e rimborso spese mediche",
+            "descrizione": "Liste d'attesa lunghe nel pubblico: una polizza salute dà accesso rapido a visite e interventi.",
+            "rami": ["malattia"],
+            "coperture": ["Rimborso spese mediche / diaria da ricovero"],
+        },
+        {
+            "id": "vita_base",
+            "nome": "Tutela del reddito familiare (TCM)",
+            "descrizione": "In caso di premorienza del percettore di reddito, una temporanea caso morte protegge mutuo e tenore di vita della famiglia.",
+            "rami": ["vita"],
+            "coperture": ["Temporanea caso morte a copertura del mutuo/famiglia"],
+        },
+        {
+            "id": "rc_capofamiglia_base",
+            "nome": "RC Capofamiglia",
+            "descrizione": "Danni involontari causati a terzi nella vita privata dai membri della famiglia (anche figli e animali domestici).",
+            "rami": ["rc_capofamiglia"],
+            "coperture": ["RC della vita privata / capofamiglia"],
+        },
+        {
+            "id": "tutela_legale_base",
+            "nome": "Tutela legale privata",
+            "descrizione": "Spese legali per controversie di lavoro, condominiali, di consumo o con la P.A.",
+            "rami": ["tutela_legale"],
+            "coperture": ["Tutela legale della famiglia"],
+        },
+    ],
 }
+
+# ----------------------------------------------------------------------
+# Spunti di trattativa per ramo: pensiero laterale + esempio in terza
+# persona + i vantaggi da portare in trattativa. Servono a supportare
+# l'intermediario nella vendita consulenziale della copertura.
+# ----------------------------------------------------------------------
+TRATTATIVA = {
+    "incendio": {
+        "leva": "Non è «se» accade, ma «quanto costa» se accade: l'incendio è l'evento che più spesso chiude un'impresa che non era coperta.",
+        "esempio": "Un imprenditore era convinto che «tanto ho gli estintori». Dopo un corto circuito di notte ha perso capannone e magazzino: senza polizza avrebbe chiuso, con la copertura ha riaperto in sei mesi.",
+        "pro": [
+            "Ricostruisce fabbricato, macchinari e merci a valore a nuovo",
+            "Con la garanzia «danni indiretti» copre anche il fermo attività",
+            "Premio spesso inferiore all'1% del valore assicurato",
+        ],
+    },
+    "furto": {
+        "leva": "Il danno del furto non è solo la merce rubata: è la vetrina sfondata, i giorni di chiusura e i clienti persi.",
+        "esempio": "Una titolare di negozio pensava bastasse l'allarme. Dopo una spaccata notturna ha pagato di tasca propria vetrina e riparazioni: più del premio di tre anni di polizza.",
+        "pro": [
+            "Copre merci, attrezzature e valori, oltre ai guasti da effrazione",
+            "Estendibile a rapina e portavalori",
+            "Riduce l'esposizione proprio nei periodi di magazzino pieno",
+        ],
+    },
+    "rct_rco": {
+        "leva": "Basta un cliente che scivola o un dipendente che si infortuna per trasformare un'attività sana in una causa da centinaia di migliaia di euro.",
+        "esempio": "Un ristoratore ha avuto un cliente caduto per un pavimento bagnato: risarcimento e spese legali sarebbero stati insostenibili, la RCT ha coperto tutto.",
+        "pro": [
+            "Protegge il patrimonio dell'impresa e del titolare",
+            "L'estensione RCO copre la rivalsa INAIL e il danno differenziale sui dipendenti",
+            "Richiesta di fatto da molti clienti e committenti",
+        ],
+    },
+    "rc_professionale": {
+        "leva": "La competenza non basta: un errore o una semplice contestazione può costare la parcella moltiplicata per dieci. Per molti ordini è anche un obbligo di legge.",
+        "esempio": "Un progettista ha ricevuto una richiesta danni per un ritardo non dipeso da lui: la RC professionale ha pagato l'avvocato e la difesa, evitando un esborso enorme.",
+        "pro": [
+            "Copertura obbligatoria per le professioni ordinistiche",
+            "Include la difesa legale, non solo il risarcimento",
+            "Con la retroattività copre anche gli incarichi già svolti",
+        ],
+    },
+    "cyber": {
+        "leva": "«A me non capita» è la frase che precede un attacco. Oggi il rischio non è più solo delle grandi aziende: i ransomware colpiscono soprattutto le PMI, meno difese.",
+        "esempio": "Uno studio si è ritrovato i file criptati e i dati dei clienti bloccati: senza cyber avrebbe pagato il riscatto e rischiato una sanzione GDPR; con la polizza ha avuto assistenza tecnica e legale immediata.",
+        "pro": [
+            "Copre ripristino dati, interruzione dell'attività e danni a terzi",
+            "Include la gestione della violazione e gli obblighi GDPR",
+            "Mette a disposizione tecnici e legali h24, non solo un rimborso",
+        ],
+    },
+    "rc_prodotti": {
+        "leva": "La responsabilità sul prodotto ti segue anche dopo la vendita: un difetto scoperto tra un anno è comunque un tuo problema.",
+        "esempio": "Un produttore alimentare ha dovuto ritirare un lotto per un'etichetta errata: la RC prodotti ha coperto ritiro e richieste dei clienti, salvando il rapporto con la grande distribuzione.",
+        "pro": [
+            "Copre i danni causati dal prodotto dopo la consegna",
+            "Estendibile alle spese di ritiro del prodotto (recall)",
+            "Spesso richiesta da clienti esteri e dalla GDO",
+        ],
+    },
+    "trasporti": {
+        "leva": "Finché la merce viaggia, il rischio è tuo: un tamponamento o un furto sul furgone è una perdita secca se non è coperta.",
+        "esempio": "Un corriere ha avuto un carico danneggiato in un incidente: la polizza trasporti ha rimborsato il valore, evitando la contestazione del committente.",
+        "pro": [
+            "Copre le merci proprie o di terzi durante il trasporto",
+            "Adattabile a giacenza, carico/scarico e consegne",
+            "Rassicura i committenti sulla continuità del servizio",
+        ],
+    },
+    "auto": {
+        "leva": "La RCA è obbligatoria, ma il vero buco è il conducente: se il dipendente si fa male alla guida, chi lo risarcisce?",
+        "esempio": "Un'azienda con rete commerciale ha coperto i propri agenti con infortuni del conducente e kasko missione: dopo un incidente il collaboratore è stato tutelato e l'auto riparata subito.",
+        "pro": [
+            "Gestione unica della flotta con scadenze allineate",
+            "Kasko e infortuni conducente per chi guida per lavoro",
+            "Riduce i fermi e i contenziosi interni",
+        ],
+    },
+    "rc_ambientale": {
+        "leva": "Un danno ambientale non si «ripara» con due parole: la bonifica è obbligatoria per legge e i costi sono spesso a sei cifre.",
+        "esempio": "Un'azienda ha avuto uno sversamento accidentale da un serbatoio: la RC inquinamento ha coperto la bonifica del suolo imposta dall'autorità.",
+        "pro": [
+            "Copre bonifica e danni ambientali (D.Lgs. 152/2006)",
+            "Include le spese di prevenzione e ripristino",
+            "Protegge da sanzioni e richieste di terzi",
+        ],
+    },
+    "guasti_macchine": {
+        "leva": "Se si ferma la macchina chiave, non perdi solo la riparazione: perdi la produzione di quei giorni e magari un ordine.",
+        "esempio": "Un'officina ha avuto il guasto del centro di lavoro CNC: la polizza ha coperto riparazione e mancata produzione, evitando la penale sull'ordine in corso.",
+        "pro": [
+            "Copre guasti a macchinari, impianti ed elettronica",
+            "Con i danni indiretti ristora il fermo attività",
+            "Trasforma un fermo imprevisto in un costo pianificato",
+        ],
+    },
+    "do": {
+        "leva": "L'amministratore risponde con il patrimonio personale: casa e conti compresi. Non serve aver sbagliato, basta essere citati.",
+        "esempio": "Un consigliere è stato chiamato in causa dai soci per una scelta gestionale: la D&O ha pagato la sua difesa, separando il rischio d'impresa da quello personale.",
+        "pro": [
+            "Protegge il patrimonio personale di amministratori e sindaci",
+            "Copre le spese legali fin dalla prima contestazione",
+            "Rende la carica più attrattiva per manager e consiglieri",
+        ],
+    },
+    "cauzioni": {
+        "leva": "Senza fideiussione non partecipi alla gara: la cauzione non è un costo, è la chiave d'ingresso al lavoro.",
+        "esempio": "Un'impresa edile ha ottenuto la cauzione provvisoria in giornata e si è aggiudicata l'appalto: senza garanzia sarebbe rimasta fuori.",
+        "pro": [
+            "Sblocca la partecipazione a gare e appalti",
+            "Non immobilizza liquidità come un deposito cauzionale",
+            "Costruisce uno storico utile per garanzie future",
+        ],
+    },
+    "credito": {
+        "leva": "Vendere è facile, incassare no: basta un cliente importante che salta per mettere in crisi tutta la cassa.",
+        "esempio": "Un fornitore B2B ha avuto un cliente insolvente per un ordine rilevante: l'assicurazione del credito ha rimborsato la fattura, evitando la crisi di liquidità.",
+        "pro": [
+            "Indennizza le fatture rimaste insolute",
+            "Fornisce una valutazione preventiva dell'affidabilità dei clienti",
+            "Protegge il margine e il rapporto con la banca",
+        ],
+    },
+    "catastrofali": {
+        "leva": "Ormai è un obbligo di legge per le imprese, ma è anche buon senso: alluvioni e frane non sono più eventi rari.",
+        "esempio": "Un capannone allagato ha bloccato la produzione per settimane: chi aveva la copertura catastrofale ha ricostruito, gli altri hanno atteso ristori pubblici incerti.",
+        "pro": [
+            "Adempie all'obbligo di legge (L. 213/2023) per le imprese",
+            "Copre sisma, alluvione e frana su beni strumentali",
+            "Mette al riparo da eventi sempre più frequenti",
+        ],
+    },
+    "infortuni": {
+        "leva": "Il vero patrimonio è la capacità di produrre reddito: un infortunio la può azzerare in un istante, anche fuori dal lavoro.",
+        "esempio": "Un professionista si è fratturato una mano sciando: fermo due mesi, senza incassi. La polizza infortuni gli ha garantito una diaria che ha coperto le spese fisse.",
+        "pro": [
+            "Opera 24 ore su 24, anche nel tempo libero",
+            "Diaria da ricovero e capitale per invalidità permanente",
+            "Tutela il reddito di chi non ha un datore di lavoro alle spalle",
+        ],
+    },
+    "malattia": {
+        "leva": "Le liste d'attesa del pubblico si allungano: pagare per curarsi in tempo è già una realtà per molte famiglie.",
+        "esempio": "Una persona ha potuto anticipare un intervento importante rivolgendosi al privato: la polizza salute ha rimborsato la spesa che altrimenti avrebbe pagato per intero.",
+        "pro": [
+            "Accesso rapido a visite, esami e interventi",
+            "Rimborso spese mediche e diaria da ricovero",
+            "Estendibile a tutto il nucleo familiare",
+        ],
+    },
+    "vita": {
+        "leva": "È la copertura che nessuno vuole nominare, ma è quella che tiene in piedi la famiglia nel momento peggiore.",
+        "esempio": "Alla scomparsa del principale percettore di reddito, la temporanea caso morte ha estinto il mutuo: la famiglia ha potuto restare nella propria casa.",
+        "pro": [
+            "Protegge mutuo e tenore di vita dei familiari",
+            "Premi contenuti per capitali elevati (temporanea)",
+            "Possibili benefici fiscali sui premi versati",
+        ],
+    },
+    "rc_capofamiglia": {
+        "leva": "Un danno involontario a un terzo nella vita di tutti i giorni — un figlio, il cane, una perdita d'acqua al vicino — lo paghi tu, spesso a caro prezzo.",
+        "esempio": "Il figlio di un assicurato ha danneggiato l'auto di un passante giocando: la RC capofamiglia ha risarcito il terzo, evitando una spesa e un litigio.",
+        "pro": [
+            "Copre i danni a terzi di tutto il nucleo familiare",
+            "Include figli minori e animali domestici",
+            "Premio molto basso a fronte di risarcimenti potenzialmente alti",
+        ],
+    },
+    "tutela_legale": {
+        "leva": "Avere ragione non basta: senza qualcuno che paghi l'avvocato, spesso conviene rinunciare. La tutela legale ribalta questo calcolo.",
+        "esempio": "Un cliente ha avuto una controversia con un fornitore: la tutela legale ha coperto avvocato e perizia, permettendogli di far valere le proprie ragioni fino in fondo.",
+        "pro": [
+            "Paga spese legali, peritali e di giudizio",
+            "Mette a disposizione consulenza legale telefonica",
+            "Consente di difendersi senza pensare ai costi",
+        ],
+    },
+}
+
+
+def trattativa_for(rami: list[str]) -> dict | None:
+    """Restituisce lo spunto di trattativa per il primo ramo che ne ha uno."""
+    for ramo in rami:
+        if ramo in TRATTATIVA:
+            return {"ramo": ramo, **TRATTATIVA[ramo]}
+    return None
 
 
 def _normalize(text: str) -> str:
@@ -300,6 +524,7 @@ def analyze_risks(
                     "parole_chiave": matched,
                     "rami": rule["rami"],
                     "coperture_consigliate": rule["coperture"],
+                    "trattativa": trattativa_for(rule["rami"]),
                     "baseline": False,
                 }
             )
@@ -322,6 +547,7 @@ def analyze_risks(
                 "parole_chiave": [],
                 "rami": base["rami"],
                 "coperture_consigliate": base["coperture"],
+                "trattativa": trattativa_for(base["rami"]),
                 "baseline": True,
             }
         )
@@ -339,7 +565,11 @@ def analyze_risks(
             "nome_ramo": BRANCH_LABELS.get(branch, branch),
             "rischi": risk_names,
         }
-        (covered if branch in active_branches else uncovered).append(entry)
+        if branch in active_branches:
+            covered.append(entry)
+        else:
+            entry["trattativa"] = trattativa_for([branch])
+            uncovered.append(entry)
 
     return {
         "generata_il": datetime.utcnow().isoformat(timespec="seconds"),

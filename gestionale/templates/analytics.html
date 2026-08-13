@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Statistiche — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h3 mb-0"><i class="bi bi-bar-chart-line me-2"></i>Statistiche di portafoglio</h1>
+  <button class="btn btn-outline-secondary no-print" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+</div>
+
+<!-- KPI principali -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card accent-primary h-100"><div class="card-body">
+      <i class="bi bi-file-earmark-text stat-icon"></i>
+      <div class="text-muted small">Polizze attive</div>
+      <div class="display-6">{{ totale_polizze }}</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card accent-info h-100"><div class="card-body">
+      <i class="bi bi-cash-coin stat-icon"></i>
+      <div class="text-muted small">Premi annui</div>
+      <div class="h4 mt-2 mb-0">{{ premi_totali | euro }}</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card accent-success h-100"><div class="card-body">
+      <i class="bi bi-wallet2 stat-icon"></i>
+      <div class="text-muted small">Provvigioni stimate</div>
+      <div class="h4 mt-2 mb-0">{{ provvigioni_totali | euro }}</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card accent-warning h-100"><div class="card-body">
+      <i class="bi bi-funnel stat-icon"></i>
+      <div class="text-muted small">Valore pipeline aperta</div>
+      <div class="h4 mt-2 mb-0">{{ pipeline | sum(attribute='valore') | euro }}</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Portafoglio per ramo -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-pie-chart me-1"></i> Premi per ramo</div>
+      <div class="card-body">
+        {% if rami %}
+        {% for r in rami %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between small">
+            <span>{{ r.nome }} <span class="text-muted">· {{ r.numero }} pol.</span></span>
+            <span class="fw-semibold">{{ r.premi | euro }}</span>
+          </div>
+          <div class="progress mt-1" style="height: 10px;">
+            <div class="progress-bar" role="progressbar"
+                 style="width: {{ (100 * r.premi / premi_max) if premi_max else 0 }}%; background: var(--ga-primary-2);"></div>
+          </div>
+          {% if r.provvigioni %}<div class="small text-success">Provvigioni: {{ r.provvigioni | euro }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="text-muted mb-0">Nessuna polizza attiva da analizzare.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Clienti per tipo + Pipeline -->
+  <div class="col-lg-5">
+    <div class="card mb-4">
+      <div class="card-header"><i class="bi bi-people me-1"></i> Clienti per tipo</div>
+      <div class="card-body">
+        {% set tot_clienti = clienti_per_tipo | sum(attribute='n') %}
+        {% for c in clienti_per_tipo %}
+        <div class="mb-2">
+          <div class="d-flex justify-content-between small"><span>{{ c.tipo }}</span><span class="fw-semibold">{{ c.n }}</span></div>
+          <div class="progress mt-1" style="height: 8px;">
+            <div class="progress-bar bg-secondary" style="width: {{ (100 * c.n / tot_clienti) if tot_clienti else 0 }}%;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-funnel me-1"></i> Pipeline commerciale</span>
+        <a class="small" href="{{ url_for('opportunities.board') }}">Apri pipeline</a>
+      </div>
+      <div class="card-body">
+        {% for f in pipeline %}
+        <div class="mb-2">
+          <div class="d-flex justify-content-between small">
+            <span>{{ f.label }}</span>
+            <span><span class="fw-semibold">{{ f.numero }}</span>{% if f.valore %} · {{ f.valore | euro }}{% endif %}</span>
+          </div>
+          <div class="progress mt-1" style="height: 8px;">
+            <div class="progress-bar {% if f.fase == 'vinta' %}bg-success{% elif f.fase == 'persa' %}bg-danger{% else %}bg-info{% endif %}"
+                 style="width: {{ (100 * f.numero / pipeline_max) if pipeline_max else 0 }}%;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Premi in scadenza per mese -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-calendar3 me-1"></i> Premi in scadenza nei prossimi 12 mesi</div>
+      <div class="card-body">
+        <div class="d-flex align-items-end gap-2" style="height: 180px;">
+          {% for m in mesi %}
+          <div class="text-center flex-fill d-flex flex-column justify-content-end" style="min-width: 0;">
+            <div class="small text-muted mb-1" style="font-size:.7rem;">{{ (m.premi/1000)|round(1) if m.premi else '' }}{{ 'k' if m.premi else '' }}</div>
+            <div class="mx-auto rounded-top" title="{{ m.premi | euro }}"
+                 style="width: 60%; background: var(--ga-primary-2); height: {{ (100 * m.premi / mesi_max)|round(1) if mesi_max else 0 }}%; min-height: 2px;"></div>
+            <div class="small text-muted mt-1" style="font-size:.7rem;">{{ m.label }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="text-muted small mt-3">
+  <i class="bi bi-info-circle me-1"></i>
+  Le provvigioni sono stimate dalla percentuale impostata su ciascuna polizza; il valore della pipeline usa il premio stimato delle opportunità aperte.
+</p>
+{% endblock %}

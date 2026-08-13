@@ -32,6 +32,11 @@
       <input class="form-control" name="premio_annuo" value="{{ policy.premio_annuo if policy.premio_annuo is not none else '' }}">
     </div>
     <div class="col-md-3">
+      <label class="form-label">Provvigione %</label>
+      <input class="form-control" name="provvigione_perc" placeholder="es. 15"
+             value="{{ policy.provvigione_perc if policy.provvigione_perc is not none else '' }}">
+    </div>
+    <div class="col-md-3">
       <label class="form-label">Massimale (€)</label>
       <input class="form-control" name="massimale" value="{{ policy.massimale if policy.massimale is not none else '' }}">
     </div>

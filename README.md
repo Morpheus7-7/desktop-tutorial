@@ -8,20 +8,33 @@ notifiche generate in automatico.
 
 ## Funzionalità
 
-- **Anagrafica clienti** (aziende e professionisti): dati fiscali, contatti,
-  sede, settore, dipendenti, fatturato e descrizione dettagliata dell'attività.
-- **Polizze**: compagnia, ramo, massimale, premio, frazionamento, decorrenza,
-  scadenza, tacito rinnovo e stato; oltre 20 rami precompilati.
-- **Archivio documenti**: caricamento e download di file (polizze, preventivi,
-  visure, documenti d'identità, sinistri, GDPR…), collegabili a una polizza.
+- **Anagrafica clienti** — aziende, professionisti **e lavoratori dipendenti**
+  (con datore di lavoro e mansione): dati fiscali, contatti, sede, settore,
+  dipendenti, fatturato e descrizione dettagliata dell'attività. Il form adatta
+  i campi al tipo di cliente selezionato.
+- **Polizze**: compagnia, ramo, massimale, premio, **percentuale di provvigione**,
+  frazionamento, decorrenza, scadenza, tacito rinnovo e stato; oltre 20 rami
+  precompilati.
+- **Archivio documenti**: caricamento **multiplo con drag & drop**, download ed
+  eliminazione di file (polizze, preventivi, visure, sinistri, GDPR…), con
+  dimensione e icona per tipo, collegabili a una polizza.
 - **Analisi automatica dei rischi**: un motore a regole in italiano legge la
   descrizione dell'attività (più i dati di anagrafica) e produce:
   - i **pericoli rilevati** con severità e parole chiave che li hanno attivati;
   - le **coperture consigliate** per ciascun pericolo;
-  - la **gap analysis** tra coperture consigliate e polizze già attive
-    (scoperte vs. presenti). Ogni analisi è salvata nello storico ed è stampabile.
-- **Follow-up**: attività con scadenza, tipo e priorità (chiamate, rinnovi,
-  preventivi, raccolta documenti, gestione sinistri…).
+  - per ogni copertura uno **spunto di trattativa** con pensiero laterale,
+    esempio in terza persona e vantaggi da portare in trattativa;
+  - la **gap analysis** tra coperture consigliate e polizze già attive, con la
+    possibilità di trasformare una copertura scoperta in un'**opportunità** con
+    un clic. Ogni analisi è salvata nello storico ed è stampabile.
+- **Pipeline commerciale (opportunità)**: gestione delle opportunità di vendita
+  a fasi in stile CRM (lead → contatto → preventivo → trattativa → vinta/persa),
+  con premio e provvigione stimati, alimentabile direttamente dai gap di copertura.
+- **Statistiche di portafoglio**: cruscotto con premi e provvigioni per ramo,
+  clienti per tipo, valore della pipeline e premi in scadenza nei 12 mesi.
+- **Ricerca globale** di clienti e polizze dalla barra in alto.
+- **Follow-up**: attività con scadenza, tipo e priorità; i **follow-up di
+  rinnovo** vengono generati automaticamente prima della scadenza delle polizze.
 - **Scadenzario** unificato di polizze e follow-up, con evidenza delle urgenze.
 - **Notifiche automatiche**: generate a ogni accesso per polizze in scadenza
   (preavviso a 60/30/7 giorni e polizze scadute) e per follow-up in arrivo,
@@ -109,10 +122,12 @@ gestionale/
   notifications.py         # generazione notifiche da scadenze e follow-up
   mailer.py                # invio email (SMTP stdlib) e digest notifiche
   scheduler.py             # thread in background per l'invio automatico
-  routes/                  # blueprint: main, clients, policies, documents,
-                           #            followups, notifications, settings
+  routes/                  # blueprint: main (dashboard, ricerca, statistiche),
+                           #            clients, policies, documents, followups,
+                           #            opportunities, notifications, settings
   templates/               # interfaccia (Bootstrap 5)
-  static/style.css
+  static/style.css         # tema grafico
+  static/vendor/           # Bootstrap e icone in locale (funziona offline)
 tests/test_app.py          # test funzionali (pytest)
 tests/test_email.py        # test notifiche email e pagina impostazioni
 .github/workflows/build.yml # CI: test + build eseguibile Windows

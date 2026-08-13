@@ -43,42 +43,65 @@ def list_documents():
     )
 
 
+def _resolve_policy_id(client, raw):
+    if not raw:
+        return None
+    try:
+        pid = int(raw)
+    except (ValueError, TypeError):
+        return None
+    return pid if pid in [p.id for p in client.polizze] else None
+
+
 @bp.route("/carica/<int:client_id>", methods=["POST"])
 def upload(client_id):
     client = db.get_or_404(Client, client_id)
-    file = request.files.get("file")
-    if not file or not file.filename:
-        flash("Seleziona un file da caricare.", "warning")
-        return redirect(url_for("clients.detail", client_id=client.id) + "#documenti")
-    if not _allowed(file.filename):
-        flash("Tipo di file non consentito.", "danger")
+    # Accetta sia un singolo file sia una selezione multipla (drag & drop).
+    files = [f for f in request.files.getlist("file") if f and f.filename]
+    if not files:
+        flash("Seleziona uno o più file da caricare.", "warning")
         return redirect(url_for("clients.detail", client_id=client.id) + "#documenti")
 
-    original = file.filename
-    safe = secure_filename(original) or "documento"
-    stored_name = f"{uuid.uuid4().hex}_{safe}"
-    file.save(os.path.join(current_app.config["UPLOAD_FOLDER"], stored_name))
+    policy_id = _resolve_policy_id(client, request.form.get("policy_id"))
+    categoria = request.form.get("categoria", "altro")
+    note = request.form.get("note", "").strip() or None
+    upload_folder = current_app.config["UPLOAD_FOLDER"]
 
-    policy_id = request.form.get("policy_id") or None
-    if policy_id:
+    caricati, scartati = 0, []
+    for file in files:
+        original = file.filename
+        if not _allowed(original):
+            scartati.append(original)
+            continue
+        safe = secure_filename(original) or "documento"
+        stored_name = f"{uuid.uuid4().hex}_{safe}"
+        path = os.path.join(upload_folder, stored_name)
+        file.save(path)
         try:
-            policy_id = int(policy_id)
-            if policy_id not in [p.id for p in client.polizze]:
-                policy_id = None
-        except ValueError:
-            policy_id = None
+            dimensione = os.path.getsize(path)
+        except OSError:
+            dimensione = None
+        db.session.add(
+            Document(
+                client_id=client.id,
+                policy_id=policy_id,
+                categoria=categoria,
+                filename=stored_name,
+                original_name=original,
+                dimensione=dimensione,
+                note=note,
+            )
+        )
+        caricati += 1
 
-    doc = Document(
-        client_id=client.id,
-        policy_id=policy_id,
-        categoria=request.form.get("categoria", "altro"),
-        filename=stored_name,
-        original_name=original,
-        note=request.form.get("note", "").strip() or None,
-    )
-    db.session.add(doc)
-    db.session.commit()
-    flash(f"Documento “{original}” caricato.", "success")
+    if caricati:
+        db.session.commit()
+        flash(
+            f"{caricati} documento{'i' if caricati > 1 else ''} caricat{'i' if caricati > 1 else 'o'}.",
+            "success",
+        )
+    if scartati:
+        flash("Tipo di file non consentito: " + ", ".join(scartati), "danger")
     return redirect(url_for("clients.detail", client_id=client.id) + "#documenti")
 
 

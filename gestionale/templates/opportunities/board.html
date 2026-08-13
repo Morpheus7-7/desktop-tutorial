@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Pipeline — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 mb-0"><i class="bi bi-funnel me-2"></i>Pipeline commerciale</h1>
+    <div class="small text-muted">{{ aperte }} opportunità aperte</div>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('opportunities.new_opportunity') }}">
+    <i class="bi bi-plus-lg"></i> Nuova opportunità
+  </a>
+</div>
+
+<div class="d-flex gap-3 overflow-auto pb-3">
+  {% for col in colonne %}
+  <div class="flex-shrink-0" style="width: 300px;">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center
+                  {% if col.fase == 'vinta' %}text-success{% elif col.fase == 'persa' %}text-danger{% endif %}">
+        <span class="fw-semibold">{{ col.label }}</span>
+        <span class="badge bg-secondary">{{ col.opps | length }}</span>
+      </div>
+      <div class="card-body p-2" style="background:#f8f9fc;">
+        {% if col.valore %}<div class="small text-muted mb-2 px-1">Valore: {{ col.valore | euro }}</div>{% endif %}
+        {% for o in col.opps %}
+        <div class="card mb-2">
+          <div class="card-body p-2">
+            <div class="d-flex justify-content-between align-items-start">
+              <span class="fw-semibold small">{{ o.titolo }}</span>
+              <span class="badge {% if o.priorita == 'alta' %}bg-danger{% elif o.priorita == 'media' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ o.priorita }}</span>
+            </div>
+            <a class="small d-block" href="{{ url_for('clients.detail', client_id=o.client_id) }}">
+              <i class="bi bi-person"></i> {{ o.cliente.ragione_sociale }}
+            </a>
+            {% if o.ramo %}<div class="small text-muted">{{ o.ramo_label }}</div>{% endif %}
+            {% if o.premio_stimato %}<div class="small">Premio: <strong>{{ o.premio_stimato | euro }}</strong>{% if o.provvigione_stimata %} · prov. {{ o.provvigione_stimata | euro }}{% endif %}</div>{% endif %}
+            {% if o.origine == 'analisi_rischi' %}<span class="badge bg-light text-dark border mt-1"><i class="bi bi-magic"></i> da analisi</span>{% endif %}
+
+            <div class="d-flex gap-1 mt-2">
+              <form method="post" action="{{ url_for('opportunities.change_stage', opportunity_id=o.id) }}" class="flex-fill">
+                <input type="hidden" name="next" value="{{ url_for('opportunities.board') }}">
+                <select class="form-select form-select-sm" name="fase" onchange="this.form.submit()" title="Sposta di fase">
+                  {% for f, lab in stages %}<option value="{{ f }}" {% if o.fase == f %}selected{% endif %}>{{ lab }}</option>{% endfor %}
+                </select>
+              </form>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('opportunities.edit_opportunity', opportunity_id=o.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>
+              <form method="post" action="{{ url_for('opportunities.delete_opportunity', opportunity_id=o.id) }}"
+                    onsubmit="return confirm('Eliminare l\'opportunità?');">
+                <input type="hidden" name="next" value="{{ url_for('opportunities.board') }}">
+                <button class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <p class="text-muted small text-center py-3 mb-0">—</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

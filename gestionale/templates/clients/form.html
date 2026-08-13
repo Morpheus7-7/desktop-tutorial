@@ -19,7 +19,7 @@
         </select>
       </div>
       <div class="col-md-5">
-        <label class="form-label">Ragione sociale / Nominativo *</label>
+        <label class="form-label" id="label-nome">Ragione sociale / Nominativo *</label>
         <input type="text" class="form-control" name="ragione_sociale" required
                value="{{ client.ragione_sociale if client else '' }}">
       </div>
@@ -27,7 +27,7 @@
         <label class="form-label">Referente</label>
         <input type="text" class="form-control" name="referente" value="{{ client.referente or '' if client else '' }}">
       </div>
-      <div class="col-md-3">
+      <div class="col-md-3 campo-azienda">
         <label class="form-label">Partita IVA</label>
         <input type="text" class="form-control" name="partita_iva" maxlength="11" value="{{ client.partita_iva or '' if client else '' }}">
       </div>
@@ -35,13 +35,17 @@
         <label class="form-label">Codice fiscale</label>
         <input type="text" class="form-control" name="codice_fiscale" maxlength="16" value="{{ client.codice_fiscale or '' if client else '' }}">
       </div>
-      <div class="col-md-3">
+      <div class="col-md-3 campo-azienda">
         <label class="form-label">Codice ATECO</label>
         <input type="text" class="form-control" name="codice_ateco" placeholder="es. 62.01" value="{{ client.codice_ateco or '' if client else '' }}">
       </div>
-      <div class="col-md-3">
-        <label class="form-label">Professione <span class="text-muted small">(per professionisti)</span></label>
+      <div class="col-md-3 campo-professionista">
+        <label class="form-label">Professione</label>
         <input type="text" class="form-control" name="professione" placeholder="es. Ingegnere civile" value="{{ client.professione or '' if client else '' }}">
+      </div>
+      <div class="col-md-3 campo-dipendente">
+        <label class="form-label">Datore di lavoro</label>
+        <input type="text" class="form-control" name="datore_lavoro" placeholder="es. Acme S.p.A." value="{{ client.datore_lavoro or '' if client else '' }}">
       </div>
     </div>
 
@@ -84,12 +88,12 @@
         <input type="text" class="form-control" name="settore" placeholder="es. Metalmeccanico, Edilizia, Studio legale…"
                value="{{ client.settore or '' if client else '' }}">
       </div>
-      <div class="col-md-4">
+      <div class="col-md-4 campo-impresa">
         <label class="form-label">Numero dipendenti</label>
         <input type="number" min="0" class="form-control" name="numero_dipendenti"
                value="{{ client.numero_dipendenti if client and client.numero_dipendenti is not none else '' }}">
       </div>
-      <div class="col-md-4">
+      <div class="col-md-4 campo-impresa">
         <label class="form-label">Fatturato annuo (€)</label>
         <input type="text" class="form-control" name="fatturato_annuo"
                value="{{ client.fatturato_annuo if client and client.fatturato_annuo is not none else '' }}">
@@ -122,4 +126,32 @@
        href="{{ url_for('clients.detail', client_id=client.id) if client else url_for('clients.list_clients') }}">Annulla</a>
   </div>
 </form>
+{% endblock %}
+{% block scripts %}
+<script>
+  // Mostra solo i campi pertinenti al tipo di cliente selezionato.
+  (function () {
+    const select = document.getElementById('tipo-cliente');
+    const nomeLabel = document.getElementById('label-nome');
+    function aggiorna() {
+      const tipo = select.value;
+      const regole = {
+        'campo-azienda': tipo === 'azienda',
+        'campo-professionista': tipo === 'professionista',
+        'campo-dipendente': tipo === 'dipendente',
+        'campo-impresa': tipo === 'azienda' || tipo === 'professionista',
+      };
+      for (const [cls, mostra] of Object.entries(regole)) {
+        document.querySelectorAll('.' + cls).forEach(function (el) {
+          el.style.display = mostra ? '' : 'none';
+        });
+      }
+      nomeLabel.textContent = tipo === 'azienda'
+        ? 'Ragione sociale *'
+        : (tipo === 'dipendente' ? 'Nome e cognome *' : 'Nominativo *');
+    }
+    select.addEventListener('change', aggiorna);
+    aggiorna();
+  })();
+</script>
 {% endblock %}

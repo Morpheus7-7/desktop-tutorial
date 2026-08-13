@@ -22,17 +22,40 @@ def _ensure_schema() -> None:
     ricrearlo.
     """
     inspector = inspect(db.engine)
-    if "notifications" not in inspector.get_table_names():
-        return
-    esistenti = {c["name"] for c in inspector.get_columns("notifications")}
-    nuove = {
-        "inviata_email": "ALTER TABLE notifications ADD COLUMN inviata_email BOOLEAN NOT NULL DEFAULT 0",
-        "inviata_email_at": "ALTER TABLE notifications ADD COLUMN inviata_email_at DATETIME",
+    tabelle = set(inspector.get_table_names())
+
+    # Mappa: tabella -> {colonna: DDL per aggiungerla}
+    migrazioni = {
+        "notifications": {
+            "inviata_email": "ALTER TABLE notifications ADD COLUMN inviata_email BOOLEAN NOT NULL DEFAULT 0",
+            "inviata_email_at": "ALTER TABLE notifications ADD COLUMN inviata_email_at DATETIME",
+        },
+        "clients": {
+            "datore_lavoro": "ALTER TABLE clients ADD COLUMN datore_lavoro VARCHAR(200)",
+        },
+        "policies": {
+            "provvigione_perc": "ALTER TABLE policies ADD COLUMN provvigione_perc FLOAT",
+        },
+        "documents": {
+            "dimensione": "ALTER TABLE documents ADD COLUMN dimensione INTEGER",
+        },
+        "followups": {
+            "policy_id": "ALTER TABLE followups ADD COLUMN policy_id INTEGER",
+            "auto_generato": "ALTER TABLE followups ADD COLUMN auto_generato BOOLEAN NOT NULL DEFAULT 0",
+        },
     }
-    for colonna, ddl in nuove.items():
-        if colonna not in esistenti:
-            db.session.execute(text(ddl))
-    db.session.commit()
+
+    cambiato = False
+    for tabella, colonne in migrazioni.items():
+        if tabella not in tabelle:
+            continue
+        esistenti = {c["name"] for c in inspector.get_columns(tabella)}
+        for colonna, ddl in colonne.items():
+            if colonna not in esistenti:
+                db.session.execute(text(ddl))
+                cambiato = True
+    if cambiato:
+        db.session.commit()
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -89,8 +112,9 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.before_request
     def refresh_notifications():
-        from .notifications import generate_notifications
+        from .notifications import auto_create_renewal_followups, generate_notifications
 
+        auto_create_renewal_followups()
         generate_notifications()
 
     return app

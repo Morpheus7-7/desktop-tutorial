@@ -50,6 +50,7 @@ def _populate_from_form(client: Client, form) -> None:
     client.partita_iva = form.get("partita_iva", "").strip() or None
     client.codice_ateco = form.get("codice_ateco", "").strip() or None
     client.professione = form.get("professione", "").strip() or None
+    client.datore_lavoro = form.get("datore_lavoro", "").strip() or None
     client.settore = form.get("settore", "").strip() or None
     client.indirizzo = form.get("indirizzo", "").strip() or None
     client.citta = form.get("citta", "").strip() or None
@@ -80,7 +81,7 @@ def list_clients():
                 Client.settore.ilike(like),
             )
         )
-    if tipo in ("azienda", "professionista"):
+    if tipo in {t for t, _ in CLIENT_TYPES}:
         query = query.filter_by(tipo=tipo)
     clienti = query.order_by(Client.ragione_sociale.asc()).all()
     return render_template(

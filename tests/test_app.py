@@ -170,7 +170,10 @@ def test_full_flow_policy_followup_analysis(client, app):
 
     with app.app_context():
         assert Policy.query.filter_by(client_id=cid).count() == 1
-        assert FollowUp.query.filter_by(client_id=cid).count() == 1
+        # Un follow-up creato manualmente...
+        assert FollowUp.query.filter_by(client_id=cid, auto_generato=False).count() == 1
+        # ...più il follow-up di rinnovo generato in automatico (polizza in scadenza).
+        assert FollowUp.query.filter_by(client_id=cid, tipo="rinnovo", auto_generato=True).count() == 1
         assert RiskAnalysis.query.filter_by(client_id=cid).count() == 1
         # Il before_request deve aver generato notifiche per scadenza/followup
         assert Notification.query.count() > 0
