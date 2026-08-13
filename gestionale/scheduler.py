@@ -23,11 +23,12 @@ _MIN_INTERVALLO_S = 60  # limite di sicurezza: non più spesso di una volta al m
 def _tick(app: Flask) -> None:
     """Un ciclo di controllo: genera notifiche e invia il digest se attivo."""
     from .mailer import send_pending_notifications
-    from .notifications import generate_notifications
+    from .notifications import auto_create_renewal_followups, generate_notifications
     from .models import Settings
 
     with app.app_context():
         try:
+            auto_create_renewal_followups()
             generate_notifications()
             settings = Settings.get()
             inviate = send_pending_notifications(settings)

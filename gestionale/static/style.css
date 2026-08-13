@@ -1,11 +1,127 @@
-/* Rifiniture sopra Bootstrap */
-.stat-card .display-6 { font-weight: 700; }
-.severita-alta { border-left: 4px solid #dc3545; }
-.severita-media { border-left: 4px solid #fd7e14; }
-.severita-bassa { border-left: 4px solid #ffc107; }
-.severita-baseline { border-left: 4px solid #0d6efd; }
-.urgenza-scaduta { background-color: #f8d7da !important; }
-.urgenza-critica { background-color: #fff3cd !important; }
-.table td, .table th { vertical-align: middle; }
-.nav-tabs .nav-link { color: #495057; }
+/* ==========================================================================
+   Gestionale Assicurativo — tema grafico (layer sopra Bootstrap 5)
+   ========================================================================== */
+:root {
+  --ga-primary: #1e3a8a;      /* blu profondo, colore di fiducia */
+  --ga-primary-2: #2563eb;    /* blu acceso per accenti/gradienti */
+  --ga-accent: #0ea5e9;
+  --ga-success: #16a34a;
+  --ga-danger: #dc2626;
+  --ga-warning: #f59e0b;
+  --ga-bg: #f4f6fb;
+  --ga-card-shadow: 0 1px 2px rgba(16,24,40,.06), 0 4px 16px rgba(16,24,40,.06);
+  --ga-radius: .7rem;
+}
+
+body {
+  background: var(--ga-bg);
+  color: #1f2937;
+}
+
+/* ---------- Navbar --------------------------------------------------------- */
+.navbar-brand { letter-spacing: .2px; }
+.ga-navbar {
+  background: linear-gradient(100deg, var(--ga-primary), var(--ga-primary-2)) !important;
+}
+.ga-navbar .nav-link {
+  border-radius: .5rem;
+  padding-inline: .7rem;
+  transition: background-color .15s ease;
+}
+.ga-navbar .nav-link:hover,
+.ga-navbar .nav-link.active { background: rgba(255,255,255,.15); }
+.ga-search .form-control {
+  border: none;
+  background: rgba(255,255,255,.16);
+  color: #fff;
+}
+.ga-search .form-control::placeholder { color: rgba(255,255,255,.75); }
+.ga-search .form-control:focus {
+  background: #fff;
+  color: #111;
+  box-shadow: 0 0 0 .2rem rgba(255,255,255,.35);
+}
+
+/* ---------- Card & superfici ---------------------------------------------- */
+.card {
+  border: 1px solid #eaecf3;
+  border-radius: var(--ga-radius);
+  box-shadow: var(--ga-card-shadow);
+}
+.card-header { background: #fff; border-bottom: 1px solid #eef0f5; font-weight: 600; }
+.tab-content.bg-white { box-shadow: var(--ga-card-shadow); border-radius: 0 0 var(--ga-radius) var(--ga-radius); }
+
+/* ---------- Stat card (dashboard) ----------------------------------------- */
+.stat-card { position: relative; overflow: hidden; }
+.stat-card .display-6 { font-weight: 700; line-height: 1.1; }
+.stat-card .stat-icon {
+  position: absolute; right: .6rem; top: .5rem;
+  font-size: 1.5rem; opacity: .18;
+}
+.stat-card.accent-primary { border-left: 4px solid var(--ga-primary-2); }
+.stat-card.accent-success { border-left: 4px solid var(--ga-success); }
+.stat-card.accent-warning { border-left: 4px solid var(--ga-warning); }
+.stat-card.accent-danger  { border-left: 4px solid var(--ga-danger); }
+.stat-card.accent-info    { border-left: 4px solid var(--ga-accent); }
+
+/* ---------- Analisi rischi ------------------------------------------------- */
+.severita-alta    { border-left: 4px solid var(--ga-danger); }
+.severita-media   { border-left: 4px solid #fd7e14; }
+.severita-bassa   { border-left: 4px solid #ffc107; }
+.severita-baseline{ border-left: 4px solid var(--ga-primary-2); }
 .keyword-badge { font-weight: 400; }
+
+/* Spunto di trattativa: riquadro evidenziato */
+.trattativa {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: .5rem;
+  padding: .6rem .75rem;
+  margin-top: .6rem;
+}
+.trattativa .trattativa-title { color: #b45309; font-weight: 600; }
+.trattativa .esempio { font-style: italic; color: #7c2d12; }
+
+/* ---------- Tabelle -------------------------------------------------------- */
+.table td, .table th { vertical-align: middle; }
+.nav-tabs .nav-link { color: #475569; }
+.nav-tabs .nav-link.active { color: var(--ga-primary); font-weight: 600; }
+.urgenza-scaduta { background-color: #fde8e8 !important; }
+.urgenza-critica { background-color: #fff4d6 !important; }
+.urgenza-attenzione { background-color: #fbfbe8 !important; }
+
+/* ---------- Dropzone documenti -------------------------------------------- */
+.dropzone {
+  border: 2px dashed #c7cede;
+  border-radius: var(--ga-radius);
+  background: #fbfcff;
+  padding: 1.5rem;
+  text-align: center;
+  color: #64748b;
+  transition: border-color .15s ease, background-color .15s ease;
+  cursor: pointer;
+}
+.dropzone:hover, .dropzone.dragover {
+  border-color: var(--ga-primary-2);
+  background: #eff4ff;
+  color: var(--ga-primary);
+}
+.dropzone .bi { font-size: 1.8rem; }
+.file-pill {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: #eef2ff; color: #3730a3;
+  border-radius: 999px; padding: .15rem .6rem; margin: .2rem;
+  font-size: .85rem;
+}
+
+/* ---------- Badge tipo cliente -------------------------------------------- */
+.tipo-azienda { background: var(--ga-primary) !important; }
+.tipo-professionista { background: var(--ga-success) !important; }
+.tipo-dipendente { background: #7c3aed !important; }
+
+/* ---------- Stampa --------------------------------------------------------- */
+@media print {
+  .navbar, footer, .btn, .no-print { display: none !important; }
+  .card { box-shadow: none; border: 1px solid #ccc; }
+  body { background: #fff; }
+}

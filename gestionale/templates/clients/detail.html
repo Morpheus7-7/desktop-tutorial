@@ -5,11 +5,12 @@
   <div>
     <h1 class="h3 mb-1">
       {{ client.ragione_sociale }}
-      <span class="badge {% if client.tipo == 'azienda' %}bg-primary{% else %}bg-success{% endif %}">{{ client.tipo_label }}</span>
+      <span class="badge {{ client.tipo_badge }}">{{ client.tipo_label }}</span>
     </h1>
     <div class="text-muted small">
       {% if client.settore %}{{ client.settore }} · {% endif %}
       {% if client.professione %}{{ client.professione }} · {% endif %}
+      {% if client.datore_lavoro %}presso {{ client.datore_lavoro }} · {% endif %}
       {% if client.citta %}{{ client.citta }}{% if client.provincia %} ({{ client.provincia }}){% endif %}{% endif %}
     </div>
   </div>
@@ -28,6 +29,7 @@
   <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-info">Anagrafica</button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-polizze">Polizze <span class="badge bg-secondary">{{ client.polizze | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-documenti">Documenti <span class="badge bg-secondary">{{ client.documenti | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-opportunita">Opportunità <span class="badge bg-secondary">{{ client.opportunita | selectattr('aperta') | list | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-followup">Follow-up <span class="badge bg-secondary">{{ client.followups | selectattr('stato', 'equalto', 'aperto') | list | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-analisi">Analisi rischi <span class="badge bg-secondary">{{ client.analisi | length }}</span></button></li>
 </ul>
@@ -59,9 +61,14 @@
         <h2 class="h6 text-uppercase text-muted">Attività</h2>
         <dl class="row mb-3">
           <dt class="col-sm-4">Settore</dt><dd class="col-sm-8">{{ client.settore or '—' }}</dd>
+          {% if client.tipo == 'dipendente' %}
+          <dt class="col-sm-4">Mansione</dt><dd class="col-sm-8">{{ client.professione or '—' }}</dd>
+          <dt class="col-sm-4">Datore di lavoro</dt><dd class="col-sm-8">{{ client.datore_lavoro or '—' }}</dd>
+          {% else %}
           <dt class="col-sm-4">Professione</dt><dd class="col-sm-8">{{ client.professione or '—' }}</dd>
           <dt class="col-sm-4">Dipendenti</dt><dd class="col-sm-8">{{ client.numero_dipendenti if client.numero_dipendenti is not none else '—' }}</dd>
           <dt class="col-sm-4">Fatturato annuo</dt><dd class="col-sm-8">{{ client.fatturato_annuo | euro }}</dd>
+          {% endif %}
         </dl>
         <h2 class="h6 text-uppercase text-muted">Descrizione attività</h2>
         <p class="border rounded p-3 bg-light">{{ client.descrizione_attivita or 'Nessuna descrizione inserita: aggiungila per poter eseguire l\'analisi automatica dei rischi.' }}</p>
@@ -84,7 +91,9 @@
           <td class="fw-semibold">{{ p.numero_polizza }}</td>
           <td>{{ p.compagnia }}</td>
           <td class="small">{{ p.ramo_label }}</td>
-          <td>{{ p.premio_annuo | euro }}<br><span class="small text-muted">{{ p.frazionamento }}</span></td>
+          <td>{{ p.premio_annuo | euro }}<br><span class="small text-muted">{{ p.frazionamento }}</span>
+            {% if p.provvigione_annua %}<br><span class="small text-success">prov. {{ p.provvigione_annua | euro }} ({{ p.provvigione_perc }}%)</span>{% endif %}
+          </td>
           <td>{{ p.data_decorrenza | data_it }}</td>
           <td>{{ p.data_scadenza | data_it }}
             {% if p.giorni_alla_scadenza is not none and p.stato in ('attiva', 'in_rinnovo') %}
@@ -136,6 +145,10 @@
         <input class="form-control" name="premio_annuo">
       </div>
       <div class="col-md-2">
+        <label class="form-label">Provvigione %</label>
+        <input class="form-control" name="provvigione_perc" placeholder="es. 15">
+      </div>
+      <div class="col-md-2">
         <label class="form-label">Massimale (€)</label>
         <input class="form-control" name="massimale">
       </div>
@@ -173,14 +186,16 @@
   <div class="tab-pane fade" id="tab-documenti">
     {% if client.documenti %}
     <table class="table table-hover align-middle">
-      <thead><tr><th>Documento</th><th>Categoria</th><th>Polizza collegata</th><th>Note</th><th>Caricato il</th><th></th></tr></thead>
+      <thead><tr><th>Documento</th><th>Categoria</th><th>Polizza collegata</th><th>Dim.</th><th>Caricato il</th><th></th></tr></thead>
       <tbody>
       {% for d in client.documenti %}
         <tr>
-          <td><i class="bi bi-file-earmark me-1"></i>{{ d.original_name }}</td>
+          <td><i class="bi {{ d.icona }} me-1"></i>{{ d.original_name }}
+            {% if d.note %}<br><span class="small text-muted">{{ d.note }}</span>{% endif %}
+          </td>
           <td><span class="badge bg-light text-dark">{{ d.categoria_label }}</span></td>
           <td class="small">{% if d.polizza %}{{ d.polizza.numero_polizza }} ({{ d.polizza.ramo_label }}){% else %}—{% endif %}</td>
-          <td class="small">{{ d.note or '—' }}</td>
+          <td class="small text-nowrap">{{ d.dimensione_leggibile if d.dimensione else '—' }}</td>
           <td class="small">{{ d.uploaded_at.strftime('%d/%m/%Y %H:%M') }}</td>
           <td class="text-end text-nowrap">
             <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}"><i class="bi bi-download"></i></a>
@@ -198,34 +213,83 @@
     {% endif %}
 
     <hr>
-    <h2 class="h6 text-uppercase text-muted">Carica documento</h2>
+    <h2 class="h6 text-uppercase text-muted">Carica documenti</h2>
     <form method="post" action="{{ url_for('documents.upload', client_id=client.id) }}"
-          enctype="multipart/form-data" class="row g-3">
-      <div class="col-md-4">
-        <label class="form-label">File *</label>
-        <input type="file" class="form-control" name="file" required>
+          enctype="multipart/form-data" class="row g-3" id="form-upload">
+      <div class="col-12">
+        <div class="dropzone" id="dropzone">
+          <i class="bi bi-cloud-arrow-up d-block"></i>
+          <div class="fw-semibold">Trascina qui i file oppure clicca per selezionarli</div>
+          <div class="small">Puoi caricarne più di uno. PDF, immagini, Office, p7m, zip…</div>
+          <input type="file" class="d-none" name="file" id="input-file" multiple required>
+        </div>
+        <div id="file-list" class="mt-2"></div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-4">
         <label class="form-label">Categoria</label>
         <select class="form-select" name="categoria">
           {% for value, label in document_categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-4">
         <label class="form-label">Polizza collegata</label>
         <select class="form-select" name="policy_id">
           <option value="">Nessuna</option>
           {% for p in client.polizze %}<option value="{{ p.id }}">{{ p.numero_polizza }} — {{ p.ramo_label }}</option>{% endfor %}
         </select>
       </div>
-      <div class="col-md-8">
-        <label class="form-label">Note</label>
+      <div class="col-md-4">
+        <label class="form-label">Note (a tutti i file caricati)</label>
         <input class="form-control" name="note">
       </div>
       <div class="col-12">
         <button class="btn btn-primary"><i class="bi bi-upload"></i> Carica</button>
       </div>
     </form>
+  </div>
+
+  <!-- ============ OPPORTUNITÀ ============ -->
+  <div class="tab-pane fade" id="tab-opportunita">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h6 text-uppercase text-muted mb-0">Opportunità di vendita</h2>
+      <a class="btn btn-sm btn-primary" href="{{ url_for('opportunities.new_opportunity', client_id=client.id) }}">
+        <i class="bi bi-plus-lg"></i> Nuova opportunità
+      </a>
+    </div>
+    {% if client.opportunita %}
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Titolo</th><th>Ramo</th><th>Fase</th><th>Premio stimato</th><th>Origine</th><th></th></tr></thead>
+      <tbody>
+      {% for o in client.opportunita %}
+        <tr>
+          <td class="fw-semibold">{{ o.titolo }}</td>
+          <td class="small">{{ o.ramo_label }}</td>
+          <td>
+            <form method="post" action="{{ url_for('opportunities.change_stage', opportunity_id=o.id) }}">
+              <input type="hidden" name="next" value="{{ url_for('clients.detail', client_id=client.id) }}#opportunita">
+              <select class="form-select form-select-sm" name="fase" onchange="this.form.submit()" style="min-width: 9rem;">
+                {% for f, lab in [('lead','Lead'),('contatto','Contattato'),('preventivo','Preventivo inviato'),('trattativa','In trattativa'),('vinta','Vinta'),('persa','Persa')] %}
+                <option value="{{ f }}" {% if o.fase == f %}selected{% endif %}>{{ lab }}</option>{% endfor %}
+              </select>
+            </form>
+          </td>
+          <td>{{ o.premio_stimato | euro }}{% if o.provvigione_stimata %}<br><span class="small text-success">prov. {{ o.provvigione_stimata | euro }}</span>{% endif %}</td>
+          <td class="small">{% if o.origine == 'analisi_rischi' %}<span class="badge bg-light text-dark border"><i class="bi bi-magic"></i> analisi</span>{% else %}{{ o.origine or '—' }}{% endif %}</td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('opportunities.edit_opportunity', opportunity_id=o.id) }}"><i class="bi bi-pencil"></i></a>
+            <form class="d-inline" method="post" action="{{ url_for('opportunities.delete_opportunity', opportunity_id=o.id) }}"
+                  onsubmit="return confirm('Eliminare l\'opportunità?');">
+              <input type="hidden" name="next" value="{{ url_for('clients.detail', client_id=client.id) }}#opportunita">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">Nessuna opportunità per questo cliente. Puoi crearle anche dalle coperture scoperte nel report di analisi rischi.</p>
+    {% endif %}
   </div>
 
   <!-- ============ FOLLOW-UP ============ -->
@@ -346,14 +410,41 @@
   </div>
 </div>
 
+{% endblock %}
+{% block scripts %}
 <script>
   // Apre il tab indicato nell'ancora dell'URL (es. #polizze dopo un salvataggio).
   document.addEventListener('DOMContentLoaded', function () {
-    const map = {polizze: '#tab-polizze', documenti: '#tab-documenti', followup: '#tab-followup', analisi: '#tab-analisi'};
+    const map = {
+      polizze: '#tab-polizze', documenti: '#tab-documenti',
+      opportunita: '#tab-opportunita', followup: '#tab-followup', analisi: '#tab-analisi'
+    };
     const target = map[window.location.hash.replace('#', '')];
     if (target) {
       const trigger = document.querySelector(`[data-bs-target="${target}"]`);
       if (trigger) new bootstrap.Tab(trigger).show();
+    }
+
+    // Dropzone documenti: drag & drop + anteprima dei file selezionati.
+    const dz = document.getElementById('dropzone');
+    const input = document.getElementById('input-file');
+    const lista = document.getElementById('file-list');
+    if (dz && input) {
+      const fmt = (b) => b < 1024 ? b + ' B' : (b < 1048576 ? (b/1024).toFixed(1) + ' KB' : (b/1048576).toFixed(1) + ' MB');
+      function mostra() {
+        lista.innerHTML = '';
+        for (const f of input.files) {
+          const pill = document.createElement('span');
+          pill.className = 'file-pill';
+          pill.innerHTML = '<i class="bi bi-paperclip"></i> ' + f.name + ' <span class="text-muted">(' + fmt(f.size) + ')</span>';
+          lista.appendChild(pill);
+        }
+      }
+      dz.addEventListener('click', () => input.click());
+      input.addEventListener('change', mostra);
+      ['dragover', 'dragenter'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('dragover'); }));
+      ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('dragover'); }));
+      dz.addEventListener('drop', e => { input.files = e.dataTransfer.files; mostra(); });
     }
   });
 </script>

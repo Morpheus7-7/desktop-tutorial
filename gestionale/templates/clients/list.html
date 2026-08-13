@@ -40,8 +40,8 @@
       {% for c in clienti %}
         <tr>
           <td><a href="{{ url_for('clients.detail', client_id=c.id) }}" class="fw-semibold">{{ c.ragione_sociale }}</a></td>
-          <td><span class="badge {% if c.tipo == 'azienda' %}bg-primary{% else %}bg-success{% endif %}">{{ c.tipo_label }}</span></td>
-          <td class="small">{{ c.settore or c.professione or '—' }}</td>
+          <td><span class="badge {{ c.tipo_badge }}">{{ c.tipo_label }}</span></td>
+          <td class="small">{{ c.settore or c.professione or c.datore_lavoro or '—' }}</td>
           <td class="small">{{ c.citta or '—' }}{% if c.provincia %} ({{ c.provincia }}){% endif %}</td>
           <td class="small">{{ c.partita_iva or c.codice_fiscale or '—' }}</td>
           <td>{{ c.polizze_attive | length }}</td>

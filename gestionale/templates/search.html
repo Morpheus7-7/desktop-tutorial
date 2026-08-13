@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Ricerca — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4"><i class="bi bi-search me-2"></i>Risultati per «{{ q }}»</h1>
+
+{% if not q %}
+<p class="text-muted">Digita un termine nella barra di ricerca in alto.</p>
+{% else %}
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-people me-1"></i> Clienti</span>
+    <span class="badge bg-secondary">{{ clienti | length }}</span>
+  </div>
+  <div class="card-body p-0">
+    {% if clienti %}
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Cliente</th><th>Tipo</th><th>Settore / Prof.</th><th>Città</th><th>P.IVA / CF</th></tr></thead>
+      <tbody>
+      {% for c in clienti %}
+        <tr>
+          <td><a href="{{ url_for('clients.detail', client_id=c.id) }}" class="fw-semibold">{{ c.ragione_sociale }}</a></td>
+          <td><span class="badge {{ c.tipo_badge }}">{{ c.tipo_label }}</span></td>
+          <td class="small">{{ c.settore or c.professione or c.datore_lavoro or '—' }}</td>
+          <td class="small">{{ c.citta or '—' }}</td>
+          <td class="small">{{ c.partita_iva or c.codice_fiscale or '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="text-muted p-3 mb-0">Nessun cliente trovato.</p>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-file-earmark-text me-1"></i> Polizze</span>
+    <span class="badge bg-secondary">{{ polizze | length }}</span>
+  </div>
+  <div class="card-body p-0">
+    {% if polizze %}
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Numero</th><th>Cliente</th><th>Compagnia</th><th>Ramo</th><th>Scadenza</th><th>Stato</th></tr></thead>
+      <tbody>
+      {% for p in polizze %}
+        <tr>
+          <td class="fw-semibold">{{ p.numero_polizza }}</td>
+          <td><a href="{{ url_for('clients.detail', client_id=p.client_id) }}">{{ p.cliente.ragione_sociale }}</a></td>
+          <td>{{ p.compagnia }}</td>
+          <td class="small">{{ p.ramo_label }}</td>
+          <td>{{ p.data_scadenza | data_it }}</td>
+          <td><span class="badge {% if p.stato == 'attiva' %}bg-success{% elif p.stato == 'in_rinnovo' %}bg-info text-dark{% elif p.stato == 'scaduta' %}bg-danger{% else %}bg-secondary{% endif %}">{{ p.stato_label }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="text-muted p-3 mb-0">Nessuna polizza trovata.</p>{% endif %}
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

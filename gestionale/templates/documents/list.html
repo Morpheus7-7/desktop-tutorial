@@ -20,16 +20,17 @@
   <div class="card-body p-0">
     {% if documenti %}
     <table class="table table-hover mb-0 align-middle">
-      <thead><tr><th>Documento</th><th>Cliente</th><th>Categoria</th><th>Polizza</th><th>Caricato il</th><th></th></tr></thead>
+      <thead><tr><th>Documento</th><th>Cliente</th><th>Categoria</th><th>Polizza</th><th>Dim.</th><th>Caricato il</th><th></th></tr></thead>
       <tbody>
       {% for d in documenti %}
         <tr>
-          <td><i class="bi bi-file-earmark me-1"></i>{{ d.original_name }}
+          <td><i class="bi {{ d.icona }} me-1"></i>{{ d.original_name }}
             {% if d.note %}<br><span class="small text-muted">{{ d.note }}</span>{% endif %}
           </td>
           <td><a href="{{ url_for('clients.detail', client_id=d.client_id) }}">{{ d.cliente.ragione_sociale }}</a></td>
           <td><span class="badge bg-light text-dark">{{ d.categoria_label }}</span></td>
           <td class="small">{% if d.polizza %}{{ d.polizza.numero_polizza }}{% else %}—{% endif %}</td>
+          <td class="small text-nowrap">{{ d.dimensione_leggibile if d.dimensione else '—' }}</td>
           <td class="small">{{ d.uploaded_at.strftime('%d/%m/%Y %H:%M') }}</td>
           <td class="text-end text-nowrap">
             <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}"><i class="bi bi-download"></i></a>

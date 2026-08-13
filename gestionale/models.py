@@ -12,7 +12,13 @@ db = SQLAlchemy()
 CLIENT_TYPES = [
     ("azienda", "Azienda"),
     ("professionista", "Professionista"),
+    ("dipendente", "Lavoratore dipendente"),
 ]
+CLIENT_TYPE_BADGES = {
+    "azienda": "tipo-azienda",
+    "professionista": "tipo-professionista",
+    "dipendente": "tipo-dipendente",
+}
 
 POLICY_BRANCHES = [
     ("rc_professionale", "RC Professionale"),
@@ -27,6 +33,8 @@ POLICY_BRANCHES = [
     ("infortuni", "Infortuni"),
     ("malattia", "Malattia / Rimborso Spese Mediche"),
     ("vita", "Vita / Temporanea Caso Morte"),
+    ("previdenza", "Previdenza integrativa / PIP"),
+    ("rc_capofamiglia", "RC Capofamiglia / Vita Privata"),
     ("do", "D&O — Responsabilità Amministratori"),
     ("tutela_legale", "Tutela Legale"),
     ("trasporti", "Trasporti / Merci"),
@@ -85,6 +93,18 @@ DOCUMENT_CATEGORIES = [
 ]
 DOCUMENT_CATEGORY_LABELS = dict(DOCUMENT_CATEGORIES)
 
+# Fasi della pipeline commerciale (opportunità di vendita), stile CRM.
+OPPORTUNITY_STAGES = [
+    ("lead", "Lead"),
+    ("contatto", "Contattato"),
+    ("preventivo", "Preventivo inviato"),
+    ("trattativa", "In trattativa"),
+    ("vinta", "Vinta"),
+    ("persa", "Persa"),
+]
+OPPORTUNITY_STAGE_LABELS = dict(OPPORTUNITY_STAGES)
+OPPORTUNITY_OPEN_STAGES = {"lead", "contatto", "preventivo", "trattativa"}
+
 
 class Client(db.Model):
     __tablename__ = "clients"
@@ -97,6 +117,7 @@ class Client(db.Model):
     partita_iva = db.Column(db.String(11))
     codice_ateco = db.Column(db.String(10))
     professione = db.Column(db.String(120))
+    datore_lavoro = db.Column(db.String(200))  # per i lavoratori dipendenti
     settore = db.Column(db.String(120))
     indirizzo = db.Column(db.String(200))
     citta = db.Column(db.String(100))
@@ -128,10 +149,21 @@ class Client(db.Model):
         lazy=True,
         order_by="RiskAnalysis.created_at.desc()",
     )
+    opportunita = db.relationship(
+        "Opportunity",
+        backref="cliente",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="Opportunity.created_at.desc()",
+    )
 
     @property
     def tipo_label(self):
         return dict(CLIENT_TYPES).get(self.tipo, self.tipo)
+
+    @property
+    def tipo_badge(self):
+        return CLIENT_TYPE_BADGES.get(self.tipo, "bg-secondary")
 
     @property
     def polizze_attive(self):
@@ -157,6 +189,7 @@ class Policy(db.Model):
     ramo = db.Column(db.String(40), nullable=False, default="altro")
     massimale = db.Column(db.Float)
     premio_annuo = db.Column(db.Float)
+    provvigione_perc = db.Column(db.Float)  # percentuale di provvigione
     frazionamento = db.Column(db.String(20), default="annuale")
     data_decorrenza = db.Column(db.Date)
     data_scadenza = db.Column(db.Date, index=True)
@@ -174,6 +207,12 @@ class Policy(db.Model):
     @property
     def stato_label(self):
         return dict(POLICY_STATUSES).get(self.stato, self.stato)
+
+    @property
+    def provvigione_annua(self):
+        if self.premio_annuo and self.provvigione_perc:
+            return self.premio_annuo * self.provvigione_perc / 100.0
+        return None
 
     @property
     def giorni_alla_scadenza(self):
@@ -210,12 +249,41 @@ class Document(db.Model):
     categoria = db.Column(db.String(40), nullable=False, default="altro")
     filename = db.Column(db.String(300), nullable=False)  # nome su disco (sicuro)
     original_name = db.Column(db.String(300), nullable=False)
+    dimensione = db.Column(db.Integer)  # dimensione in byte
     note = db.Column(db.Text)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     @property
     def categoria_label(self):
         return DOCUMENT_CATEGORY_LABELS.get(self.categoria, self.categoria)
+
+    @property
+    def estensione(self):
+        return self.original_name.rsplit(".", 1)[-1].lower() if "." in self.original_name else ""
+
+    @property
+    def dimensione_leggibile(self):
+        n = float(self.dimensione or 0)
+        for unit in ("B", "KB", "MB", "GB"):
+            if n < 1024 or unit == "GB":
+                return f"{int(n)} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+            n /= 1024
+        return f"{n:.1f} GB"
+
+    @property
+    def icona(self):
+        ext = self.estensione
+        if ext == "pdf":
+            return "bi-file-earmark-pdf"
+        if ext in ("doc", "docx", "odt"):
+            return "bi-file-earmark-word"
+        if ext in ("xls", "xlsx", "ods", "csv"):
+            return "bi-file-earmark-spreadsheet"
+        if ext in ("png", "jpg", "jpeg", "gif"):
+            return "bi-file-earmark-image"
+        if ext in ("zip", "p7m"):
+            return "bi-file-earmark-zip"
+        return "bi-file-earmark-text"
 
 
 class FollowUp(db.Model):
@@ -225,12 +293,14 @@ class FollowUp(db.Model):
     client_id = db.Column(
         db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
     )
+    policy_id = db.Column(db.Integer, db.ForeignKey("policies.id"), index=True)
     tipo = db.Column(db.String(30), nullable=False, default="chiamata")
     titolo = db.Column(db.String(200), nullable=False)
     descrizione = db.Column(db.Text)
     data_scadenza = db.Column(db.Date, nullable=False, index=True)
     priorita = db.Column(db.String(10), nullable=False, default="media")
     stato = db.Column(db.String(20), nullable=False, default="aperto")
+    auto_generato = db.Column(db.Boolean, default=False, nullable=False)
     completed_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -241,6 +311,46 @@ class FollowUp(db.Model):
     @property
     def in_ritardo(self):
         return self.stato == "aperto" and self.data_scadenza < date.today()
+
+
+class Opportunity(db.Model):
+    """Opportunità di vendita (pipeline commerciale, stile CRM assicurativo)."""
+
+    __tablename__ = "opportunities"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(
+        db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
+    )
+    titolo = db.Column(db.String(200), nullable=False)
+    ramo = db.Column(db.String(40))  # ramo assicurativo di riferimento (opzionale)
+    fase = db.Column(db.String(20), nullable=False, default="lead", index=True)
+    premio_stimato = db.Column(db.Float)
+    provvigione_perc = db.Column(db.Float)
+    priorita = db.Column(db.String(10), nullable=False, default="media")
+    origine = db.Column(db.String(40))  # es. manuale | analisi_rischi | rinnovo
+    note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    chiusa_at = db.Column(db.DateTime)
+
+    @property
+    def ramo_label(self):
+        return BRANCH_LABELS.get(self.ramo, self.ramo or "—")
+
+    @property
+    def fase_label(self):
+        return OPPORTUNITY_STAGE_LABELS.get(self.fase, self.fase)
+
+    @property
+    def aperta(self):
+        return self.fase in OPPORTUNITY_OPEN_STAGES
+
+    @property
+    def provvigione_stimata(self):
+        if self.premio_stimato and self.provvigione_perc:
+            return self.premio_stimato * self.provvigione_perc / 100.0
+        return None
 
 
 class RiskAnalysis(db.Model):

@@ -77,6 +77,17 @@
             {% for cop in rischio.coperture_consigliate %}<li>{{ cop }}</li>{% endfor %}
           </ul>
         </div>
+        {% if rischio.trattativa %}
+        {% set t = rischio.trattativa %}
+        <div class="trattativa small">
+          <div class="trattativa-title"><i class="bi bi-lightbulb"></i> Spunto per la trattativa</div>
+          <div class="mb-1">{{ t.leva }}</div>
+          <div class="esempio mb-1"><i class="bi bi-quote"></i> {{ t.esempio }}</div>
+          <div><strong>Perché conviene:</strong>
+            <ul class="mb-0">{% for p in t.pro %}<li>{{ p }}</li>{% endfor %}</ul>
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -93,8 +104,28 @@
       <ul class="list-group list-group-flush">
         {% for gap in r.coperture_scoperte %}
         <li class="list-group-item">
-          <strong>{{ gap.nome_ramo }}</strong>
-          <div class="small text-muted">Per: {{ gap.rischi | join(', ') }}</div>
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <strong>{{ gap.nome_ramo }}</strong>
+              <div class="small text-muted">Per: {{ gap.rischi | join(', ') }}</div>
+            </div>
+            <form method="post" action="{{ url_for('opportunities.from_gap', client_id=client.id) }}" class="no-print">
+              <input type="hidden" name="ramo" value="{{ gap.ramo }}">
+              <input type="hidden" name="titolo" value="Proposta {{ gap.nome_ramo }}">
+              <input type="hidden" name="next" value="{{ url_for('clients.view_analysis', client_id=client.id, analysis_id=analysis.id) }}">
+              <button class="btn btn-sm btn-outline-primary text-nowrap" title="Aggiungi alla pipeline commerciale">
+                <i class="bi bi-funnel"></i> In pipeline
+              </button>
+            </form>
+          </div>
+          {% if gap.trattativa %}
+          {% set t = gap.trattativa %}
+          <div class="trattativa small mt-2">
+            <div class="trattativa-title"><i class="bi bi-lightbulb"></i> Come proporla</div>
+            <div class="mb-1">{{ t.leva }}</div>
+            <div class="esempio"><i class="bi bi-quote"></i> {{ t.esempio }}</div>
+          </div>
+          {% endif %}
         </li>
         {% else %}
         <li class="list-group-item text-success">Tutte le coperture consigliate risultano già attive.</li>
