@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Analisi AI — {{ client.ragione_sociale }}{% endblock %}
+{% block content %}
+{% set r = analysis.results %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('clients.list_clients') }}">Clienti</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.ragione_sociale }}</a></li>
+    <li class="breadcrumb-item active">Analisi AI del {{ analysis.created_at.strftime('%d/%m/%Y %H:%M') }}</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0"><i class="bi bi-stars me-2"></i>Analisi dei rischi con AI</h1>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-primary no-print" href="{{ url_for('opportunities.new_opportunity', client_id=client.id) }}">
+      <i class="bi bi-funnel"></i> Nuova opportunità
+    </a>
+    <button class="btn btn-outline-secondary no-print" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+  </div>
+</div>
+
+<div class="alert alert-info d-flex align-items-center gap-2">
+  <i class="bi bi-robot fs-5"></i>
+  <div>
+    Analisi generata da <strong>Claude</strong>{% if r.modello %} (<code>{{ r.modello }}</code>){% endif %}.
+    È un supporto alla consulenza da verificare, non un parere professionale.
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-card-text me-1"></i> Descrizione analizzata</div>
+  <div class="card-body"><p class="mb-0 fst-italic">{{ analysis.input_text }}</p></div>
+</div>
+
+{% if r.riepilogo %}
+<div class="card mb-4 border-primary">
+  <div class="card-header text-primary"><i class="bi bi-clipboard2-check me-1"></i> Sintesi del profilo di rischio</div>
+  <div class="card-body"><p class="mb-0">{{ r.riepilogo }}</p></div>
+</div>
+{% endif %}
+
+<h2 class="h5 mb-3">Rischi individuati e coperture consigliate</h2>
+<div class="row g-3 mb-4">
+  {% for rischio in r.rischi %}
+  <div class="col-lg-6">
+    <div class="card h-100 severita-{{ rischio.severita }}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <h3 class="h6 mb-1">{{ rischio.nome }}</h3>
+          <span class="badge {% if rischio.severita == 'alta' %}bg-danger{% elif rischio.severita == 'media' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+            severità {{ rischio.severita }}
+          </span>
+        </div>
+        <p class="small text-muted mb-2">{{ rischio.descrizione }}</p>
+        {% if rischio.coperture %}
+        <div class="small">
+          <strong>Coperture consigliate:</strong>
+          <ul class="mb-0">{% for cop in rischio.coperture %}<li>{{ cop }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        {% if rischio.spunto_trattativa %}
+        <div class="trattativa small">
+          <div class="trattativa-title"><i class="bi bi-lightbulb"></i> Spunto per la trattativa</div>
+          <div>{{ rischio.spunto_trattativa }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><p class="text-muted">L'AI non ha individuato rischi specifici: arricchisci la descrizione.</p></div>
+  {% endfor %}
+</div>
+
+<div class="alert alert-secondary small">
+  <i class="bi bi-info-circle me-1"></i>
+  Contenuto generato automaticamente da un modello di intelligenza artificiale sulla base della
+  descrizione fornita. Verifica sempre le informazioni prima di proporle al cliente.
+</div>
+{% endblock %}

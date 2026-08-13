@@ -27,6 +27,12 @@ notifiche generate in automatico.
   - la **gap analysis** tra coperture consigliate e polizze già attive, con la
     possibilità di trasformare una copertura scoperta in un'**opportunità** con
     un clic. Ogni analisi è salvata nello storico ed è stampabile.
+- **Analisi assistita da AI (opzionale)**: oltre al motore a regole locale,
+  puoi eseguire un'analisi generata da **Claude** che interpreta descrizioni
+  libere e propone coperture e spunti di trattativa su misura del cliente.
+  Richiede una chiave API Anthropic e connessione a Internet; si attiva dalle
+  *Impostazioni*. Il motore a regole locale resta sempre il default e funziona
+  offline. Vedi [Analisi con l'AI](#analisi-con-lai).
 - **Pipeline commerciale (opportunità)**: gestione delle opportunità di vendita
   a fasi in stile CRM (lead → contatto → preventivo → trattativa → vinta/persa),
   con premio e provvigione stimati, alimentabile direttamente dai gap di copertura.
@@ -108,6 +114,28 @@ d'ambiente, che **hanno la precedenza** su quanto salvato nel database:
 | `MAIL_TO`        | `titolare@studio.it, ...`   | Destinatari (separati da virgola)             |
 | `APP_BASE_URL`   | `http://127.0.0.1:5000`     | Base per i link «Apri scheda» nelle email     |
 
+### Analisi con l'AI
+
+Il gestionale integra un motore di analisi dei rischi **a regole, locale e
+offline** (sempre disponibile) e, in aggiunta, un'**analisi assistita da Claude**
+opzionale. Quest'ultima interpreta descrizioni libere e produce coperture e
+spunti di trattativa personalizzati sul singolo cliente.
+
+Si configura da **Impostazioni ▸ Analisi dei rischi con l'AI**: attiva la
+funzione, inserisci la **chiave API Anthropic** (da console.anthropic.com) e
+scegli il modello (Opus 5 / Sonnet 5 / Haiku 4.5). Da lì in poi la scheda di un
+cliente mostra il pulsante **«Analizza con l'AI»** accanto a quello del motore a
+regole. Costo indicativo: pochi centesimi ad analisi (a consumo).
+
+I parametri si possono anche impostare via variabili d'ambiente, che hanno la
+precedenza: `ANTHROPIC_API_KEY`, `AI_MODELLO` (es. `claude-opus-5`), `AI_ATTIVA`.
+
+> **Requisiti:** connessione a Internet e il pacchetto `anthropic`
+> (`pip install anthropic`, già in `requirements.txt`). Per mantenerlo leggero e
+> offline, **l'eseguibile `.exe` non include l'analisi AI**: usala avviando con
+> `python run_desktop.py`. La descrizione dell'attività del cliente viene
+> inviata all'API di Anthropic per l'elaborazione: valutalo per i dati sensibili.
+
 ## Struttura
 
 ```
@@ -118,7 +146,8 @@ gestionale.spec            # ricetta PyInstaller per l'eseguibile
 gestionale/
   __init__.py              # application factory, filtri e micro-migrazioni
   models.py                # modelli e vocabolari (rami, categorie, Settings…)
-  risk_engine.py           # motore di analisi automatica dei rischi
+  risk_engine.py           # motore di analisi automatica dei rischi (locale)
+  ai_analysis.py           # analisi opzionale assistita da Claude (SDK Anthropic)
   notifications.py         # generazione notifiche da scadenze e follow-up
   mailer.py                # invio email (SMTP stdlib) e digest notifiche
   scheduler.py             # thread in background per l'invio automatico
