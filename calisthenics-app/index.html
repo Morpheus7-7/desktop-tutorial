@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b0f14" />
+  <meta name="description" content="Cali100 — allenamento calisthenics a corpo libero da casa, dal livello 0 al 100. 100 schede progressive, esercizi, skill e progressi. Funziona offline." />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Cali100" />
+  <title>Cali100 — Calisthenics da 0 a 100</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="assets/icons/favicon.png" sizes="any" />
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body>
+  <!-- Splash di avvio -->
+  <div id="splash" class="splash">
+    <div class="splash-logo">C<span>100</span></div>
+    <div class="splash-tag">Corpo libero · da 0 a 100</div>
+  </div>
+
+  <!-- Intestazione -->
+  <header id="appHeader" class="app-header" hidden>
+    <button class="hdr-brand" data-action="go" data-route="#/">
+      <span class="hdr-logo">C<b>100</b></span>
+    </button>
+    <div class="hdr-stats">
+      <button class="chip chip-level" data-action="go" data-route="#/percorso" title="Livello del percorso">
+        <span class="chip-ico">🧗</span><span id="hdrLevel">Lv 1</span>
+      </button>
+      <button class="chip chip-streak" data-action="go" data-route="#/progressi" title="Giorni di fila">
+        <span class="chip-ico">🔥</span><span id="hdrStreak">0</span>
+      </button>
+      <button class="chip chip-gear" data-action="go" data-route="#/impostazioni" title="Impostazioni" aria-label="Impostazioni">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Contenuto -->
+  <main id="view" class="view" aria-live="polite"></main>
+
+  <!-- Navigazione inferiore -->
+  <nav id="bottomNav" class="bottom-nav" hidden>
+    <button class="nav-btn" data-action="go" data-route="#/"><span class="nav-ico">🏠</span><span class="nav-lbl">Home</span></button>
+    <button class="nav-btn" data-action="go" data-route="#/percorso"><span class="nav-ico">🧗</span><span class="nav-lbl">Percorso</span></button>
+    <button class="nav-btn" data-action="go" data-route="#/esercizi"><span class="nav-ico">📚</span><span class="nav-lbl">Esercizi</span></button>
+    <button class="nav-btn" data-action="go" data-route="#/skill"><span class="nav-ico">⭐</span><span class="nav-lbl">Skill</span></button>
+    <button class="nav-btn" data-action="go" data-route="#/progressi"><span class="nav-ico">📈</span><span class="nav-lbl">Progressi</span></button>
+  </nav>
+
+  <!-- Overlay del player di allenamento -->
+  <div id="player" class="player" hidden></div>
+
+  <!-- Contenitore per i "toast" -->
+  <div id="toasts" class="toasts"></div>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/levels.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
