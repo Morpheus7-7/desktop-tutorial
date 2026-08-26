@@ -41,10 +41,12 @@ def _prepara_dati_iniziali(app: Flask) -> None:
         app.logger.info("Database alimenti: importati %d alimenti.", inseriti)
 
     if User.query.filter_by(ruolo="nutrizionista").count() == 0:
-        email = os.environ.get("NUTRI_ADMIN_EMAIL", "nutrizionista@nutristudio.it")
-        password = os.environ.get("NUTRI_ADMIN_PASSWORD", "nutristudio")
+        from .security import email_studio_iniziale, password_studio_iniziale
+
+        email = email_studio_iniziale()
+        password = password_studio_iniziale()
         utente = User(
-            email=email.strip().lower(),
+            email=email,
             nome=os.environ.get("NUTRI_ADMIN_NOME", "Studio"),
             ruolo="nutrizionista",
             # Se la password è quella di default va cambiata al primo accesso.

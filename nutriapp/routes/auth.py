@@ -10,6 +10,7 @@ from ..mailer import invia_credenziali
 from ..models import Assistito, User, db
 from ..security import (
     accedi,
+    credenziali_di_fabbrica,
     esci,
     login_required,
     nutrizionista_required,
@@ -58,7 +59,13 @@ def login():
                 return redirect(destinazione)
             return redirect(url_for("auth.indice"))
 
-    return render_template("auth/login.html", next=request.args.get("next", ""))
+    return render_template(
+        "auth/login.html",
+        next=request.args.get("next", ""),
+        # Al primo avvio nessuno sa che cosa scrivere: glielo diciamo noi,
+        # finché la password è ancora quella di fabbrica.
+        credenziali_iniziali=credenziali_di_fabbrica(),
+    )
 
 
 @bp.route("/esci")

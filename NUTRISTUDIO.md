@@ -25,12 +25,25 @@ python run_nutristudio.py
 > assicurativo** sulla porta 5000. NutriStudio è `nutri_app.py`,
 > `run_nutristudio.py` e `NutriStudio.exe`, sulla porta 5001.
 
-Accessi dopo il seed:
+## Come si entra la prima volta
+
+**In NutriStudio non ci si registra.** È un'applicazione di studio privato: c'è
+un accesso per lo studio, creato insieme al database al primo avvio, e gli
+accessi dei clienti li apre la nutrizionista dalla scheda di ogni assistito
+(«Crea accesso»: genera una password provvisoria e la manda via email).
+
+Al primo avvio, quindi, entra con le credenziali di fabbrica — te le mostra la
+pagina di accesso e le stampa la console — e ti verrà chiesto subito di
+sceglierne una tua, dopodiché l'indicazione sparisce:
 
 | Ruolo | Email | Password |
 |-------|-------|----------|
 | Studio | `nutrizionista@nutristudio.it` | `nutristudio` (da cambiare al primo accesso) |
-| Cliente | `giulia.bianchi@example.it` | `giulia2026` |
+| Cliente di esempio (solo dopo `seed_nutri.py`) | `giulia.bianchi@example.it` | `giulia2026` |
+
+Per partire con credenziali tue invece di quelle di fabbrica, imposta
+`NUTRI_ADMIN_EMAIL` e `NUTRI_ADMIN_PASSWORD` prima del primo avvio: in quel caso
+la pagina non suggerisce niente e non c'è nessun cambio password forzato.
 
 ---
 

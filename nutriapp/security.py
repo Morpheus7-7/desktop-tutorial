@@ -6,6 +6,7 @@ può entrare dove, così nessuna vista può dimenticarsene per distrazione.
 """
 from __future__ import annotations
 
+import os
 import secrets
 import string
 from functools import wraps
@@ -15,12 +16,44 @@ from flask import flash, g, redirect, request, session, url_for
 from .models import User, db
 
 CHIAVE_SESSIONE = "utente_id"
+EMAIL_STUDIO_DEFAULT = "nutrizionista@nutristudio.it"
+PASSWORD_STUDIO_DEFAULT = "nutristudio"
 _ALFABETO_PASSWORD = string.ascii_letters.replace("l", "").replace("I", "") + "23456789"
 
 
 def password_provvisoria(lunghezza: int = 10) -> str:
     """Password leggibile da dettare al telefono: niente caratteri ambigui."""
     return "".join(secrets.choice(_ALFABETO_PASSWORD) for _ in range(lunghezza))
+
+
+def email_studio_iniziale() -> str:
+    return os.environ.get("NUTRI_ADMIN_EMAIL", EMAIL_STUDIO_DEFAULT).strip().lower()
+
+
+def password_studio_iniziale() -> str:
+    return os.environ.get("NUTRI_ADMIN_PASSWORD", PASSWORD_STUDIO_DEFAULT)
+
+
+def credenziali_di_fabbrica() -> tuple[str, str] | None:
+    """Le credenziali dello studio da mostrare al primo avvio, se ancora valide.
+
+    Nessuno si registra da solo in NutriStudio: l'accesso dello studio nasce
+    con l'applicazione e quelli dei clienti li apre la nutrizionista. Al primo
+    avvio, però, chi lancia il programma non ha modo di sapere che cosa
+    scrivere — quindi glielo diciamo, ma **solo** finché la password è ancora
+    quella di fabbrica, che è già pubblicata nel README. Appena viene cambiata
+    l'indicazione sparisce da sola.
+    """
+    utenti = User.query.filter_by(ruolo="nutrizionista").all()
+    if len(utenti) != 1:
+        return None
+    utente = utenti[0]
+    if not utente.deve_cambiare_password:
+        return None
+    password = password_studio_iniziale()
+    if not utente.check_password(password):
+        return None
+    return utente.email, password
 
 
 def accedi(utente: User) -> None:

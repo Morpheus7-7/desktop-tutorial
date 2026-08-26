@@ -821,3 +821,69 @@ def test_credenziali_iniziali_solo_finche_la_password_e_provvisoria(app):
         utente.deve_cambiare_password = False
         db.session.commit()
         assert run_nutristudio._credenziali_iniziali() is None
+
+
+# ----------------------------------------------------------------------
+# Primo avvio
+# ----------------------------------------------------------------------
+def test_il_primo_avvio_mostra_le_credenziali_dello_studio(client, app, monkeypatch):
+    """Nessuno si registra da solo: al primo avvio la pagina dice come entrare."""
+    monkeypatch.setenv("NUTRI_ADMIN_PASSWORD", PASSWORD_STUDIO)
+    with app.app_context():
+        utente = User.query.filter_by(ruolo="nutrizionista").one()
+        utente.deve_cambiare_password = True
+        db.session.commit()
+
+    testo = client.get("/accedi").get_data(as_text=True)
+    assert "Primo avvio" in testo
+    assert "studio@prova.it" in testo
+    assert PASSWORD_STUDIO in testo
+
+
+def test_le_credenziali_spariscono_appena_la_password_cambia(client, app, monkeypatch):
+    monkeypatch.setenv("NUTRI_ADMIN_PASSWORD", PASSWORD_STUDIO)
+    with app.app_context():
+        utente = User.query.filter_by(ruolo="nutrizionista").one()
+        utente.deve_cambiare_password = True
+        db.session.commit()
+    assert "Primo avvio" in client.get("/accedi").get_data(as_text=True)
+
+    client.post("/accedi", data={"email": "studio@prova.it", "password": PASSWORD_STUDIO})
+    client.post(
+        "/cambia-password",
+        data={"nuova": "una-password-mia", "conferma": "una-password-mia"},
+        follow_redirects=True,
+    )
+    client.get("/esci")
+
+    testo = client.get("/accedi").get_data(as_text=True)
+    assert "Primo avvio" not in testo
+    assert PASSWORD_STUDIO not in testo
+
+
+def test_niente_credenziali_in_pagina_se_la_password_non_e_quella_di_fabbrica(client, app, monkeypatch):
+    """Anche con il cambio password pendente: se la password non è quella
+    documentata, non c'è niente da suggerire."""
+    monkeypatch.setenv("NUTRI_ADMIN_PASSWORD", "tutt-altra-password")
+    with app.app_context():
+        utente = User.query.filter_by(ruolo="nutrizionista").one()
+        utente.deve_cambiare_password = True
+        db.session.commit()
+
+    testo = client.get("/accedi").get_data(as_text=True)
+    assert "Primo avvio" not in testo
+    assert "tutt-altra-password" not in testo
+
+
+def test_con_piu_accessi_di_studio_non_si_suggerisce_nulla(client, app, monkeypatch):
+    """Studio già avviato con un collaboratore: non è più un primo avvio."""
+    monkeypatch.setenv("NUTRI_ADMIN_PASSWORD", PASSWORD_STUDIO)
+    with app.app_context():
+        utente = User.query.filter_by(ruolo="nutrizionista").one()
+        utente.deve_cambiare_password = True
+        collega = User(email="collega@prova.it", nome="Collega", ruolo="nutrizionista")
+        collega.set_password("password-del-collega")
+        db.session.add(collega)
+        db.session.commit()
+
+    assert "Primo avvio" not in client.get("/accedi").get_data(as_text=True)
