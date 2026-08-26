@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar, badge_piano, grafico %}
+{% block title %}{{ assistito.nome_completo }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+  <div class="d-flex align-items-center gap-3">
+    {{ avatar(assistito.iniziali, true) }}
+    <div>
+      <h1 class="h4 mb-0">{{ assistito.nome_completo }}
+        {% if not assistito.attivo %}<span class="badge bg-secondary align-middle">archiviato</span>{% endif %}
+      </h1>
+      <div class="text-tenue small">
+        {% if assistito.eta %}{{ assistito.eta }} anni · {% endif %}
+        {{ assistito.obiettivo or 'obiettivo da definire' }} · dieta {{ assistito.tipo_dieta }}
+      </div>
+      <div class="small">
+        {% if assistito.email %}<i class="bi bi-envelope"></i> {{ assistito.email }}{% endif %}
+        {% if assistito.telefono %} · <i class="bi bi-telephone"></i> {{ assistito.telefono }}{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary" href="{{ url_for('clients.modifica', assistito_id=assistito.id) }}"><i class="bi bi-pencil"></i> Modifica</a>
+    <a class="btn btn-success" href="{{ url_for('plans.nuovo', assistito=assistito.id) }}"><i class="bi bi-calendar-plus"></i> Nuovo piano</a>
+  </div>
+</div>
+
+{% if assistito.allergie or assistito.patologie %}
+<div class="alert alert-warning py-2">
+  {% if assistito.allergie %}<div><strong>Allergie:</strong> {{ assistito.allergie }}</div>{% endif %}
+  {% if assistito.patologie %}<div><strong>Patologie:</strong> {{ assistito.patologie }}</div>{% endif %}
+</div>
+{% endif %}
+
+<div class="row g-3 mb-3">
+  {% for etichetta, valore, suffisso in [
+      ('Peso attuale', assistito.peso_attuale, 'kg'),
+      ('Variazione', assistito.variazione_peso, 'kg'),
+      ('BMI', assistito.bmi, assistito.bmi_categoria or ''),
+      ('Target', assistito.target_kcal, 'kcal/giorno')] %}
+  <div class="col-6 col-lg-3">
+    <div class="card ns-kpi h-100"><div class="card-body">
+      <div class="valore">{{ valore | numero(1) if valore is not none else '—' }}</div>
+      <div class="etichetta">{{ etichetta }} <span class="text-tenue">{{ suffisso }}</span></div>
+    </div></div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-calendar3-week me-1"></i> Piani alimentari</span>
+        <a class="btn btn-sm btn-outline-success" href="{{ url_for('plans.nuovo', assistito=assistito.id) }}">Nuovo</a>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for piano in assistito.piani %}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+           href="{{ url_for('plans.dettaglio', piano_id=piano.id) }}">
+          <div>
+            <div class="fw-semibold">{{ piano.titolo }}</div>
+            <div class="small text-tenue">
+              {{ piano.data_inizio | data_it }} – {{ piano.data_fine | data_it }} ·
+              {{ piano.target_kcal }} kcal · {{ piano.tipo_dieta }}
+            </div>
+          </div>
+          {{ badge_piano(piano) }}
+        </a>
+        {% else %}
+        <div class="list-group-item text-tenue small">Nessun piano: creane uno per cominciare.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card mb-3" id="misurazioni">
+      <div class="card-header"><i class="bi bi-graph-up-arrow me-1"></i> Andamento e misurazioni</div>
+      <div class="card-body">
+        {{ grafico(serie_peso) }}
+      </div>
+      <div class="card-body border-top pt-3">
+        <form class="row g-2 align-items-end" method="post"
+              action="{{ url_for('clients.aggiungi_misurazione', assistito_id=assistito.id) }}">
+          <div class="col-6 col-md-2">
+            <label class="form-label small" for="m-data">Data</label>
+            <input class="form-control form-control-sm" type="date" id="m-data" name="data" value="{{ oggi.isoformat() }}">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label small" for="m-peso">Peso (kg)</label>
+            <input class="form-control form-control-sm" id="m-peso" name="peso_kg" inputmode="decimal">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label small" for="m-massa">Massa grassa (%)</label>
+            <input class="form-control form-control-sm" id="m-massa" name="massa_grassa_perc" inputmode="decimal">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label small" for="m-vita">Vita (cm)</label>
+            <input class="form-control form-control-sm" id="m-vita" name="vita_cm" inputmode="decimal">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label small" for="m-fianchi">Fianchi (cm)</label>
+            <input class="form-control form-control-sm" id="m-fianchi" name="fianchi_cm" inputmode="decimal">
+          </div>
+          <div class="col-6 col-md-2">
+            <button class="btn btn-sm btn-success w-100" type="submit"><i class="bi bi-plus-lg"></i> Registra</button>
+          </div>
+        </form>
+      </div>
+      {% if misurazioni %}
+      <div class="table-responsive border-top">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr><th>Data</th><th class="text-end">Peso</th><th class="text-end">Massa grassa</th>
+                <th class="text-end">Vita</th><th class="text-end">Fianchi</th><th>Note</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for m in misurazioni %}
+            <tr>
+              <td>{{ m.data | data_it }}
+                {% if m.inserita_dal_cliente %}<i class="bi bi-person-check text-success small" title="Inserita dal cliente"></i>{% endif %}
+              </td>
+              <td class="text-end">{{ m.peso_kg | numero(1) }}</td>
+              <td class="text-end">{{ m.massa_grassa_perc | numero(1) }}</td>
+              <td class="text-end">{{ m.vita_cm | numero(1) }}</td>
+              <td class="text-end">{{ m.fianchi_cm | numero(1) }}</td>
+              <td class="small text-tenue">{{ m.note or '' }}</td>
+              <td class="text-end">
+                <form method="post" action="{{ url_for('clients.elimina_misurazione', assistito_id=assistito.id, misurazione_id=m.id) }}">
+                  <button class="btn btn-sm btn-link text-danger p-0" type="submit" title="Elimina"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card mb-3" id="messaggi">
+      <div class="card-header"><i class="bi bi-chat-dots me-1"></i> Conversazione</div>
+      <div class="card-body" style="max-height: 22rem; overflow-y: auto;">
+        {% for m in assistito.messaggi %}
+        <div class="mb-2 d-flex {{ 'justify-content-end' if m.mittente_ruolo == 'nutrizionista' }}">
+          <div class="p-2 px-3 rounded-3 {{ 'bg-success-subtle' if m.mittente_ruolo == 'nutrizionista' else 'bg-light border' }}"
+               style="max-width: 80%;">
+            <div class="small">{{ m.testo }}</div>
+            <div class="small text-tenue">{{ m.mittente_nome }} · {{ m.created_at | ora_it }}</div>
+          </div>
+        </div>
+        {% else %}
+        <p class="text-tenue small mb-0">Nessun messaggio.</p>
+        {% endfor %}
+      </div>
+      <div class="card-footer bg-white">
+        <form class="d-flex gap-2" method="post" action="{{ url_for('clients.invia_messaggio', assistito_id=assistito.id) }}">
+          <input class="form-control" name="testo" placeholder="Scrivi al tuo assistito…" required>
+          <button class="btn btn-success" type="submit"><i class="bi bi-send"></i></button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-key me-1"></i> Area riservata</div>
+      <div class="card-body">
+        {% if assistito.utente %}
+          <p class="mb-1"><i class="bi bi-check-circle-fill text-success"></i> Accesso attivo</p>
+          <p class="small text-tenue mb-2">
+            {{ assistito.utente.email }}<br>
+            {% if assistito.utente.ultimo_accesso %}Ultimo accesso: {{ assistito.utente.ultimo_accesso | ora_it }}
+            {% else %}Non è ancora entrato.{% endif %}
+          </p>
+        {% else %}
+          <p class="small text-tenue">Nessun accesso: l'assistito non può vedere il piano dal telefono.</p>
+        {% endif %}
+        <form method="post" action="{{ url_for('auth.crea_accesso', assistito_id=assistito.id) }}">
+          <div class="input-group input-group-sm">
+            <input class="form-control" type="email" name="email" value="{{ assistito.email or '' }}" placeholder="email" required>
+            <button class="btn btn-success" type="submit">
+              {{ 'Reimposta' if assistito.utente else 'Crea accesso' }}
+            </button>
+          </div>
+          <div class="form-text">Genera una password provvisoria e la manda via email.</div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-calculator me-1"></i> Fabbisogno stimato</div>
+      <div class="card-body">
+        <form method="get" class="mb-3">
+          <label class="form-label small" for="attivita">Livello di attività</label>
+          <select class="form-select form-select-sm" id="attivita" name="attivita" onchange="this.form.submit()">
+            {% for chiave, etichetta, _ in livelli_attivita %}
+            <option value="{{ chiave }}" {{ 'selected' if chiave == livello_scelto }}>{{ etichetta }}</option>
+            {% endfor %}
+          </select>
+        </form>
+        {% if fabbisogno %}
+        <div class="d-flex justify-content-between border-bottom py-1"><span class="small">Metabolismo basale</span><strong>{{ fabbisogno.bmr }} kcal</strong></div>
+        <div class="d-flex justify-content-between border-bottom py-1"><span class="small">Mantenimento</span><strong>{{ fabbisogno.mantenimento }} kcal</strong></div>
+        <div class="d-flex justify-content-between border-bottom py-1"><span class="small">Dimagrimento (−20%)</span><strong>{{ fabbisogno.dimagrimento }} kcal</strong></div>
+        <div class="d-flex justify-content-between py-1"><span class="small">Aumento (+12%)</span><strong>{{ fabbisogno.aumento }} kcal</strong></div>
+        <p class="small text-tenue mt-2 mb-0">
+          Equazione di Mifflin-St Jeor. È una stima di partenza: la decisione clinica resta tua.
+        </p>
+        {% else %}
+        <p class="small text-tenue mb-0">Servono sesso, altezza, peso e data di nascita per la stima.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card mb-3" id="appuntamenti">
+      <div class="card-header"><i class="bi bi-calendar-event me-1"></i> Appuntamenti</div>
+      <div class="list-group list-group-flush">
+        {% for app in assistito.appuntamenti %}
+        <div class="list-group-item">
+          <div class="d-flex justify-content-between">
+            <div>
+              <div class="fw-semibold small">{{ app.data_ora | ora_it }}</div>
+              <div class="small text-tenue">{{ app.tipo }} · {{ app.durata_minuti }} min
+                {% if app.luogo %}· {{ app.luogo }}{% endif %}</div>
+            </div>
+            <span class="badge bg-{{ 'success' if app.stato == 'confermato' else ('secondary' if app.stato == 'svolto' else ('danger' if app.stato == 'annullato' else 'light text-dark border')) }}">
+              {{ app.stato }}
+            </span>
+          </div>
+          <div class="d-flex gap-1 mt-2">
+            <form method="post" action="{{ url_for('clients.stato_appuntamento', appuntamento_id=app.id) }}" class="d-flex gap-1">
+              <select class="form-select form-select-sm" name="stato">
+                {% for s in stati_appuntamento %}<option value="{{ s }}" {{ 'selected' if app.stato == s }}>{{ s }}</option>{% endfor %}
+              </select>
+              <button class="btn btn-sm btn-outline-secondary" type="submit">Aggiorna</button>
+            </form>
+            <form method="post" action="{{ url_for('clients.elimina_appuntamento', appuntamento_id=app.id) }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button>
+            </form>
+          </div>
+        </div>
+        {% else %}
+        <div class="list-group-item text-tenue small">Nessun appuntamento.</div>
+        {% endfor %}
+      </div>
+      <div class="card-footer bg-white">
+        <form class="row g-2" method="post" action="{{ url_for('clients.aggiungi_appuntamento', assistito_id=assistito.id) }}">
+          <div class="col-12">
+            <input class="form-control form-control-sm" type="datetime-local" name="data_ora" required>
+          </div>
+          <div class="col-7">
+            <select class="form-select form-select-sm" name="tipo">
+              {% for t in tipi_appuntamento %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-5">
+            <button class="btn btn-sm btn-success w-100" type="submit"><i class="bi bi-plus-lg"></i> Fissa</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card border-danger-subtle">
+      <div class="card-body">
+        <form method="post" action="{{ url_for('clients.elimina', assistito_id=assistito.id) }}"
+              onsubmit="return confirm('Eliminare {{ assistito.nome_completo }} con piani, misurazioni e messaggi? L\'operazione non è reversibile.');">
+          <button class="btn btn-outline-danger btn-sm w-100" type="submit">
+            <i class="bi bi-trash"></i> Elimina assistito e tutti i suoi dati
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

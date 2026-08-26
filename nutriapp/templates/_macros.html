@@ -1,0 +1,220 @@
+{# Pezzi di interfaccia riutilizzati fra area studio e area cliente. #}
+
+{% macro avatar(iniziali, grande=false) %}
+<span class="ns-avatar {{ 'ns-avatar-lg' if grande }}">{{ iniziali }}</span>
+{% endmacro %}
+
+{% macro pallino(stato) %}<span class="ns-pallino {{ stato }}"></span>{% endmacro %}
+
+{% macro badge_piano(piano) %}
+  {% if piano.stato == 'pubblicato' %}
+    <span class="badge bg-success"><i class="bi bi-broadcast"></i> Pubblicato</span>
+  {% elif piano.stato == 'bozza' %}
+    <span class="badge bg-secondary"><i class="bi bi-pencil"></i> Bozza</span>
+  {% else %}
+    <span class="badge bg-light text-dark border"><i class="bi bi-archive"></i> Archiviato</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro barra_kcal(kcal, target, stato, mostra_testo=true) %}
+{% set percentuale = (kcal / target * 100) if target else 0 %}
+<div class="ns-barra ns-stato-{{ stato }}" title="{{ kcal }} kcal su {{ target }}">
+  <span style="width: {{ [percentuale, 100] | min }}%;"></span>
+</div>
+{% if mostra_testo %}
+<div class="d-flex justify-content-between small text-tenue mt-1">
+  <span>{{ kcal }} kcal</span>
+  <span>{{ percentuale | round | int }}% del target</span>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro flag_dieta(alimento) %}
+  {% for etichetta, valore in [('Vegano', alimento.vegan), ('Vegetariano', alimento.vegetariano),
+                               ('Senza glutine', alimento.senza_glutine), ('Senza lattosio', alimento.senza_lattosio)] %}
+    {% if valore %}<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">{{ etichetta }}</span>
+    {% elif valore is none %}<span class="badge bg-light text-muted border" title="Non verificato nella fonte">{{ etichetta }}?</span>
+    {% endif %}
+  {% endfor %}
+{% endmacro %}
+
+{# --- una giornata del piano, in sola lettura --- #}
+{% macro scheda_giorno(giorno, piano, compatta=false, link_dettaglio=none) %}
+<div class="ns-giorno h-100 {{ 'oggi' if giorno.oggi }}">
+  <div class="d-flex justify-content-between align-items-center px-3 pt-3">
+    <div>
+      <h6 class="mb-0">
+        {% if link_dettaglio %}<a class="text-decoration-none" href="{{ link_dettaglio }}">{{ giorno.nome }}</a>
+        {% else %}{{ giorno.nome }}{% endif %}
+      </h6>
+      <div class="small text-tenue">{{ giorno.kcal }} kcal{% if giorno.perc_target %} · {{ giorno.perc_target }}% del target{% endif %}</div>
+    </div>
+    {{ pallino(giorno.stato) }}
+  </div>
+  <div class="px-3 pt-2">{{ barra_kcal(giorno.kcal, piano.target_kcal, giorno.stato, false) }}</div>
+  <div class="px-3 py-2">
+    {% if giorno.vuoto %}
+      <p class="small text-tenue fst-italic mb-2">Giornata ancora vuota.</p>
+    {% endif %}
+    {% for pasto in giorno.pasti %}
+      <div class="mb-2">
+        <div class="ns-pasto-titolo d-flex justify-content-between">
+          <span>{{ pasto.nome }}</span>
+          <span>{{ pasto.totali.get('kcal') | round | int }} kcal</span>
+        </div>
+        {% for riga in pasto.righe %}
+          <div class="ns-voce {{ 'conflitto' if riga.conflitto }}">
+            <div class="d-flex justify-content-between gap-2">
+              <span class="small">{{ riga.voce.etichetta }}</span>
+              {% if not compatta %}<span class="small text-tenue text-nowrap">{{ riga.totali.get('kcal') | round | int }} kcal</span>{% endif %}
+            </div>
+            <div class="small text-tenue">
+              {{ riga.voce.quantita_etichetta }}
+              {% if riga.voce.nota %}· <em>{{ riga.voce.nota }}</em>{% endif %}
+              {% if riga.conflitto %}<span class="text-danger">· {{ riga.conflitto }}</span>{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{# --- tabella copertura nutrienti --- #}
+{% macro tabella_copertura(copertura, gruppo=none) %}
+<div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead class="table-light">
+      <tr><th>Nutriente</th><th class="text-end">Media/giorno</th><th class="text-end">Riferimento</th>
+          <th style="width: 28%">Copertura</th><th class="text-end">%</th></tr>
+    </thead>
+    <tbody>
+    {% for voce in copertura %}
+      {% if gruppo is none or voce.nutriente.gruppo == gruppo %}
+      <tr>
+        <td>
+          {{ voce.nutriente.etichetta }}
+          {% if voce.nutriente.limite %}<i class="bi bi-arrow-down-circle text-tenue" title="È un limite da non superare, non un obiettivo"></i>{% endif %}
+          {% if voce.parziale %}<i class="bi bi-asterisk text-warning small" title="Dato non analizzato per tutti gli alimenti: il totale è sottostimato"></i>{% endif %}
+        </td>
+        <td class="text-end">{{ voce.valore | numero(voce.nutriente.decimali) }} <span class="text-tenue small">{{ voce.nutriente.unita }}</span></td>
+        <td class="text-end text-tenue">{{ voce.riferimento | numero(0) }}</td>
+        <td>
+          <div class="ns-barra ns-stato-{{ voce.stato }}">
+            <span style="width: {{ [voce.percentuale or 0, 100] | min }}%;"></span>
+          </div>
+        </td>
+        <td class="text-end">{{ voce.percentuale if voce.percentuale is not none else '—' }}%</td>
+      </tr>
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+{# --- grafico del peso --- #}
+{% macro grafico(serie) %}
+{% set g = grafico_peso(serie) %}
+{% if g %}
+<svg class="ns-grafico" viewBox="0 0 {{ g.larghezza }} {{ g.altezza }}" preserveAspectRatio="none" role="img"
+     aria-label="Andamento del peso da {{ g.primo[0] | data_it }} a {{ g.ultimo[0] | data_it }}">
+  <line class="griglia" x1="{{ g.margine }}" y1="{{ g.margine }}" x2="{{ g.larghezza - g.margine }}" y2="{{ g.margine }}"/>
+  <line class="griglia" x1="{{ g.margine }}" y1="{{ g.altezza - g.margine }}" x2="{{ g.larghezza - g.margine }}" y2="{{ g.altezza - g.margine }}"/>
+  <path class="area" d="{{ g.area }}"/>
+  <polyline class="linea" points="{{ g.linea }}"/>
+  {% for p in g.punti %}<circle class="punto" cx="{{ p.x }}" cy="{{ p.y }}" r="3.5"><title>{{ p.data | data_it }}: {{ p.peso }} kg</title></circle>{% endfor %}
+</svg>
+<div class="d-flex justify-content-between small text-tenue">
+  <span>{{ g.primo[0] | data_it }} · {{ g.primo[1] }} kg</span>
+  <span class="fw-semibold {{ 'text-success' if g.variazione < 0 else ('text-danger' if g.variazione > 0 else '') }}">
+    {{ '+' if g.variazione > 0 }}{{ g.variazione }} kg
+  </span>
+  <span>{{ g.ultimo[0] | data_it }} · {{ g.ultimo[1] }} kg</span>
+</div>
+{% else %}
+<p class="text-tenue small fst-italic mb-0">Servono almeno due misurazioni per disegnare l'andamento.</p>
+{% endif %}
+{% endmacro %}
+
+{# --- lista della spesa: identica per studio e cliente --- #}
+{% macro corpo_spesa(gruppi, manuali, fornitori, carrelli) %}
+{% if not gruppi and not manuali %}
+  <p class="text-tenue fst-italic">Il piano non contiene ancora alimenti: la lista è vuota.</p>
+{% endif %}
+{% for gruppo in gruppi %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-basket2 me-1 text-success"></i>{{ gruppo.categoria }}</span>
+    <span class="small text-tenue">{{ gruppo.peso_totale | quantita }}</span>
+  </div>
+  <div class="card-body py-2">
+    {% for riga in gruppo.righe %}
+    <div class="ns-spesa-riga">
+      <input class="form-check-input mt-0" type="checkbox" id="spesa-{{ gruppo.categoria | replace(' ', '') }}-{{ loop.index }}">
+      <label class="flex-grow-1 mb-0" for="spesa-{{ gruppo.categoria | replace(' ', '') }}-{{ loop.index }}">
+        <span class="fw-semibold">{{ riga.etichetta }}</span>
+        <span class="badge bg-light text-dark border ms-1">{{ riga.quantita }}</span>
+        <span class="d-block small text-tenue">
+          {% if riga.dettaglio_porzioni %}{{ riga.dettaglio_porzioni }} · {% endif %}{{ riga.giorni_etichetta }}
+          {% if riga.ricette %}· per {{ riga.ricette | join(', ') }}{% endif %}
+        </span>
+      </label>
+      {% if fornitori %}
+      <div class="dropdown ns-no-print">
+        <button class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" title="Cerca nei negozi online">
+          <i class="bi bi-cart-plus"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><h6 class="dropdown-header">Cerca «{{ riga.termine }}»</h6></li>
+          {% for fornitore in fornitori %}
+          <li><a class="dropdown-item" target="_blank" rel="noopener noreferrer" href="{{ fornitore.url_per(riga.termine) }}">
+            <i class="bi {{ fornitore.icona }}" style="color: {{ fornitore.colore }}"></i> {{ fornitore.nome }}
+          </a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
+{% if manuali %}
+<div class="card mb-3 border-warning-subtle">
+  <div class="card-header"><i class="bi bi-pencil me-1"></i> Da aggiungere a mano</div>
+  <div class="card-body py-2">
+    {% for voce in manuali %}
+    <div class="ns-spesa-riga">
+      <input class="form-check-input mt-0" type="checkbox" id="manuale-{{ loop.index }}">
+      <label class="flex-grow-1 mb-0" for="manuale-{{ loop.index }}">{{ voce }}</label>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro barra_carrelli(fornitori, carrelli) %}
+{% if fornitori %}
+<div class="card mb-3 ns-no-print">
+  <div class="card-body">
+    <div class="small-caps mb-2">Apri la spesa online</div>
+    <div class="d-flex flex-wrap gap-2">
+      {% for fornitore in fornitori %}
+      <a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer"
+         href="{{ carrelli[fornitore.id] }}">
+        <i class="bi {{ fornitore.icona }}" style="color: {{ fornitore.colore }}"></i> {{ fornitore.nome }}
+      </a>
+      {% endfor %}
+    </div>
+    <p class="small text-tenue mb-0 mt-2">
+      Il pulsante apre la ricerca del negozio sui prodotti principali della lista; con l'icona
+      accanto a ogni riga cerchi il singolo prodotto.
+    </p>
+  </div>
+</div>
+{% endif %}
+{% endmacro %}

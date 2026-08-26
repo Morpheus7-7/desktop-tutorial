@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar, badge_piano, pallino, barra_kcal %}
+{% block title %}{{ piano.titolo }} · {{ piano.assistito.nome_completo }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{{ url_for('clients.dettaglio', assistito_id=piano.assistito_id) }}" class="text-decoration-none">
+      {{ avatar(piano.assistito.iniziali, true) }}
+    </a>
+    <div>
+      <h1 class="h4 mb-0">{{ piano.titolo }} {{ badge_piano(piano) }}</h1>
+      <div class="text-tenue small">
+        <a href="{{ url_for('clients.dettaglio', assistito_id=piano.assistito_id) }}">{{ piano.assistito.nome_completo }}</a>
+        · {{ piano.data_inizio | data_it }} – {{ piano.data_fine | data_it }}
+        · {{ piano.target_kcal }} kcal · dieta {{ piano.tipo_dieta }}
+      </div>
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary" href="{{ url_for('plans.analisi', piano_id=piano.id) }}"><i class="bi bi-clipboard-data"></i> Analisi</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('shopping.lista', piano_id=piano.id) }}"><i class="bi bi-cart3"></i> Spesa</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('plans.scheda', piano_id=piano.id) }}" target="_blank"><i class="bi bi-printer"></i> Scheda</a>
+    {% if piano.stato != 'pubblicato' %}
+    <form method="post" action="{{ url_for('plans.pubblica', piano_id=piano.id) }}">
+      <button class="btn btn-success" type="submit"><i class="bi bi-broadcast"></i> Pubblica al cliente</button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('plans.riporta_in_bozza', piano_id=piano.id) }}">
+      <button class="btn btn-outline-warning" type="submit"><i class="bi bi-pencil"></i> Riporta in bozza</button>
+    </form>
+    {% endif %}
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><button class="dropdown-item" data-bs-toggle="collapse" data-bs-target="#impostazioniPiano"><i class="bi bi-sliders"></i> Impostazioni e riferimenti</button></li>
+        <li><form method="post" action="{{ url_for('plans.duplica', piano_id=piano.id) }}">
+          <button class="dropdown-item" type="submit"><i class="bi bi-files"></i> Duplica piano</button></form></li>
+        <li><form method="post" action="{{ url_for('plans.archivia', piano_id=piano.id) }}">
+          <button class="dropdown-item" type="submit"><i class="bi bi-archive"></i> Archivia</button></form></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><form method="post" action="{{ url_for('plans.elimina', piano_id=piano.id) }}"
+                  onsubmit="return confirm('Eliminare definitivamente questo piano?');">
+          <button class="dropdown-item text-danger" type="submit"><i class="bi bi-trash"></i> Elimina</button></form></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+{% if analisi.conflitti %}
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle"></i>
+  <strong>{{ analisi.conflitti | length }} voci</strong> non rispettano la dieta «{{ piano.tipo_dieta }}»:
+  {% for c in analisi.conflitti[:4] %}{{ c.voce.etichetta }} ({{ c.motivo }}){% if not loop.last %}, {% endif %}{% endfor %}
+  {% if analisi.conflitti | length > 4 %}…{% endif %}
+</div>
+{% endif %}
+
+<!-- Riepilogo della settimana -->
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <div class="row g-2 align-items-center">
+      <div class="col-lg-3">
+        <div class="small-caps">Media settimanale</div>
+        <div class="d-flex align-items-baseline gap-2">
+          <span class="fs-3 fw-bold">{{ analisi.media_kcal }}</span>
+          <span class="text-tenue">kcal / giorno</span>
+          {{ pallino(analisi.stato_media) }}
+        </div>
+        <div class="small text-tenue">
+          su {{ analisi.giorni_compilati }} giorni compilati · obiettivo {{ analisi.target }} kcal
+        </div>
+        <div class="small text-tenue mt-1">
+          P {{ analisi.macro_medi.proteine }}% · C {{ analisi.macro_medi.carboidrati }}% · G {{ analisi.macro_medi.grassi }}%
+        </div>
+      </div>
+      <div class="col-lg-9">
+        <div class="row g-2">
+          {% for giorno in analisi.giorni %}
+          <div class="col">
+            <a class="text-decoration-none text-reset" href="#giorno-{{ giorno.indice }}">
+              <div class="border rounded-3 p-2 text-center {{ 'border-success' if giorno.oggi }}">
+                <div class="small fw-semibold">{{ giorno.nome[:3] }}</div>
+                <div class="small text-tenue">{{ giorno.kcal }}</div>
+                <div class="ns-barra ns-stato-{{ giorno.stato }} mt-1">
+                  <span style="width: {{ [giorno.perc_target or 0, 100] | min }}%;"></span>
+                </div>
+              </div>
+            </a>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Impostazioni del piano -->
+<div class="collapse mb-3" id="impostazioniPiano">
+  <div class="card"><div class="card-body">
+    <form method="post" action="{{ url_for('plans.impostazioni', piano_id=piano.id) }}">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label" for="titolo">Titolo</label>
+          <input class="form-control" id="titolo" name="titolo" value="{{ piano.titolo }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label" for="data_inizio">Inizio</label>
+          <input class="form-control" type="date" id="data_inizio" name="data_inizio" value="{{ piano.data_inizio.isoformat() }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label" for="data_fine">Fine</label>
+          <input class="form-control" type="date" id="data_fine" name="data_fine" value="{{ piano.data_fine.isoformat() }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label" for="target_kcal">Target kcal</label>
+          <input class="form-control" type="number" id="target_kcal" name="target_kcal" value="{{ piano.target_kcal }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label" for="tipo_dieta">Dieta</label>
+          <select class="form-select" id="tipo_dieta" name="tipo_dieta">
+            {% for d in diete %}<option value="{{ d }}" {{ 'selected' if piano.tipo_dieta == d }}>{{ d }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="note_cliente">Nota per il cliente</label>
+          <textarea class="form-control" id="note_cliente" name="note_cliente" rows="2">{{ piano.note_cliente or '' }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="note_nutrizionista">Nota interna</label>
+          <textarea class="form-control" id="note_nutrizionista" name="note_nutrizionista" rows="2">{{ piano.note_nutrizionista or '' }}</textarea>
+        </div>
+
+        <div class="col-12">
+          <div class="small-caps mb-2">Riferimenti giornalieri — adattali a questo assistito</div>
+          <div class="row g-2">
+            {% for n in nutrienti if n.chiave != 'kcal' %}
+            <div class="col-6 col-md-3 col-xl-2">
+              <label class="form-label small mb-0" for="rif_{{ n.chiave }}">{{ n.etichetta }} <span class="text-tenue">({{ n.unita }})</span></label>
+              <input class="form-control form-control-sm" id="rif_{{ n.chiave }}" name="rif_{{ n.chiave }}"
+                     inputmode="decimal" value="{{ analisi.riferimenti[n.chiave] }}">
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-success mt-3" type="submit"><i class="bi bi-check2"></i> Salva impostazioni</button>
+    </form>
+  </div></div>
+</div>
+
+<!-- La settimana -->
+<div class="row g-3">
+{% for giorno in analisi.giorni %}
+  <div class="col-md-6 col-xl-4" id="giorno-{{ giorno.indice }}">
+    <div class="ns-giorno h-100 d-flex flex-column {{ 'oggi' if giorno.oggi }}">
+      <div class="d-flex justify-content-between align-items-start p-3 pb-2">
+        <div>
+          <h6 class="mb-0">{{ giorno.nome }} {% if giorno.oggi %}<span class="badge bg-success">oggi</span>{% endif %}</h6>
+          <div class="small text-tenue">
+            {{ giorno.kcal }} kcal{% if giorno.perc_target %} · {{ giorno.perc_target }}%{% endif %}
+            · P {{ giorno.macro.proteine }}% C {{ giorno.macro.carboidrati }}% G {{ giorno.macro.grassi }}%
+          </div>
+        </div>
+        <div class="dropdown">
+          <button class="btn btn-sm btn-link text-tenue p-0" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+          <ul class="dropdown-menu dropdown-menu-end p-3" style="min-width: 15rem;">
+            <li class="small-caps mb-2">Copia {{ giorno.nome }} su…</li>
+            <li>
+              <form method="post" action="{{ url_for('plans.copia_giorno', piano_id=piano.id, giorno=giorno.indice) }}">
+                {% for altro in analisi.giorni if altro.indice != giorno.indice %}
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="destinazioni" value="{{ altro.indice }}"
+                         id="copia-{{ giorno.indice }}-{{ altro.indice }}">
+                  <label class="form-check-label small" for="copia-{{ giorno.indice }}-{{ altro.indice }}">{{ altro.nome }}</label>
+                </div>
+                {% endfor %}
+                <div class="form-check form-switch mt-2">
+                  <input class="form-check-input" type="checkbox" name="sostituisci" value="1" id="sost-{{ giorno.indice }}" checked>
+                  <label class="form-check-label small" for="sost-{{ giorno.indice }}">Sostituisci il contenuto</label>
+                </div>
+                <button class="btn btn-sm btn-success w-100 mt-2" type="submit">Copia</button>
+              </form>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item small px-0" href="{{ url_for('plans.giorno', piano_id=piano.id, giorno=giorno.indice) }}">
+              <i class="bi bi-eye"></i> Vedi la scheda del giorno</a></li>
+            <li>
+              <form method="post" action="{{ url_for('plans.svuota_giorno', piano_id=piano.id, giorno=giorno.indice) }}"
+                    onsubmit="return confirm('Svuotare {{ giorno.nome }}?');">
+                <button class="dropdown-item small px-0 text-danger" type="submit"><i class="bi bi-eraser"></i> Svuota la giornata</button>
+              </form>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div class="px-3">{{ barra_kcal(giorno.kcal, piano.target_kcal, giorno.stato, false) }}</div>
+
+      <div class="p-3 pt-2 flex-grow-1">
+        {% for nome_pasto in PASTI %}
+          {% set pasto = (giorno.pasti | selectattr('nome', 'equalto', nome_pasto) | list | first) %}
+          <div class="mb-2">
+            <div class="ns-pasto-titolo d-flex justify-content-between align-items-center">
+              <span>{{ nome_pasto }}</span>
+              <span>
+                {% if pasto %}{{ pasto.totali.get('kcal') | round | int }} kcal{% endif %}
+                <button class="btn btn-sm btn-link p-0 ms-1 ns-aggiungi" type="button"
+                        data-bs-toggle="modal" data-bs-target="#modaleVoce"
+                        data-giorno="{{ giorno.indice }}" data-pasto="{{ nome_pasto }}"
+                        data-etichetta="{{ giorno.nome }} · {{ nome_pasto }}" title="Aggiungi">
+                  <i class="bi bi-plus-circle"></i>
+                </button>
+              </span>
+            </div>
+            {% if pasto %}
+              {% for riga in pasto.righe %}
+              <div class="ns-voce {{ 'conflitto' if riga.conflitto }}">
+                <div class="d-flex justify-content-between align-items-start gap-1">
+                  <div class="flex-grow-1">
+                    <div class="small">{{ riga.voce.etichetta }}</div>
+                    <div class="small text-tenue">
+                      {{ riga.voce.quantita_etichetta }} · {{ riga.totali.get('kcal') | round | int }} kcal
+                      {% if riga.voce.nota %}<br><em>{{ riga.voce.nota }}</em>{% endif %}
+                      {% if riga.conflitto %}<span class="text-danger d-block">{{ riga.conflitto }}</span>{% endif %}
+                    </div>
+                  </div>
+                  <div class="d-flex align-items-center gap-1">
+                    <form method="post" action="{{ url_for('plans.aggiorna_porzioni', piano_id=piano.id, voce_id=riga.voce.id) }}">
+                      <input class="form-control form-control-sm text-center px-1" name="porzioni" style="width: 3.2rem;"
+                             value="{{ '%g' % riga.voce.porzioni }}" inputmode="decimal"
+                             onchange="this.form.submit()" title="Porzioni">
+                    </form>
+                    <form method="post" action="{{ url_for('plans.elimina_voce', piano_id=piano.id, voce_id=riga.voce.id) }}">
+                      <button class="btn btn-sm btn-link text-danger p-0" type="submit" title="Togli"><i class="bi bi-x-lg"></i></button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endfor %}
+</div>
+
+<!-- Modale: aggiungi una voce -->
+<div class="modal fade" id="modaleVoce" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('plans.aggiungi_voce', piano_id=piano.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Aggiungi a <span id="modaleEtichetta" class="text-success"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="giorno" id="modaleGiorno">
+          <input type="hidden" name="pasto" id="modalePasto">
+
+          <ul class="nav nav-tabs mb-3" role="tablist">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabAlimento" type="button">Alimento</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabRicetta" type="button">Ricetta</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLibero" type="button">Voce libera</button></li>
+          </ul>
+
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="tabAlimento">
+              <input class="form-control mb-2" id="filtroAlimenti" placeholder="Filtra: scrivi «pollo», «riso», «yogurt»…">
+              <select class="form-select" name="alimento_id" id="selectAlimento" size="10">
+                <option value="">— nessun alimento —</option>
+                {% for categoria, alimenti in gruppi_alimenti.items() %}
+                <optgroup label="{{ categoria }}">
+                  {% for a in alimenti %}
+                  <option value="{{ a.id }}">{{ a.etichetta }} — {{ a.porzione_etichetta }}, {{ a.kcal | numero(0) }} kcal/100 g</option>
+                  {% endfor %}
+                </optgroup>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="tab-pane fade" id="tabRicetta">
+              <select class="form-select" name="ricetta_id" size="8">
+                <option value="">— nessuna ricetta —</option>
+                {% for r in ricette %}
+                <option value="{{ r.id }}">{{ r.titolo }}{% if r.categoria %} ({{ r.categoria }}){% endif %}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Le porzioni della ricetta entrano nel conteggio dei nutrienti e nella spesa.</div>
+            </div>
+
+            <div class="tab-pane fade" id="tabLibero">
+              <input class="form-control" name="testo_libero" placeholder="Es. «un caffè amaro», «tisana della sera»">
+              <div class="form-text">Non ha valori nutrizionali: compare nel piano ma non nei totali.</div>
+            </div>
+          </div>
+
+          <div class="row g-2 mt-3">
+            <div class="col-4">
+              <label class="form-label" for="porzioni">Porzioni</label>
+              <input class="form-control" id="porzioni" name="porzioni" value="1" inputmode="decimal">
+            </div>
+            <div class="col-8">
+              <label class="form-label" for="nota">Nota (facoltativa)</label>
+              <input class="form-control" id="nota" name="nota" placeholder="a crudo, cotto al vapore…">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Annulla</button>
+          <button class="btn btn-success" type="submit"><i class="bi bi-plus-lg"></i> Aggiungi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// La modale è una sola per tutta la settimana: al click portiamo dentro
+// giorno e pasto, così il menu degli alimenti viene disegnato una volta sola.
+document.querySelectorAll('.ns-aggiungi').forEach(function (pulsante) {
+  pulsante.addEventListener('click', function () {
+    document.getElementById('modaleGiorno').value = this.dataset.giorno;
+    document.getElementById('modalePasto').value = this.dataset.pasto;
+    document.getElementById('modaleEtichetta').textContent = this.dataset.etichetta;
+  });
+});
+
+// Filtro locale sul menu degli alimenti: nessuna chiamata al server.
+var filtro = document.getElementById('filtroAlimenti');
+if (filtro) {
+  filtro.addEventListener('input', function () {
+    var testo = this.value.trim().toLowerCase();
+    document.querySelectorAll('#selectAlimento optgroup').forEach(function (gruppo) {
+      var visibili = 0;
+      gruppo.querySelectorAll('option').forEach(function (opzione) {
+        var mostra = !testo || opzione.textContent.toLowerCase().indexOf(testo) !== -1;
+        opzione.hidden = !mostra;
+        if (mostra) visibili++;
+      });
+      gruppo.hidden = visibili === 0;
+    });
+  });
+}
+</script>
+{% endblock %}

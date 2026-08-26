@@ -1,0 +1,41 @@
+{% extends "portal/base.html" %}
+{% block title %}{{ articolo.titolo }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <a class="small ns-no-print" href="{{ url_for('portal.blog') }}">&larr; tutti gli articoli</a>
+    <div class="small-caps mt-2">{{ articolo.categoria or 'articolo' }}</div>
+    <h1 class="h3 mb-1">{{ articolo.titolo }}</h1>
+    <p class="text-tenue small">
+      {{ articolo.data_pubblicazione | data_it }}
+      {% if articolo.autore %} · {{ articolo.autore }}{% endif %}
+      {% if articolo.tempo_lettura %} · {{ articolo.tempo_lettura }} min di lettura{% endif %}
+    </p>
+
+    {% if articolo.sommario %}
+    <p class="lead fs-6 fst-italic">{{ articolo.sommario }}</p>
+    {% endif %}
+
+    <div class="card"><div class="card-body">
+      {% for blocco in articolo.corpo | paragrafi %}
+      <p>{{ blocco }}</p>
+      {% endfor %}
+    </div></div>
+
+    {% if articolo.lista_tags %}
+    <div class="mt-3 d-flex flex-wrap gap-1">
+      {% for tag in articolo.lista_tags %}<span class="badge bg-light text-dark border">{{ tag }}</span>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if correlati %}
+    <h2 class="h6 mt-4">Da leggere dopo</h2>
+    <div class="list-group">
+      {% for c in correlati %}
+      <a class="list-group-item list-group-item-action" href="{{ url_for('portal.articolo', slug=c.slug) }}">{{ c.titolo }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

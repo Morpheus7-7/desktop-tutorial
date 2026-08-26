@@ -1,0 +1,36 @@
+{% extends "portal/base.html" %}
+{% block title %}Ricette{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">Ricette</h1>
+<p class="text-tenue small">Le ricette scelte dal tuo nutrizionista, con i valori per porzione.</p>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-6"><input class="form-control" name="q" value="{{ q }}" placeholder="Cerca una ricetta…"></div>
+  <div class="col-md-2"><button class="btn btn-outline-secondary w-100" type="submit">Cerca</button></div>
+</form>
+
+<div class="row g-3">
+  {% for scheda in schede %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6><a class="text-decoration-none" href="{{ url_for('portal.ricetta', slug=scheda.ricetta.slug) }}">{{ scheda.ricetta.titolo }}</a></h6>
+        <div class="small text-tenue mb-2">
+          {{ scheda.ricetta.categoria or '' }}
+          {% if scheda.ricetta.tempo_minuti %} · {{ scheda.ricetta.tempo_minuti }} min{% endif %}
+        </div>
+        <p class="small">{{ scheda.ricetta.descrizione | truncate(110) if scheda.ricetta.descrizione else '' }}</p>
+        <div class="small text-tenue border-top pt-2">
+          <strong>{{ scheda.per_porzione.get('kcal') | round | int }} kcal</strong> a porzione ·
+          P {{ scheda.per_porzione.get('proteine') | numero(0) }} g ·
+          C {{ scheda.per_porzione.get('carboidrati') | numero(0) }} g ·
+          G {{ scheda.per_porzione.get('grassi') | numero(0) }} g
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><div class="alert alert-light border">Non ci sono ancora ricette pubblicate.</div></div>
+  {% endfor %}
+</div>
+{% endblock %}

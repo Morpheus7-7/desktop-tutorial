@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Ricettario{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-0">Ricettario <span class="text-tenue fs-6">({{ schede | length }})</span></h1>
+    <p class="text-tenue small mb-0">Gli ingredienti collegati agli alimenti calcolano da soli i valori per porzione.</p>
+  </div>
+  <a class="btn btn-success" href="{{ url_for('recipes.nuova') }}"><i class="bi bi-plus-lg"></i> Nuova ricetta</a>
+</div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-5"><input class="form-control" name="q" value="{{ q }}" placeholder="Cerca per titolo o tag…"></div>
+  <div class="col-md-4">
+    <select class="form-select" name="categoria" onchange="this.form.submit()">
+      <option value="">Tutte le categorie</option>
+      {% for c in categorie %}<option value="{{ c }}" {{ 'selected' if categoria == c }}>{{ c }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2"><button class="btn btn-outline-secondary w-100" type="submit">Filtra</button></div>
+</form>
+
+<div class="row g-3">
+  {% for scheda in schede %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <h6 class="mb-1"><a class="text-decoration-none" href="{{ url_for('recipes.dettaglio', ricetta_id=scheda.ricetta.id) }}">{{ scheda.ricetta.titolo }}</a></h6>
+          {% if not scheda.ricetta.pubblicata %}<span class="badge bg-secondary">non visibile</span>{% endif %}
+        </div>
+        <div class="small text-tenue mb-2">
+          {{ scheda.ricetta.categoria or 'senza categoria' }}
+          {% if scheda.ricetta.tempo_minuti %} · {{ scheda.ricetta.tempo_minuti }} min{% endif %}
+          · {{ scheda.ricetta.porzioni }} porzion{{ 'e' if scheda.ricetta.porzioni == 1 else 'i' }}
+        </div>
+        <p class="small mb-2">{{ scheda.ricetta.descrizione | truncate(110) if scheda.ricetta.descrizione else '' }}</p>
+        <div class="d-flex flex-wrap gap-1 mb-2">
+          {% for tag in scheda.ricetta.lista_tags %}<span class="badge bg-light text-dark border">{{ tag }}</span>{% endfor %}
+        </div>
+        <div class="small text-tenue border-top pt-2">
+          A porzione: <strong>{{ scheda.per_porzione.get('kcal') | round | int }} kcal</strong> ·
+          P {{ scheda.per_porzione.get('proteine') | numero(1) }} g ·
+          C {{ scheda.per_porzione.get('carboidrati') | numero(1) }} g ·
+          G {{ scheda.per_porzione.get('grassi') | numero(1) }} g
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><div class="alert alert-light border">Nessuna ricetta: comincia da «Nuova ricetta».</div></div>
+  {% endfor %}
+</div>
+{% endblock %}

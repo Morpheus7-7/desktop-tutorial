@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Ricerca · {{ q }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">Ricerca</h1>
+<p class="text-tenue small">
+  {% if q %}{{ totale }} risultati per «{{ q }}»{% else %}Scrivi almeno due caratteri nella barra in alto.{% endif %}
+</p>
+
+{% if risultati.assistiti %}
+<div class="card mb-3">
+  <div class="card-header">Assistiti</div>
+  <div class="list-group list-group-flush">
+    {% for a in risultati.assistiti %}
+    <a class="list-group-item list-group-item-action d-flex align-items-center gap-2" href="{{ url_for('clients.dettaglio', assistito_id=a.id) }}">
+      {{ avatar(a.iniziali) }}
+      <div><div class="fw-semibold">{{ a.nome_completo }}</div>
+      <div class="small text-tenue">{{ a.email or '—' }} {% if a.telefono %}· {{ a.telefono }}{% endif %}</div></div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if risultati.alimenti %}
+<div class="card mb-3">
+  <div class="card-header">Alimenti</div>
+  <div class="list-group list-group-flush">
+    {% for al in risultati.alimenti %}
+    <a class="list-group-item list-group-item-action d-flex justify-content-between" href="{{ url_for('foods.dettaglio', alimento_id=al.id) }}">
+      <span>{{ al.etichetta }} <span class="small text-tenue">· {{ al.categoria_it }}</span></span>
+      <span class="small text-tenue">{{ al.kcal | numero(0) }} kcal/100 g</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if risultati.ricette %}
+<div class="card mb-3">
+  <div class="card-header">Ricette</div>
+  <div class="list-group list-group-flush">
+    {% for r in risultati.ricette %}
+    <a class="list-group-item list-group-item-action" href="{{ url_for('recipes.dettaglio', ricetta_id=r.id) }}">
+      {{ r.titolo }} <span class="small text-tenue">· {{ r.categoria or 'senza categoria' }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if risultati.articoli %}
+<div class="card mb-3">
+  <div class="card-header">Articoli</div>
+  <div class="list-group list-group-flush">
+    {% for art in risultati.articoli %}
+    <a class="list-group-item list-group-item-action" href="{{ url_for('blog.dettaglio', articolo_id=art.id) }}">
+      {{ art.titolo }}
+      {% if not art.pubblicato %}<span class="badge bg-secondary">bozza</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if q and totale == 0 %}
+<div class="alert alert-light border">Nessun risultato per «{{ q }}».</div>
+{% endif %}
+{% endblock %}

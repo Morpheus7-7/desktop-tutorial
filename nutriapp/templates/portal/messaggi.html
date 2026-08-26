@@ -1,0 +1,32 @@
+{% extends "portal/base.html" %}
+{% block title %}Messaggi{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <h1 class="h4 mb-1">Messaggi</h1>
+    <p class="text-tenue small">Domande sul piano, sostituzioni, dubbi: scrivi qui.</p>
+
+    <div class="card">
+      <div class="card-body" style="max-height: 28rem; overflow-y: auto;">
+        {% for m in assistito.messaggi %}
+        <div class="mb-3 d-flex {{ 'justify-content-end' if m.mittente_ruolo == 'cliente' }}">
+          <div class="p-2 px-3 rounded-3 {{ 'bg-success-subtle' if m.mittente_ruolo == 'cliente' else 'bg-light border' }}"
+               style="max-width: 80%;">
+            <div>{{ m.testo }}</div>
+            <div class="small text-tenue">{{ m.mittente_nome }} · {{ m.created_at | ora_it }}</div>
+          </div>
+        </div>
+        {% else %}
+        <p class="text-tenue small mb-0">Nessun messaggio ancora.</p>
+        {% endfor %}
+      </div>
+      <div class="card-footer bg-white">
+        <form class="d-flex gap-2" method="post">
+          <input class="form-control" name="testo" placeholder="Scrivi al tuo nutrizionista…" required autofocus>
+          <button class="btn btn-success" type="submit"><i class="bi bi-send"></i></button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

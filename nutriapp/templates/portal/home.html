@@ -1,0 +1,134 @@
+{% extends "portal/base.html" %}
+{% from "_macros.html" import barra_kcal, pallino %}
+{% block title %}Oggi · {{ impostazioni.nome_studio }}{% endblock %}
+{% block content %}
+
+<div class="mb-3">
+  <h1 class="h4 mb-0">Ciao {{ assistito.nome }}</h1>
+  <p class="text-tenue small mb-0">{{ oggi | data_it }}{% if piano %} · {{ piano.titolo }}{% endif %}</p>
+</div>
+
+{% if notifiche %}
+<div class="card mb-3 border-success-subtle">
+  <div class="card-body py-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+    <div>
+      {% for n in notifiche %}
+      <div class="small"><i class="bi bi-bell text-success"></i> {{ n.messaggio }}</div>
+      {% endfor %}
+    </div>
+    <form method="post" action="{{ url_for('portal.notifiche_lette') }}">
+      <button class="btn btn-sm btn-outline-secondary" type="submit">Ho letto</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if not piano %}
+<div class="alert alert-light border">
+  <h2 class="h6">Il tuo piano non è ancora pubblicato</h2>
+  <p class="mb-0 small">
+    Appena il tuo nutrizionista lo pubblica lo trovi qui, con le schede giorno per giorno
+    e la lista della spesa. Intanto puoi leggere le <a href="{{ url_for('portal.ricette') }}">ricette</a>
+    e gli <a href="{{ url_for('portal.blog') }}">articoli</a>.
+  </p>
+</div>
+{% else %}
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-sun me-1"></i> {{ giorno.nome }} — la tua giornata</span>
+        <a class="btn btn-sm btn-outline-success" href="{{ url_for('portal.giorno', giorno=giorno.indice) }}">Apri la scheda</a>
+      </div>
+      <div class="card-body">
+        {{ barra_kcal(giorno.kcal, piano.target_kcal, giorno.stato) }}
+      </div>
+      <div class="list-group list-group-flush">
+        {% for pasto in giorno.pasti %}
+        <div class="list-group-item">
+          <div class="d-flex justify-content-between">
+            <span class="small-caps">{{ pasto.nome }}</span>
+            <span class="small text-tenue">{{ pasto.totali.get('kcal') | round | int }} kcal</span>
+          </div>
+          {% for riga in pasto.righe %}
+          <div class="d-flex flex-column flex-sm-row justify-content-between small py-1">
+            <span>{{ riga.voce.etichetta }}</span>
+            <span class="text-tenue text-nowrap ms-sm-2">{{ riga.voce.quantita_etichetta }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="list-group-item text-tenue small">Nessun pasto previsto per oggi.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if piano.note_cliente %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-sticky me-1"></i> Nota del tuo nutrizionista</div>
+      <div class="card-body small">{{ piano.note_cliente }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-body d-grid gap-2">
+        <a class="btn btn-success" href="{{ url_for('portal.spesa') }}"><i class="bi bi-cart3"></i> Lista della spesa</a>
+        <a class="btn btn-outline-success" href="{{ url_for('portal.piano') }}"><i class="bi bi-calendar3-week"></i> Tutta la settimana</a>
+        <a class="btn btn-outline-secondary" href="{{ url_for('portal.progressi') }}"><i class="bi bi-graph-up-arrow"></i> Registra il peso</a>
+      </div>
+    </div>
+
+    {% if prossimo_appuntamento %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-calendar-event me-1"></i> Prossimo appuntamento</div>
+      <div class="card-body">
+        <div class="fw-semibold">{{ prossimo_appuntamento.data_ora | ora_it }}</div>
+        <div class="small text-tenue">
+          {{ prossimo_appuntamento.tipo }}
+          {% if prossimo_appuntamento.luogo %} · {{ prossimo_appuntamento.luogo }}{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between">
+        <span><i class="bi bi-chat-dots me-1"></i> Messaggi</span>
+        <a class="small" href="{{ url_for('portal.messaggi') }}">apri</a>
+      </div>
+      <div class="card-body">
+        {% for m in ultimi_messaggi %}
+        <div class="small mb-2">
+          <strong>{{ m.mittente_nome }}</strong>
+          <span class="text-tenue">· {{ m.created_at | data_breve }}</span>
+          <div>{{ m.testo | truncate(90) }}</div>
+        </div>
+        {% else %}
+        <p class="small text-tenue mb-0">Nessun messaggio. Scrivi pure se hai un dubbio.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if articoli %}
+    <div class="card">
+      <div class="card-header d-flex justify-content-between">
+        <span><i class="bi bi-journal-text me-1"></i> Da leggere</span>
+        <a class="small" href="{{ url_for('portal.blog') }}">tutti</a>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for a in articoli %}
+        <a class="list-group-item list-group-item-action" href="{{ url_for('portal.articolo', slug=a.slug) }}">
+          <div class="small fw-semibold">{{ a.titolo }}</div>
+          <div class="small text-tenue">{{ a.categoria }}{% if a.tempo_lettura %} · {{ a.tempo_lettura }} min{% endif %}</div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

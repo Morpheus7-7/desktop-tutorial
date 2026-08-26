@@ -1,0 +1,417 @@
+[
+ {
+  "giorno": "Lunedì",
+  "voci": [
+   {
+    "pasto": "Colazione",
+    "alimento": "Oats, whole grain, rolled, old fashioned",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Milk, whole, 3.25% milkfat, with added vitamin D",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Bananas, ripe and slightly ripe, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Chicken, breast, boneless, skinless, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Rice, brown, long grain, unenriched, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Broccoli, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Yogurt, Greek, plain, nonfat",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Nuts, almonds, dry roasted, with salt added",
+    "porzioni": 0.5
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Fish, salmon, Atlantic, farm raised, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Sweet potatoes, orange flesh, without skin, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Spinach, mature",
+    "porzioni": 1.0
+   }
+  ]
+ },
+ {
+  "giorno": "Martedì",
+  "voci": [
+   {
+    "pasto": "Colazione",
+    "alimento": "Yogurt, Greek, plain, nonfat",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Blueberries, raw",
+    "porzioni": 2.0
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Nuts, walnuts, English, halves, raw",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Fish, tuna, light, canned in water, drained solids",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Farro, pearled, dry, raw",
+    "porzioni": 2.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Peppers, bell, red, raw",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Apples, gala, with skin, raw",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Turkey, ground, 93% lean/ 7% fat, raw",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Potatoes, gold, without skin, raw",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Squash, summer, green, zucchini, includes skin, raw",
+    "porzioni": 2.0
+   }
+  ]
+ },
+ {
+  "giorno": "Mercoledì",
+  "voci": [
+   {
+    "pasto": "Colazione",
+    "alimento": "Eggs, Grade A, Large, egg whole",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Oats, whole grain, rolled, old fashioned",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Oranges, raw, navels",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Lentils, dry",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Rice, brown, long grain, unenriched, raw",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Carrots, mature, raw",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Cheese, cottage, lowfat, 2% milkfat",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Strawberries, raw",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Fish, cod, Atlantic, wild caught, raw",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Sweet potatoes, orange flesh, without skin, raw",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Kale, raw",
+    "porzioni": 0.5
+   }
+  ]
+ },
+ {
+  "giorno": "Giovedì",
+  "voci": [
+   {
+    "pasto": "Colazione",
+    "alimento": "Oats, whole grain, rolled, old fashioned",
+    "porzioni": 0.5
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Soy milk, unsweetened, plain, shelf stable",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Strawberries, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Chickpeas (garbanzo beans, bengal gram), canned, sodium added, drained and rinse",
+    "porzioni": 0.5
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Bulgur, dry, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Tomatoes, grape, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Nuts, almonds, dry roasted, with salt added",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Apples, gala, with skin, raw",
+    "porzioni": 0.5
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Beef, flank, steak, boneless, choice, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Potatoes, gold, without skin, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Broccoli, raw",
+    "porzioni": 1.0
+   }
+  ]
+ },
+ {
+  "giorno": "Venerdì",
+  "voci": [
+   {
+    "pasto": "Colazione",
+    "alimento": "Yogurt, Greek, plain, nonfat",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Chia seeds, dry, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Bananas, ripe and slightly ripe, raw",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Fish, salmon, Atlantic, farm raised, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Farro, pearled, dry, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Squash, summer, green, zucchini, includes skin, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Nuts, walnuts, English, halves, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Oranges, raw, navels",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Beans, cannellini, canned, sodium added, drained and rinsed",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Rice, brown, long grain, unenriched, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Peppers, bell, red, raw",
+    "porzioni": 1.5
+   }
+  ]
+ },
+ {
+  "giorno": "Sabato",
+  "voci": [
+   {
+    "pasto": "Colazione",
+    "alimento": "Oats, whole grain, rolled, old fashioned",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Peanut butter, creamy",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Apples, gala, with skin, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Crustaceans, shrimp, farm raised, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Rice, white, long grain, unenriched, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Kale, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Cheese, cottage, lowfat, 2% milkfat",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Blueberries, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Chicken, breast, boneless, skinless, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Sweet potatoes, orange flesh, without skin, raw",
+    "porzioni": 1.5
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Mushroom, crimini",
+    "porzioni": 1.0
+   }
+  ]
+ },
+ {
+  "giorno": "Domenica",
+  "voci": [
+   {
+    "pasto": "Colazione",
+    "alimento": "Eggs, Grade A, Large, egg whole",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Milk, whole, 3.25% milkfat, with added vitamin D",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Colazione",
+    "alimento": "Oranges, raw, navels",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Beans, black, canned, sodium added, drained and rinsed",
+    "porzioni": 0.5
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Bulgur, dry, raw",
+    "porzioni": 0.5
+   },
+   {
+    "pasto": "Pranzo",
+    "alimento": "Tomatoes, grape, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Yogurt, Greek, plain, nonfat",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Spuntino",
+    "alimento": "Nuts, almonds, dry roasted, with salt added",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Pork, chop, center cut, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Potatoes, gold, without skin, raw",
+    "porzioni": 1.0
+   },
+   {
+    "pasto": "Cena",
+    "alimento": "Broccoli, raw",
+    "porzioni": 1.0
+   }
+  ]
+ }
+]

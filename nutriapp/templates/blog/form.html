@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ articolo.titolo if articolo else 'Nuovo articolo' }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">{{ articolo.titolo if articolo else 'Nuovo articolo' }}</h1>
+
+<form method="post">
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-body row g-3">
+        <div class="col-12">
+          <label class="form-label" for="titolo">Titolo *</label>
+          <input class="form-control" id="titolo" name="titolo" required value="{{ articolo.titolo if articolo else '' }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="sommario">Sommario</label>
+          <textarea class="form-control" id="sommario" name="sommario" rows="2">{{ articolo.sommario or '' if articolo else '' }}</textarea>
+          <div class="form-text">Le due righe che compaiono nell'elenco dell'area clienti.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="corpo">Testo</label>
+          <textarea class="form-control" id="corpo" name="corpo" rows="18">{{ articolo.corpo or '' if articolo else '' }}</textarea>
+          <div class="form-text">Testo semplice: separa i paragrafi con una riga vuota.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-body row g-3">
+        <div class="col-12">
+          <label class="form-label" for="categoria">Categoria</label>
+          <select class="form-select" id="categoria" name="categoria">
+            <option value="">—</option>
+            {% for c in categorie %}<option value="{{ c }}" {{ 'selected' if articolo and articolo.categoria == c }}>{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="tags">Tag</label>
+          <input class="form-control" id="tags" name="tags" value="{{ articolo.tags or '' if articolo else '' }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="autore">Autore</label>
+          <input class="form-control" id="autore" name="autore"
+                 value="{{ articolo.autore or utente.nome if articolo else utente.nome }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="data_pubblicazione">Data di pubblicazione</label>
+          <input class="form-control" type="date" id="data_pubblicazione" name="data_pubblicazione"
+                 value="{{ articolo.data_pubblicazione.isoformat() if articolo and articolo.data_pubblicazione else oggi.isoformat() }}">
+        </div>
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="pubblicato" name="pubblicato" value="1"
+                   {{ 'checked' if articolo and articolo.pubblicato }}>
+            <label class="form-check-label" for="pubblicato">Pubblicato (visibile ai clienti)</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button class="btn btn-success" type="submit"><i class="bi bi-check2"></i> Salva</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('blog.elenco') }}">Elenco</a>
+      {% if articolo %}
+      <form method="post" action="{{ url_for('blog.elimina', articolo_id=articolo.id) }}" class="ms-auto"
+            onsubmit="return confirm('Eliminare l\'articolo?');">
+        <button class="btn btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</form>
+{% endblock %}

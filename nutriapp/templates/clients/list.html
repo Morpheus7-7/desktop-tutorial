@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar, badge_piano %}
+{% block title %}Assistiti{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h1 class="h4 mb-0">Assistiti <span class="text-tenue fs-6">({{ assistiti | length }})</span></h1>
+  <a class="btn btn-success" href="{{ url_for('clients.nuovo') }}"><i class="bi bi-person-plus"></i> Nuovo assistito</a>
+</div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-5">
+    <input class="form-control" name="q" value="{{ q }}" placeholder="Cerca per nome, cognome o email…">
+  </div>
+  <div class="col-md-3">
+    <select class="form-select" name="stato" onchange="this.form.submit()">
+      <option value="attivi" {{ 'selected' if stato == 'attivi' }}>Solo attivi</option>
+      <option value="archiviati" {{ 'selected' if stato == 'archiviati' }}>Solo archiviati</option>
+      <option value="tutti" {{ 'selected' if stato == 'tutti' }}>Tutti</option>
+    </select>
+  </div>
+  <div class="col-md-2"><button class="btn btn-outline-secondary w-100" type="submit">Filtra</button></div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Assistito</th><th>Obiettivo</th><th>Dieta</th><th class="text-end">Peso</th>
+            <th class="text-end">BMI</th><th>Piano</th><th>Area riservata</th></tr>
+      </thead>
+      <tbody>
+      {% for a in assistiti %}
+        <tr onclick="location.href='{{ url_for('clients.dettaglio', assistito_id=a.id) }}'" style="cursor:pointer">
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              {{ avatar(a.iniziali) }}
+              <div>
+                <div class="fw-semibold">{{ a.nome_completo }}</div>
+                <div class="small text-tenue">{{ a.email or '—' }}{% if a.eta %} · {{ a.eta }} anni{% endif %}</div>
+              </div>
+            </div>
+          </td>
+          <td class="small">{{ a.obiettivo or '—' }}</td>
+          <td class="small">{{ a.tipo_dieta }}</td>
+          <td class="text-end">
+            {{ a.peso_attuale | numero(1) }} kg
+            {% if a.variazione_peso is not none and a.variazione_peso != 0 %}
+              <span class="small {{ 'text-success' if a.variazione_peso < 0 else 'text-danger' }}">
+                {{ '+' if a.variazione_peso > 0 }}{{ a.variazione_peso }}
+              </span>
+            {% endif %}
+          </td>
+          <td class="text-end">{{ a.bmi | numero(1) }}</td>
+          <td>{% if a.piano_attivo %}{{ badge_piano(a.piano_attivo) }}{% else %}<span class="text-tenue small">nessuno</span>{% endif %}</td>
+          <td>
+            {% if a.utente %}<i class="bi bi-check-circle-fill text-success" title="Accesso attivo"></i>
+            {% else %}<i class="bi bi-dash-circle text-tenue" title="Nessun accesso"></i>{% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="text-center text-tenue py-4">Nessun assistito trovato.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,5 +1,10 @@
 # Gestionale Assicurativo
 
+> **In questo repository ci sono due applicazioni.** Questa è il gestionale
+> assicurativo; l'altra è **[NutriStudio](NUTRISTUDIO.md)**, l'app per studi di
+> nutrizione con area riservata per la nutrizionista e per i clienti
+> (`python nutri_app.py`).
+
 Gestionale web per intermediari assicurativi che seguono **professionisti e
 aziende**. Permette di raccogliere in un unico posto anagrafiche, polizze e
 documenti, di **analizzare automaticamente i pericoli** a partire dalla
