@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Articoli{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-0">Articoli</h1>
+    <p class="text-tenue small mb-0">Educazione alimentare e comunicazioni: i clienti li leggono nella loro area.</p>
+  </div>
+  <a class="btn btn-success" href="{{ url_for('blog.nuovo') }}"><i class="bi bi-plus-lg"></i> Nuovo articolo</a>
+</div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-5"><input class="form-control" name="q" value="{{ q }}" placeholder="Cerca…"></div>
+  <div class="col-md-4">
+    <select class="form-select" name="stato" onchange="this.form.submit()">
+      <option value="">Tutti</option>
+      <option value="pubblicati" {{ 'selected' if stato == 'pubblicati' }}>Pubblicati</option>
+      <option value="bozze" {{ 'selected' if stato == 'bozze' }}>Bozze</option>
+    </select>
+  </div>
+  <div class="col-md-2"><button class="btn btn-outline-secondary w-100" type="submit">Filtra</button></div>
+</form>
+
+<div class="card">
+  <div class="list-group list-group-flush">
+    {% for a in articoli %}
+    <div class="list-group-item d-flex justify-content-between align-items-start gap-3">
+      <div>
+        <a class="fw-semibold text-decoration-none" href="{{ url_for('blog.dettaglio', articolo_id=a.id) }}">{{ a.titolo }}</a>
+        <div class="small text-tenue">
+          {{ a.categoria or 'senza categoria' }}
+          {% if a.data_pubblicazione %} · {{ a.data_pubblicazione | data_it }}{% endif %}
+          {% if a.tempo_lettura %} · {{ a.tempo_lettura }} min di lettura{% endif %}
+          {% if a.autore %} · {{ a.autore }}{% endif %}
+        </div>
+        <p class="small mb-0 mt-1">{{ a.sommario | truncate(150) if a.sommario else '' }}</p>
+      </div>
+      <div class="text-end text-nowrap">
+        {% if a.pubblicato %}<span class="badge bg-success mb-1">Pubblicato</span>
+        {% else %}<span class="badge bg-secondary mb-1">Bozza</span>{% endif %}
+        <form method="post" action="{{ url_for('blog.pubblica', articolo_id=a.id) }}">
+          <button class="btn btn-sm btn-outline-secondary" type="submit">
+            {{ 'Ritira' if a.pubblicato else 'Pubblica' }}
+          </button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="list-group-item text-tenue small">Nessun articolo.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

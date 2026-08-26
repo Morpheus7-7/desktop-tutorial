@@ -1,0 +1,39 @@
+{% extends "portal/base.html" %}
+{% from "_macros.html" import scheda_giorno %}
+{% block title %}Il mio piano{% endblock %}
+{% block content %}
+
+{% if not piano %}
+<div class="alert alert-light border">Il tuo nutrizionista non ha ancora pubblicato un piano.</div>
+{% else %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-0">{{ piano.titolo }}</h1>
+    <p class="text-tenue small mb-0">
+      {{ piano.data_inizio | data_it }} – {{ piano.data_fine | data_it }} ·
+      circa {{ piano.target_kcal }} kcal al giorno · {{ piano.tipo_dieta }}
+    </p>
+  </div>
+  <div class="d-flex gap-2 ns-no-print">
+    <a class="btn btn-outline-secondary" href="{{ url_for('portal.spesa') }}"><i class="bi bi-cart3"></i> Spesa</a>
+    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+  </div>
+</div>
+
+{% if piano.note_cliente %}
+<div class="alert alert-light border">{{ piano.note_cliente }}</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for giorno in analisi.giorni %}
+  <div class="col-md-6 col-xl-4">
+    {{ scheda_giorno(giorno, piano, false, url_for('portal.giorno', giorno=giorno.indice)) }}
+  </div>
+  {% endfor %}
+</div>
+
+<p class="small text-tenue mt-3">
+  Le porzioni sono indicative. Prima di modificarle scrivi al tuo nutrizionista.
+</p>
+{% endif %}
+{% endblock %}

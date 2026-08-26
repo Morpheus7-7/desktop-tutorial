@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}{{ alimento.etichetta if alimento else 'Nuovo alimento' }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">{{ alimento.etichetta if alimento else 'Nuovo alimento' }}</h1>
+<p class="text-tenue small">
+  {% if alimento and alimento.fdc_id %}
+    Fonte: USDA FoodData Central, FDC ID {{ alimento.fdc_id }} · porzione «{{ alimento.fonte_porzione or 'non indicata' }}».
+    I valori sono per 100 g: correggi il nome italiano e la porzione, non i nutrienti, se non hai una fonte migliore.
+  {% else %}
+    Valori per 100 g di parte edibile. Lascia vuoto ciò che non conosci: vuoto significa «non analizzato», non zero.
+  {% endif %}
+</p>
+
+<form method="post">
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header">Identità</div>
+      <div class="card-body row g-3">
+        <div class="col-12">
+          <label class="form-label" for="nome_it">Nome italiano</label>
+          <input class="form-control" id="nome_it" name="nome_it" value="{{ alimento.nome_it or '' if alimento else '' }}">
+          <div class="form-text">È il nome che vedono la nutrizionista e il cliente.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="nome">Nome originale</label>
+          <input class="form-control" id="nome" name="nome" value="{{ alimento.nome if alimento else '' }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="categoria_it">Reparto</label>
+          <input class="form-control" id="categoria_it" name="categoria_it" value="{{ alimento.categoria_it or '' if alimento else '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="spesa_query">Termine per la spesa</label>
+          <input class="form-control" id="spesa_query" name="spesa_query" value="{{ alimento.spesa_query or '' if alimento else '' }}">
+          <div class="form-text">Quello che verrà cercato su Glovo &amp; co.</div>
+        </div>
+        <div class="col-md-7">
+          <label class="form-label" for="porzione_nome">Nome della porzione</label>
+          <input class="form-control" id="porzione_nome" name="porzione_nome"
+                 value="{{ alimento.porzione_nome or '' if alimento else '' }}" placeholder="1 tazza, 1 medio…">
+        </div>
+        <div class="col-md-5">
+          <label class="form-label" for="porzione_g">Porzione (g)</label>
+          <input class="form-control" id="porzione_g" name="porzione_g" inputmode="decimal"
+                 value="{{ alimento.porzione_g if alimento else 100 }}">
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">Compatibilità con le diete</div>
+      <div class="card-body row g-2">
+        {% for campo, etichetta in [('vegan', 'Vegano'), ('vegetariano', 'Vegetariano'),
+                                     ('senza_glutine', 'Senza glutine'), ('senza_lattosio', 'Senza lattosio')] %}
+        {% set valore = alimento[campo] if alimento else none %}
+        <div class="col-md-6">
+          <label class="form-label small" for="{{ campo }}">{{ etichetta }}</label>
+          <select class="form-select form-select-sm" id="{{ campo }}" name="{{ campo }}">
+            <option value="" {{ 'selected' if valore is none }}>Non verificato</option>
+            <option value="1" {{ 'selected' if valore is true }}>Sì</option>
+            <option value="0" {{ 'selected' if valore is false }}>No</option>
+          </select>
+        </div>
+        {% endfor %}
+        <div class="col-12">
+          <div class="form-check form-switch mt-2">
+            <input class="form-check-input" type="checkbox" id="da_verificare" name="da_verificare" value="1"
+                   {{ 'checked' if alimento and alimento.da_verificare }}>
+            <label class="form-check-label" for="da_verificare">Da verificare</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card mb-3">
+      <div class="card-header">Valori per 100 g</div>
+      <div class="card-body row g-2">
+        {% for n in nutrienti %}
+        <div class="col-6 col-md-4 col-xl-3">
+          <label class="form-label small mb-0" for="{{ n.chiave }}">{{ n.etichetta }} <span class="text-tenue">({{ n.unita }})</span></label>
+          <input class="form-control form-control-sm" id="{{ n.chiave }}" name="{{ n.chiave }}" inputmode="decimal"
+                 value="{{ alimento[n.chiave] if alimento and alimento[n.chiave] is not none else '' }}">
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button class="btn btn-success" type="submit"><i class="bi bi-check2"></i> Salva</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('foods.elenco') }}">Torna all'elenco</a>
+      {% if alimento and alimento.personalizzato %}
+      <form method="post" action="{{ url_for('foods.elimina', alimento_id=alimento.id) }}" class="ms-auto"
+            onsubmit="return confirm('Eliminare questo alimento?');">
+        <button class="btn btn-outline-danger" type="submit"><i class="bi bi-trash"></i> Elimina</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</form>
+{% endblock %}

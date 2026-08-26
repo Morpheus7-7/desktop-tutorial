@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Impostazioni{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Impostazioni</h1>
+
+<form method="post">
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-shop me-1"></i> Studio</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label" for="nome_studio">Nome dello studio</label>
+          <input class="form-control" id="nome_studio" name="nome_studio" value="{{ settings.nome_studio or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="professionista">Professionista</label>
+          <input class="form-control" id="professionista" name="professionista" value="{{ settings.professionista or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="email_studio">Email pubblica</label>
+          <input class="form-control" type="email" id="email_studio" name="email_studio" value="{{ settings.email_studio or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="telefono_studio">Telefono</label>
+          <input class="form-control" id="telefono_studio" name="telefono_studio" value="{{ settings.telefono_studio or '' }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="sito_web">Sito web</label>
+          <input class="form-control" id="sito_web" name="sito_web" value="{{ settings.sito_web or '' }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="disclaimer">Disclaimer sulle schede</label>
+          <textarea class="form-control" id="disclaimer" name="disclaimer" rows="3">{{ settings.disclaimer or '' }}</textarea>
+          <div class="form-text">Compare in fondo alla scheda che consegni al cliente.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-bell me-1"></i> Quando avvisarti</div>
+      <div class="card-body row g-3">
+        <div class="col-md-7">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="avvisa_piano_in_scadenza" name="avvisa_piano_in_scadenza"
+                   value="1" {{ 'checked' if settings.avvisa_piano_in_scadenza }}>
+            <label class="form-check-label" for="avvisa_piano_in_scadenza">Piani in scadenza</label>
+          </div>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label small" for="giorni_preavviso_piano">Preavviso (giorni)</label>
+          <input class="form-control form-control-sm" type="number" id="giorni_preavviso_piano"
+                 name="giorni_preavviso_piano" value="{{ settings.giorni_preavviso_piano }}">
+        </div>
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="avvisa_appuntamenti" name="avvisa_appuntamenti"
+                   value="1" {{ 'checked' if settings.avvisa_appuntamenti }}>
+            <label class="form-check-label" for="avvisa_appuntamenti">Appuntamenti di oggi e domani</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="avvisa_nuovo_piano_al_cliente"
+                   name="avvisa_nuovo_piano_al_cliente" value="1" {{ 'checked' if settings.avvisa_nuovo_piano_al_cliente }}>
+            <label class="form-check-label" for="avvisa_nuovo_piano_al_cliente">Avvisa il cliente quando pubblichi un piano</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-envelope me-1"></i> Email</span>
+        {% if in_attesa %}<span class="badge bg-warning text-dark">{{ in_attesa }} notifiche da inviare</span>{% endif %}
+      </div>
+      <div class="card-body row g-3">
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="email_attive" name="email_attive"
+                   value="1" {{ 'checked' if settings.email_attive }}>
+            <label class="form-check-label" for="email_attive">Invio automatico attivo</label>
+          </div>
+          <div class="form-text">
+            Le credenziali di accesso partono comunque, anche a invio automatico spento.
+          </div>
+        </div>
+        <div class="col-md-7">
+          <label class="form-label" for="smtp_host">Server SMTP</label>
+          <input class="form-control" id="smtp_host" name="smtp_host" value="{{ settings.smtp_host or '' }}" placeholder="smtp.gmail.com">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label" for="smtp_port">Porta</label>
+          <input class="form-control" type="number" id="smtp_port" name="smtp_port" value="{{ settings.smtp_port }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="smtp_security">Sicurezza</label>
+          <select class="form-select" id="smtp_security" name="smtp_security">
+            {% for valore, etichetta in [('tls', 'STARTTLS'), ('ssl', 'SSL'), ('none', 'nessuna')] %}
+            <option value="{{ valore }}" {{ 'selected' if settings.smtp_security == valore }}>{{ etichetta }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="smtp_user">Utente</label>
+          <input class="form-control" id="smtp_user" name="smtp_user" value="{{ settings.smtp_user or '' }}" autocomplete="off">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="smtp_password">Password</label>
+          <input class="form-control" type="password" id="smtp_password" name="smtp_password"
+                 placeholder="{{ '•••••• (lascia vuoto per non cambiarla)' if settings.smtp_password else '' }}" autocomplete="new-password">
+          <div class="form-text">Con Gmail serve una «password per le app».</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="mail_from">Mittente</label>
+          <input class="form-control" id="mail_from" name="mail_from" value="{{ settings.mail_from or '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="intervallo_minuti">Controllo ogni (minuti)</label>
+          <input class="form-control" type="number" id="intervallo_minuti" name="intervallo_minuti" value="{{ settings.intervallo_minuti }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="mail_to">Destinatari del riepilogo</label>
+          <input class="form-control" id="mail_to" name="mail_to" value="{{ settings.mail_to or '' }}"
+                 placeholder="studio@esempio.it, collega@esempio.it">
+        </div>
+        <div class="col-12">
+          <div class="alert alert-light border small mb-0">
+            Configurazione in uso: <strong>{{ config.host or 'nessun server' }}</strong>:{{ config.port }}
+            ({{ config.security }}) da <strong>{{ config.mittente or '—' }}</strong>.
+            Le variabili d'ambiente <code>SMTP_*</code> hanno la precedenza su questi campi.
+          </div>
+        </div>
+      </div>
+      <div class="card-footer bg-white d-flex gap-2 flex-wrap">
+        <button class="btn btn-success" type="submit"><i class="bi bi-check2"></i> Salva impostazioni</button>
+        <button class="btn btn-outline-secondary" type="submit" formaction="{{ url_for('settings.prova_email') }}" formnovalidate>
+          <i class="bi bi-send"></i> Email di prova
+        </button>
+        <button class="btn btn-outline-secondary" type="submit" formaction="{{ url_for('settings.invia_notifiche') }}" formnovalidate>
+          <i class="bi bi-envelope-arrow-up"></i> Invia il riepilogo adesso
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+</form>
+
+<div class="card mt-3" id="spesa">
+  <div class="card-header"><i class="bi bi-cart3 me-1"></i> Servizi di spesa online</div>
+  <div class="card-body">
+    <p class="small text-tenue">
+      Ogni riga della lista della spesa apre la ricerca del prodotto su questi servizi.
+      Nell'indirizzo, <code>{query}</code> è il posto in cui finisce il nome del prodotto.
+    </p>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr><th>Nome</th><th>Indirizzo di ricerca</th><th>Icona</th><th>Colore</th><th>Ordine</th><th>Attivo</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for f in fornitori %}
+          <tr>
+            <form method="post" action="{{ url_for('settings.salva_fornitore') }}">
+              <input type="hidden" name="id" value="{{ f.id }}">
+              <td><input class="form-control form-control-sm" name="nome" value="{{ f.nome }}" required></td>
+              <td><input class="form-control form-control-sm" name="url_template" value="{{ f.url_template }}" required></td>
+              <td><input class="form-control form-control-sm" name="icona" value="{{ f.icona }}" style="width: 9rem;"></td>
+              <td><input class="form-control form-control-sm form-control-color" type="color" name="colore" value="{{ f.colore }}"></td>
+              <td><input class="form-control form-control-sm" type="number" name="ordine" value="{{ f.ordine }}" style="width: 5rem;"></td>
+              <td class="text-center"><input class="form-check-input" type="checkbox" name="attivo" value="1" {{ 'checked' if f.attivo }}></td>
+              <td class="text-nowrap">
+                <button class="btn btn-sm btn-outline-success" type="submit"><i class="bi bi-check2"></i></button>
+            </form>
+                <form class="d-inline" method="post" action="{{ url_for('settings.elimina_fornitore', fornitore_id=f.id) }}">
+                  <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+          </tr>
+          {% endfor %}
+          <tr class="table-light">
+            <form method="post" action="{{ url_for('settings.salva_fornitore') }}">
+              <td><input class="form-control form-control-sm" name="nome" placeholder="Nuovo servizio"></td>
+              <td><input class="form-control form-control-sm" name="url_template" placeholder="https://negozio.it/cerca?q={query}"></td>
+              <td><input class="form-control form-control-sm" name="icona" value="bi-bag" style="width: 9rem;"></td>
+              <td><input class="form-control form-control-sm form-control-color" type="color" name="colore" value="#198754"></td>
+              <td><input class="form-control form-control-sm" type="number" name="ordine" value="100" style="width: 5rem;"></td>
+              <td class="text-center"><input class="form-check-input" type="checkbox" name="attivo" value="1" checked></td>
+              <td><button class="btn btn-sm btn-success" type="submit"><i class="bi bi-plus-lg"></i></button></td>
+            </form>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

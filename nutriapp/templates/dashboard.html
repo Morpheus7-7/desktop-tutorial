@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar, badge_piano %}
+{% block title %}Cruscotto · {{ impostazioni.nome_studio }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-0">Buon lavoro, {{ utente.nome }}</h1>
+    <p class="text-tenue small mb-0">{{ oggi | data_it }} — ecco che cosa richiede attenzione.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-success" href="{{ url_for('clients.nuovo') }}"><i class="bi bi-person-plus"></i> Nuovo assistito</a>
+    <a class="btn btn-success" href="{{ url_for('plans.nuovo') }}"><i class="bi bi-calendar-plus"></i> Nuovo piano</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  {% for etichetta, valore, icona, link in [
+      ('Assistiti attivi', assistiti_attivi, 'bi-people', url_for('clients.elenco')),
+      ('Piani in corso', piani_in_corso | length, 'bi-calendar3-week', url_for('plans.elenco', stato='pubblicato')),
+      ('Piani in scadenza', piani_in_scadenza | length, 'bi-hourglass-split', url_for('plans.elenco', stato='pubblicato')),
+      ('Messaggi da leggere', messaggi_non_letti | length, 'bi-chat-dots', url_for('main.notifiche'))] %}
+  <div class="col-6 col-lg-3">
+    <a class="text-decoration-none text-reset" href="{{ link }}">
+      <div class="card ns-kpi h-100"><div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+          <div class="valore">{{ valore }}</div>
+          <div class="etichetta">{{ etichetta }}</div>
+        </div>
+        <i class="bi {{ icona }} fs-2 text-success opacity-50"></i>
+      </div></div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between">
+        <span><i class="bi bi-hourglass-split me-1"></i> Piani da rinnovare</span>
+        <a class="small" href="{{ url_for('plans.elenco') }}">tutti i piani</a>
+      </div>
+      {% if piani_in_scadenza %}
+      <div class="list-group list-group-flush">
+        {% for piano in piani_in_scadenza %}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+           href="{{ url_for('plans.dettaglio', piano_id=piano.id) }}">
+          <div class="d-flex align-items-center gap-2">
+            {{ avatar(piano.assistito.iniziali) }}
+            <div>
+              <div class="fw-semibold">{{ piano.assistito.nome_completo }}</div>
+              <div class="small text-tenue">{{ piano.titolo }}</div>
+            </div>
+          </div>
+          <div class="text-end">
+            <div class="small">finisce il {{ piano.data_fine | data_it }}</div>
+            <span class="badge bg-{{ 'danger' if (piano.data_fine - oggi).days < 2 else 'warning text-dark' }}">
+              fra {{ (piano.data_fine - oggi).days }} giorni
+            </span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="card-body text-tenue small">Nessun piano in scadenza nei prossimi sette giorni.</div>
+      {% endif %}
+    </div>
+
+    {% if senza_piano %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-exclamation-triangle me-1 text-warning"></i> Assistiti senza piano in corso</div>
+      <div class="card-body d-flex flex-wrap gap-2">
+        {% for a in senza_piano %}
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('plans.nuovo', assistito=a.id) }}">
+          {{ a.nome_completo }} <i class="bi bi-plus-lg"></i>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-chat-dots me-1"></i> Messaggi dei clienti</div>
+      {% if messaggi_non_letti %}
+      <div class="list-group list-group-flush">
+        {% for m in messaggi_non_letti %}
+        <a class="list-group-item list-group-item-action"
+           href="{{ url_for('clients.dettaglio', assistito_id=m.assistito_id) }}#messaggi">
+          <div class="d-flex justify-content-between">
+            <span class="fw-semibold">{{ m.assistito.nome_completo }}</span>
+            <span class="small text-tenue">{{ m.created_at | ora_it }}</span>
+          </div>
+          <div class="small text-tenue">{{ m.testo | truncate(120) }}</div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="card-body text-tenue small">Nessun messaggio in attesa.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-calendar-event me-1"></i> Prossimi appuntamenti</div>
+      {% if appuntamenti %}
+      <div class="list-group list-group-flush">
+        {% for app in appuntamenti %}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+           href="{{ url_for('clients.dettaglio', assistito_id=app.assistito_id) }}#appuntamenti">
+          <div>
+            <div class="fw-semibold">{{ app.assistito.nome_completo }}</div>
+            <div class="small text-tenue">{{ app.tipo }}{% if app.luogo %} · {{ app.luogo }}{% endif %}</div>
+          </div>
+          <div class="text-end small">
+            <div class="fw-semibold">{{ app.data_ora | data_breve }}</div>
+            <div class="text-tenue">{{ app.data_ora.strftime('%H:%M') }}</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="card-body text-tenue small">Agenda libera.</div>
+      {% endif %}
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-person-plus me-1"></i> Ultimi assistiti</div>
+      <div class="list-group list-group-flush">
+        {% for a in ultimi_assistiti %}
+        <a class="list-group-item list-group-item-action d-flex align-items-center gap-2"
+           href="{{ url_for('clients.dettaglio', assistito_id=a.id) }}">
+          {{ avatar(a.iniziali) }}
+          <div class="flex-grow-1">
+            <div class="fw-semibold">{{ a.nome_completo }}</div>
+            <div class="small text-tenue">{{ a.obiettivo or 'obiettivo da definire' }}</div>
+          </div>
+          {% if a.piano_attivo %}{{ badge_piano(a.piano_attivo) }}{% endif %}
+        </a>
+        {% else %}
+        <div class="list-group-item text-tenue small">Nessun assistito: comincia da «Nuovo assistito».</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-collection me-1"></i> Contenuti</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between border-bottom py-1">
+          <span>Ricette in archivio</span><a href="{{ url_for('recipes.elenco') }}">{{ ricette_totali }}</a>
+        </div>
+        <div class="d-flex justify-content-between border-bottom py-1">
+          <span>Articoli in bozza</span><a href="{{ url_for('blog.elenco', stato='bozze') }}">{{ bozze_articoli }}</a>
+        </div>
+        <div class="d-flex justify-content-between py-1">
+          <span>Alimenti in banca dati</span><a href="{{ url_for('foods.elenco') }}">{{ alimenti_totali }}</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

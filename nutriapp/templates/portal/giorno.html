@@ -1,0 +1,64 @@
+{% extends "portal/base.html" %}
+{% from "_macros.html" import barra_kcal %}
+{% block title %}{{ giorno.nome }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-0">{{ giorno.nome }}</h1>
+    <p class="text-tenue small mb-0">{{ piano.titolo }}</p>
+  </div>
+  <div class="btn-group ns-no-print">
+    {% for altro in analisi.giorni %}
+    <a class="btn btn-sm {{ 'btn-success' if altro.indice == giorno.indice else 'btn-outline-secondary' }}"
+       href="{{ url_for('portal.giorno', giorno=altro.indice) }}">{{ altro.nome[:3] }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    {{ barra_kcal(giorno.kcal, piano.target_kcal, giorno.stato) }}
+    <div class="small text-tenue mt-2">
+      Proteine {{ giorno.totali.get('proteine') | numero(0) }} g ·
+      Carboidrati {{ giorno.totali.get('carboidrati') | numero(0) }} g ·
+      Grassi {{ giorno.totali.get('grassi') | numero(0) }} g ·
+      Fibre {{ giorno.totali.get('fibre') | numero(0) }} g
+    </div>
+  </div>
+</div>
+
+{% for pasto in giorno.pasti %}
+<div class="card mb-3 ns-card-pasto">
+  <div class="card-header d-flex justify-content-between">
+    <span>{{ pasto.nome }}</span>
+    <span class="text-tenue">{{ pasto.totali.get('kcal') | round | int }} kcal</span>
+  </div>
+  <div class="list-group list-group-flush">
+    {% for riga in pasto.righe %}
+    <div class="list-group-item">
+      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-start gap-1 gap-sm-3">
+        <div>
+          <div class="fw-semibold">{{ riga.voce.etichetta }}</div>
+          {% if riga.voce.nota %}<div class="small text-tenue fst-italic">{{ riga.voce.nota }}</div>{% endif %}
+          {% if riga.voce.ricetta %}
+          <a class="small" href="{{ url_for('portal.ricetta', slug=riga.voce.ricetta.slug) }}">vedi la ricetta →</a>
+          {% endif %}
+        </div>
+        <div class="text-sm-end text-nowrap">
+          <div class="fw-semibold">{{ riga.voce.quantita_etichetta }}</div>
+          <div class="small text-tenue">{{ riga.totali.get('kcal') | round | int }} kcal</div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border">Per questa giornata non è previsto nulla.</div>
+{% endfor %}
+
+<a class="btn btn-outline-secondary ns-no-print" href="{{ url_for('portal.piano') }}">
+  <i class="bi bi-arrow-left"></i> Tutta la settimana
+</a>
+{% endblock %}

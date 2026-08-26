@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifica' if assistito else 'Nuovo assistito' }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">{{ assistito.nome_completo if assistito else 'Nuovo assistito' }}</h1>
+
+<form method="post" novalidate>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card mb-3">
+      <div class="card-header">Anagrafica</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label" for="nome">Nome *</label>
+          <input class="form-control" id="nome" name="nome" required value="{{ assistito.nome if assistito else '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="cognome">Cognome *</label>
+          <input class="form-control" id="cognome" name="cognome" required value="{{ assistito.cognome if assistito else '' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="email">Email</label>
+          <input class="form-control" type="email" id="email" name="email" value="{{ assistito.email or '' if assistito else '' }}">
+          <div class="form-text">Serve per creare l'area riservata e mandare gli avvisi.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="telefono">Telefono</label>
+          <input class="form-control" id="telefono" name="telefono" value="{{ assistito.telefono or '' if assistito else '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="data_nascita">Data di nascita</label>
+          <input class="form-control" type="date" id="data_nascita" name="data_nascita"
+                 value="{{ assistito.data_nascita.isoformat() if assistito and assistito.data_nascita else '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="sesso">Sesso</label>
+          <select class="form-select" id="sesso" name="sesso">
+            <option value="">—</option>
+            {% for s in sessi %}<option value="{{ s }}" {{ 'selected' if assistito and assistito.sesso == s }}>{{ s }}</option>{% endfor %}
+          </select>
+          <div class="form-text">Usato solo per la stima del fabbisogno.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="altezza_cm">Altezza (cm)</label>
+          <input class="form-control" id="altezza_cm" name="altezza_cm" inputmode="decimal"
+                 value="{{ assistito.altezza_cm or '' if assistito else '' }}">
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">Note cliniche</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label" for="allergie">Allergie e intolleranze</label>
+          <textarea class="form-control" id="allergie" name="allergie" rows="2">{{ assistito.allergie or '' if assistito else '' }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="patologie">Patologie e terapie</label>
+          <textarea class="form-control" id="patologie" name="patologie" rows="2">{{ assistito.patologie or '' if assistito else '' }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="preferenze">Gusti e preferenze</label>
+          <textarea class="form-control" id="preferenze" name="preferenze" rows="2">{{ assistito.preferenze or '' if assistito else '' }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="note">Note libere</label>
+          <textarea class="form-control" id="note" name="note" rows="2">{{ assistito.note or '' if assistito else '' }}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header">Percorso</div>
+      <div class="card-body row g-3">
+        <div class="col-12">
+          <label class="form-label" for="obiettivo">Obiettivo</label>
+          <select class="form-select" id="obiettivo" name="obiettivo">
+            <option value="">—</option>
+            {% for o in obiettivi %}<option value="{{ o }}" {{ 'selected' if assistito and assistito.obiettivo == o }}>{{ o }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-6">
+          <label class="form-label" for="peso_iniziale_kg">Peso iniziale (kg)</label>
+          <input class="form-control" id="peso_iniziale_kg" name="peso_iniziale_kg" inputmode="decimal"
+                 value="{{ assistito.peso_iniziale_kg or '' if assistito else '' }}">
+        </div>
+        <div class="col-6">
+          <label class="form-label" for="target_kcal">Target kcal / giorno</label>
+          <input class="form-control" type="number" id="target_kcal" name="target_kcal"
+                 value="{{ assistito.target_kcal if assistito else 1800 }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="tipo_dieta">Tipo di dieta</label>
+          <select class="form-select" id="tipo_dieta" name="tipo_dieta">
+            {% for d in diete %}<option value="{{ d }}" {{ 'selected' if assistito and assistito.tipo_dieta == d }}>{{ d }}</option>{% endfor %}
+          </select>
+          <div class="form-text">Gli alimenti incompatibili verranno segnalati in rosso nei piani.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="attivo" name="attivo" value="1"
+                 {{ 'checked' if not assistito or assistito.attivo }}>
+          <label class="form-check-label" for="attivo">Assistito attivo</label>
+        </div>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="consenso_privacy" name="consenso_privacy" value="1"
+                 {{ 'checked' if assistito and assistito.consenso_privacy }}>
+          <label class="form-check-label" for="consenso_privacy">Consenso privacy raccolto</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button class="btn btn-success" type="submit"><i class="bi bi-check2"></i> Salva</button>
+      <a class="btn btn-outline-secondary"
+         href="{{ url_for('clients.dettaglio', assistito_id=assistito.id) if assistito else url_for('clients.elenco') }}">Annulla</a>
+    </div>
+  </div>
+</div>
+</form>
+{% endblock %}

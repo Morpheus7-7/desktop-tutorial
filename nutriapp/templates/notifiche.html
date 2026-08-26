@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Notifiche{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h4 mb-0">Notifiche</h1>
+    <p class="text-tenue small mb-0">Scadenze dei piani, appuntamenti, messaggi. Ogni avviso compare una volta sola.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <form method="post" action="{{ url_for('main.segna_tutte_lette') }}">
+      <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-check2-all"></i> Segna tutte lette</button>
+    </form>
+    <form method="post" action="{{ url_for('main.pulisci') }}">
+      <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-archive"></i> Archivia le vecchie</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="list-group list-group-flush">
+    {% for n in notifiche %}
+    <div class="list-group-item d-flex justify-content-between align-items-start gap-3 {{ 'opacity-50' if n.letta }}">
+      <div class="d-flex gap-2">
+        <i class="bi bi-{{ 'exclamation-octagon text-danger' if n.livello == 'danger' else ('exclamation-triangle text-warning' if n.livello == 'warning' else 'info-circle text-success') }} mt-1"></i>
+        <div>
+          <div>{{ n.messaggio }}</div>
+          <div class="small text-tenue">
+            {{ n.created_at | ora_it }}
+            {% if n.categoria %}· {{ n.categoria }}{% endif %}
+            {% if n.inviata_email %}· <i class="bi bi-envelope-check" title="Inclusa in un riepilogo email"></i>{% endif %}
+          </div>
+        </div>
+      </div>
+      {% if not n.letta %}
+      <form method="post" action="{{ url_for('main.segna_letta', notifica_id=n.id) }}">
+        <button class="btn btn-sm btn-outline-success text-nowrap" type="submit">
+          {{ 'Apri' if n.link else 'Letta' }}
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="list-group-item text-tenue small">Nessuna notifica: tutto sotto controllo.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}{{ ricetta.titolo if ricetta else 'Nuova ricetta' }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">{{ ricetta.titolo if ricetta else 'Nuova ricetta' }}</h1>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <form method="post">
+      <div class="card mb-3">
+        <div class="card-body row g-3">
+          <div class="col-md-8">
+            <label class="form-label" for="titolo">Titolo *</label>
+            <input class="form-control" id="titolo" name="titolo" required value="{{ ricetta.titolo if ricetta else '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="categoria">Categoria</label>
+            <select class="form-select" id="categoria" name="categoria">
+              <option value="">—</option>
+              {% for c in categorie %}<option value="{{ c }}" {{ 'selected' if ricetta and ricetta.categoria == c }}>{{ c }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="porzioni">Porzioni</label>
+            <input class="form-control" type="number" id="porzioni" name="porzioni" min="1"
+                   value="{{ ricetta.porzioni if ricetta else 2 }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="tempo_minuti">Tempo (minuti)</label>
+            <input class="form-control" type="number" id="tempo_minuti" name="tempo_minuti"
+                   value="{{ ricetta.tempo_minuti or '' if ricetta else '' }}">
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="pubblicata" name="pubblicata" value="1"
+                     {{ 'checked' if not ricetta or ricetta.pubblicata }}>
+              <label class="form-check-label" for="pubblicata">Visibile ai clienti</label>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="tags">Tag (separati da virgola)</label>
+            <input class="form-control" id="tags" name="tags" value="{{ ricetta.tags or '' if ricetta else '' }}"
+                   placeholder="veloce, proteica, senza glutine">
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="descrizione">Descrizione</label>
+            <textarea class="form-control" id="descrizione" name="descrizione" rows="2">{{ ricetta.descrizione or '' if ricetta else '' }}</textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="procedimento">Procedimento</label>
+            <textarea class="form-control" id="procedimento" name="procedimento" rows="7">{{ ricetta.procedimento or '' if ricetta else '' }}</textarea>
+            <div class="form-text">Un passaggio per riga: verrà mostrato come elenco numerato.</div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-success" type="submit"><i class="bi bi-check2"></i> Salva</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('recipes.elenco') }}">Torna al ricettario</a>
+    </form>
+  </div>
+
+  <div class="col-lg-5">
+    {% if ricetta %}
+    <div class="card mb-3" id="ingredienti">
+      <div class="card-header">Ingredienti</div>
+      <div class="list-group list-group-flush">
+        {% for ing in ricetta.ingredienti %}
+        <div class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <div>{{ ing.etichetta }}</div>
+            <div class="small text-tenue">
+              {% if ing.grammi %}{{ ing.grammi | numero(0) }} g{% else %}quantità libera{% endif %}
+              {% if not ing.alimento %}· <span class="text-warning">senza valori nutrizionali</span>{% endif %}
+            </div>
+          </div>
+          <form method="post" action="{{ url_for('recipes.elimina_ingrediente', ricetta_id=ricetta.id, ingrediente_id=ing.id) }}">
+            <button class="btn btn-sm btn-link text-danger p-0" type="submit"><i class="bi bi-x-lg"></i></button>
+          </form>
+        </div>
+        {% else %}
+        <div class="list-group-item text-tenue small">Nessun ingrediente.</div>
+        {% endfor %}
+      </div>
+      <div class="card-footer bg-white">
+        <form method="post" action="{{ url_for('recipes.aggiungi_ingrediente', ricetta_id=ricetta.id) }}" class="row g-2">
+          <div class="col-12">
+            <input class="form-control form-control-sm mb-1" id="filtroIngredienti" placeholder="Filtra alimenti…">
+            <select class="form-select form-select-sm" name="alimento_id" id="selectIngrediente" size="6">
+              <option value="">— ingrediente senza valori (scrivi sotto) —</option>
+              {% for a in alimenti %}<option value="{{ a.id }}">{{ a.etichetta }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-7">
+            <input class="form-control form-control-sm" name="testo" placeholder="oppure scrivilo: «sale q.b.»">
+          </div>
+          <div class="col-3">
+            <input class="form-control form-control-sm" name="grammi" placeholder="g" inputmode="decimal">
+          </div>
+          <div class="col-2">
+            <button class="btn btn-sm btn-success w-100" type="submit"><i class="bi bi-plus-lg"></i></button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">Valori nutrizionali</div>
+      <div class="card-body">
+        <div class="row text-center">
+          <div class="col-6 border-end">
+            <div class="small-caps">A porzione</div>
+            <div class="fs-4 fw-bold">{{ per_porzione.get('kcal') | round | int }}</div>
+            <div class="small text-tenue">kcal</div>
+          </div>
+          <div class="col-6">
+            <div class="small-caps">Totale ({{ ricetta.porzioni }} porzioni)</div>
+            <div class="fs-4 fw-bold">{{ totale.get('kcal') | round | int }}</div>
+            <div class="small text-tenue">kcal</div>
+          </div>
+        </div>
+        <hr>
+        <div class="d-flex justify-content-between border-bottom py-1"><span class="small">Proteine</span><span>{{ per_porzione.get('proteine') | numero(1) }} g</span></div>
+        <div class="d-flex justify-content-between border-bottom py-1"><span class="small">Carboidrati</span><span>{{ per_porzione.get('carboidrati') | numero(1) }} g</span></div>
+        <div class="d-flex justify-content-between border-bottom py-1"><span class="small">Grassi</span><span>{{ per_porzione.get('grassi') | numero(1) }} g</span></div>
+        <div class="d-flex justify-content-between py-1"><span class="small">Fibre</span><span>{{ per_porzione.get('fibre') | numero(1) }} g</span></div>
+        {% if totale.parziale('kcal') %}
+        <p class="small text-warning mb-0 mt-2">
+          <i class="bi bi-exclamation-circle"></i> Alcuni ingredienti non hanno valori: i totali sono sottostimati.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('recipes.elimina', ricetta_id=ricetta.id) }}"
+          onsubmit="return confirm('Eliminare la ricetta «{{ ricetta.titolo }}»?');">
+      <button class="btn btn-outline-danger btn-sm w-100" type="submit"><i class="bi bi-trash"></i> Elimina ricetta</button>
+    </form>
+    {% else %}
+    <div class="alert alert-light border">Salva la ricetta per aggiungere gli ingredienti.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var filtro = document.getElementById('filtroIngredienti');
+if (filtro) {
+  filtro.addEventListener('input', function () {
+    var testo = this.value.trim().toLowerCase();
+    document.querySelectorAll('#selectIngrediente option').forEach(function (opzione) {
+      if (!opzione.value) return;
+      opzione.hidden = testo && opzione.textContent.toLowerCase().indexOf(testo) === -1;
+    });
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,25 @@
+{
+  "_nota": "Dispensa italiana: alimenti quotidiani che il set Foundation Foods dell'USDA NON copre (niente pane, niente pasta, niente olio d'oliva, nessun piatto pronto). Vengono creati con nome, reparto, porzione e compatibilita' con le diete, ma SENZA valori nutrizionali: qui non si inventano numeri. Restano marcati «da completare» finche' la nutrizionista non inserisce i valori della propria fonte di riferimento (es. tabelle CREA / BDA). Nel frattempo sono gia' utilizzabili nel piano e nella lista della spesa.",
+  "alimenti": [
+    {"nome_it": "Olio extravergine d'oliva", "categoria_it": "Grassi e oli", "porzione_nome": "1 cucchiaio (10 g)", "porzione_g": 10, "vegan": true, "vegetariano": true, "senza_glutine": true, "senza_lattosio": true},
+    {"nome_it": "Pasta di semola di grano duro, cruda", "categoria_it": "Cereali e pasta", "porzione_nome": "1 porzione (80 g)", "porzione_g": 80, "vegan": true, "vegetariano": true, "senza_glutine": false, "senza_lattosio": true},
+    {"nome_it": "Pasta integrale, cruda", "categoria_it": "Cereali e pasta", "porzione_nome": "1 porzione (80 g)", "porzione_g": 80, "vegan": true, "vegetariano": true, "senza_glutine": false, "senza_lattosio": true},
+    {"nome_it": "Pasta all'uovo secca, cruda", "categoria_it": "Cereali e pasta", "porzione_nome": "1 porzione (80 g)", "porzione_g": 80, "vegan": false, "vegetariano": true, "senza_glutine": false, "senza_lattosio": true},
+    {"nome_it": "Pane comune", "categoria_it": "Prodotti da forno", "porzione_nome": "1 fetta (50 g)", "porzione_g": 50, "vegan": null, "vegetariano": true, "senza_glutine": false, "senza_lattosio": null},
+    {"nome_it": "Pane integrale", "categoria_it": "Prodotti da forno", "porzione_nome": "1 fetta (50 g)", "porzione_g": 50, "vegan": null, "vegetariano": true, "senza_glutine": false, "senza_lattosio": null},
+    {"nome_it": "Fette biscottate", "categoria_it": "Prodotti da forno", "porzione_nome": "1 fetta (8 g)", "porzione_g": 8, "vegan": null, "vegetariano": true, "senza_glutine": false, "senza_lattosio": null},
+    {"nome_it": "Grissini", "categoria_it": "Prodotti da forno", "porzione_nome": "1 grissino (5 g)", "porzione_g": 5, "vegan": null, "vegetariano": true, "senza_glutine": false, "senza_lattosio": null},
+    {"nome_it": "Parmigiano Reggiano", "categoria_it": "Latticini e uova", "porzione_nome": "1 cucchiaio (10 g)", "porzione_g": 10, "vegan": false, "vegetariano": null, "senza_glutine": true, "senza_lattosio": false},
+    {"nome_it": "Mozzarella di latte vaccino", "categoria_it": "Latticini e uova", "porzione_nome": "1 mozzarella (125 g)", "porzione_g": 125, "vegan": false, "vegetariano": null, "senza_glutine": true, "senza_lattosio": false},
+    {"nome_it": "Ricotta vaccina", "categoria_it": "Latticini e uova", "porzione_nome": "1 porzione (100 g)", "porzione_g": 100, "vegan": false, "vegetariano": true, "senza_glutine": true, "senza_lattosio": false},
+    {"nome_it": "Prosciutto crudo", "categoria_it": "Salumi e insaccati", "porzione_nome": "1 porzione (50 g)", "porzione_g": 50, "vegan": false, "vegetariano": false, "senza_glutine": true, "senza_lattosio": true},
+    {"nome_it": "Bresaola", "categoria_it": "Salumi e insaccati", "porzione_nome": "1 porzione (50 g)", "porzione_g": 50, "vegan": false, "vegetariano": false, "senza_glutine": true, "senza_lattosio": true},
+    {"nome_it": "Tonno in scatola al naturale, sgocciolato", "categoria_it": "Pesce e frutti di mare", "porzione_nome": "1 scatoletta (60 g)", "porzione_g": 60, "vegan": false, "vegetariano": false, "senza_glutine": true, "senza_lattosio": true},
+    {"nome_it": "Ceci lessati in scatola, sgocciolati", "categoria_it": "Legumi", "porzione_nome": "1 porzione (150 g)", "porzione_g": 150, "vegan": true, "vegetariano": true, "senza_glutine": true, "senza_lattosio": true},
+    {"nome_it": "Passata di pomodoro", "categoria_it": "Zuppe e salse", "porzione_nome": "1 porzione (200 g)", "porzione_g": 200, "vegan": true, "vegetariano": true, "senza_glutine": true, "senza_lattosio": true},
+    {"nome_it": "Aceto balsamico", "categoria_it": "Zuppe e salse", "porzione_nome": "1 cucchiaio (15 g)", "porzione_g": 15, "vegan": true, "vegetariano": true, "senza_glutine": true, "senza_lattosio": true},
+    {"nome_it": "Caffè espresso", "categoria_it": "Bevande", "porzione_nome": "1 tazzina (30 g)", "porzione_g": 30, "vegan": true, "vegetariano": true, "senza_glutine": true, "senza_lattosio": true},
+    {"nome_it": "Cioccolato fondente 70%", "categoria_it": "Dolci", "porzione_nome": "1 quadretto (10 g)", "porzione_g": 10, "vegan": null, "vegetariano": true, "senza_glutine": null, "senza_lattosio": null},
+    {"nome_it": "Miele", "categoria_it": "Dolci", "porzione_nome": "1 cucchiaino (7 g)", "porzione_g": 7, "vegan": false, "vegetariano": true, "senza_glutine": true, "senza_lattosio": true}
+  ]
+}

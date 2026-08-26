@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar, badge_piano %}
+{% block title %}Piani alimentari{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h1 class="h4 mb-0">Piani alimentari <span class="text-tenue fs-6">({{ piani | length }})</span></h1>
+  <a class="btn btn-success" href="{{ url_for('plans.nuovo') }}"><i class="bi bi-calendar-plus"></i> Nuovo piano</a>
+</div>
+
+<ul class="nav nav-pills mb-3">
+  <li class="nav-item"><a class="nav-link {{ 'active' if not stato }}" href="{{ url_for('plans.elenco') }}">Tutti</a></li>
+  {% for s in stati %}
+  <li class="nav-item"><a class="nav-link {{ 'active' if stato == s }}" href="{{ url_for('plans.elenco', stato=s) }}">{{ s | capitalize }}</a></li>
+  {% endfor %}
+</ul>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Assistito</th><th>Piano</th><th>Periodo</th><th class="text-end">Target</th><th>Dieta</th><th>Stato</th></tr>
+      </thead>
+      <tbody>
+      {% for piano in piani %}
+        <tr onclick="location.href='{{ url_for('plans.dettaglio', piano_id=piano.id) }}'" style="cursor:pointer">
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              {{ avatar(piano.assistito.iniziali) }}
+              <span class="fw-semibold">{{ piano.assistito.nome_completo }}</span>
+            </div>
+          </td>
+          <td>{{ piano.titolo }}</td>
+          <td class="small text-tenue">{{ piano.data_inizio | data_it }} – {{ piano.data_fine | data_it }}
+            {% if piano.attivo_oggi %}<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">in corso</span>{% endif %}
+          </td>
+          <td class="text-end">{{ piano.target_kcal }} kcal</td>
+          <td class="small">{{ piano.tipo_dieta }}</td>
+          <td>{{ badge_piano(piano) }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="text-center text-tenue py-4">Nessun piano.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

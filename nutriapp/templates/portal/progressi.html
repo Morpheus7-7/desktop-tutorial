@@ -1,0 +1,80 @@
+{% extends "portal/base.html" %}
+{% from "_macros.html" import grafico %}
+{% block title %}I miei progressi{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">I miei progressi</h1>
+<p class="text-tenue small">Pesati sempre nelle stesse condizioni: al mattino, a digiuno.</p>
+
+<div class="row g-3 mb-3">
+  {% for etichetta, valore, suffisso in [
+      ('Peso attuale', assistito.peso_attuale, 'kg'),
+      ('Dal punto di partenza', assistito.variazione_peso, 'kg'),
+      ('BMI', assistito.bmi, assistito.bmi_categoria or '')] %}
+  <div class="col-md-4">
+    <div class="card ns-kpi h-100"><div class="card-body">
+      <div class="valore">{{ valore | numero(1) if valore is not none else '—' }}</div>
+      <div class="etichetta">{{ etichetta }} <span class="text-tenue">{{ suffisso }}</span></div>
+    </div></div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header">Andamento del peso</div>
+      <div class="card-body">{{ grafico(serie_peso) }}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Storico</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>Data</th><th class="text-end">Peso</th><th class="text-end">Vita</th><th>Note</th></tr></thead>
+          <tbody>
+            {% for m in assistito.misurazioni %}
+            <tr>
+              <td>{{ m.data | data_it }}</td>
+              <td class="text-end">{{ m.peso_kg | numero(1) }} kg</td>
+              <td class="text-end">{{ m.vita_cm | numero(1) }}</td>
+              <td class="small text-tenue">{{ m.note or '' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-tenue small">Nessuna misurazione registrata.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">Registra una misurazione</div>
+      <div class="card-body">
+        <form method="post" class="row g-2">
+          <div class="col-12">
+            <label class="form-label small" for="data">Data</label>
+            <input class="form-control" type="date" id="data" name="data" value="{{ oggi.isoformat() }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label small" for="peso_kg">Peso (kg) *</label>
+            <input class="form-control" id="peso_kg" name="peso_kg" inputmode="decimal" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label small" for="vita_cm">Vita (cm)</label>
+            <input class="form-control" id="vita_cm" name="vita_cm" inputmode="decimal">
+          </div>
+          <div class="col-12">
+            <label class="form-label small" for="note">Note</label>
+            <textarea class="form-control" id="note" name="note" rows="2" placeholder="Come è andata la settimana…"></textarea>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-success w-100" type="submit"><i class="bi bi-check2"></i> Registra</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

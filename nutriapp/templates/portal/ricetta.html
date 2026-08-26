@@ -1,0 +1,63 @@
+{% extends "portal/base.html" %}
+{% block title %}{{ ricetta.titolo }}{% endblock %}
+{% block content %}
+<a class="small ns-no-print" href="{{ url_for('portal.ricette') }}">&larr; tutte le ricette</a>
+<h1 class="h4 mt-2 mb-1">{{ ricetta.titolo }}</h1>
+<p class="text-tenue small">
+  {{ ricetta.categoria or '' }}
+  {% if ricetta.tempo_minuti %} · {{ ricetta.tempo_minuti }} minuti{% endif %}
+  · {{ ricetta.porzioni }} porzion{{ 'e' if ricetta.porzioni == 1 else 'i' }}
+</p>
+
+{% if ricetta.descrizione %}<p>{{ ricetta.descrizione }}</p>{% endif %}
+
+<div class="row g-3">
+  <div class="col-md-5">
+    <div class="card mb-3">
+      <div class="card-header">Ingredienti</div>
+      <ul class="list-group list-group-flush">
+        {% for ing in ricetta.ingredienti %}
+        <li class="list-group-item d-flex justify-content-between">
+          <span>{{ ing.etichetta }}</span>
+          <span class="text-tenue">{{ ing.grammi | numero(0) ~ ' g' if ing.grammi else 'q.b.' }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header">Per porzione</div>
+      <div class="card-body">
+        <div class="fs-4 fw-bold">{{ per_porzione.get('kcal') | round | int }} kcal</div>
+        <div class="small text-tenue">
+          Proteine {{ per_porzione.get('proteine') | numero(1) }} g ·
+          Carboidrati {{ per_porzione.get('carboidrati') | numero(1) }} g ·
+          Grassi {{ per_porzione.get('grassi') | numero(1) }} g ·
+          Fibre {{ per_porzione.get('fibre') | numero(1) }} g
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header">Procedimento</div>
+      <div class="card-body">
+        {% if ricetta.procedimento %}
+        <ol class="mb-0">
+          {% for passo in ricetta.procedimento.split('\n') if passo.strip() %}
+          <li class="mb-2">{{ passo.strip() }}</li>
+          {% endfor %}
+        </ol>
+        {% else %}
+        <p class="text-tenue small mb-0">Procedimento non indicato.</p>
+        {% endif %}
+      </div>
+    </div>
+    {% if ricetta.lista_tags %}
+    <div class="mt-2 d-flex flex-wrap gap-1">
+      {% for tag in ricetta.lista_tags %}<span class="badge bg-light text-dark border">{{ tag }}</span>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "_macros.html" import barra_kcal, pallino %}
+{% block title %}{{ giorno.nome }} · {{ piano.titolo }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-0">{{ giorno.nome }}</h1>
+    <p class="text-tenue small mb-0">
+      Scheda pasti · {{ piano.titolo }} · {{ piano.assistito.nome_completo }}
+      {% if anteprima %}<span class="badge bg-light text-dark border">anteprima di ciò che vede il cliente</span>{% endif %}
+    </p>
+  </div>
+  <div class="btn-group">
+    {% for altro in analisi.giorni %}
+    <a class="btn btn-sm {{ 'btn-success' if altro.indice == giorno.indice else 'btn-outline-secondary' }}"
+       href="{{ url_for('plans.giorno', piano_id=piano.id, giorno=altro.indice) }}">{{ altro.nome[:3] }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    {% for pasto in giorno.pasti %}
+    <div class="card mb-3 ns-card-pasto">
+      <div class="card-header d-flex justify-content-between">
+        <span>{{ pasto.nome }}</span>
+        <span class="text-tenue">{{ pasto.totali.get('kcal') | round | int }} kcal</span>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for riga in pasto.righe %}
+        <div class="list-group-item {{ 'bg-danger-subtle' if riga.conflitto }}">
+          <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-start gap-1 gap-sm-3">
+            <div>
+              <div class="fw-semibold">{{ riga.voce.etichetta }}</div>
+              <div class="small text-tenue">
+                {{ riga.voce.quantita_etichetta }}
+                {% if riga.voce.nota %} · <em>{{ riga.voce.nota }}</em>{% endif %}
+                {% if riga.conflitto %}<span class="text-danger"> · {{ riga.conflitto }}</span>{% endif %}
+              </div>
+            </div>
+            <div class="text-sm-end small text-nowrap">
+              <div class="fw-semibold">{{ riga.totali.get('kcal') | round | int }} kcal</div>
+              <div class="text-tenue">
+                P {{ riga.totali.get('proteine') | numero(1) }} ·
+                C {{ riga.totali.get('carboidrati') | numero(1) }} ·
+                G {{ riga.totali.get('grassi') | numero(1) }}
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div class="alert alert-light border">Questa giornata non ha ancora voci.</div>
+    {% endfor %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">Totali della giornata {{ pallino(giorno.stato) }}</div>
+      <div class="card-body">
+        {{ barra_kcal(giorno.kcal, piano.target_kcal, giorno.stato) }}
+        <hr>
+        <div class="d-flex justify-content-between border-bottom py-1"><span>Proteine</span><strong>{{ giorno.totali.get('proteine') | numero(1) }} g</strong></div>
+        <div class="d-flex justify-content-between border-bottom py-1"><span>Carboidrati</span><strong>{{ giorno.totali.get('carboidrati') | numero(1) }} g</strong></div>
+        <div class="d-flex justify-content-between border-bottom py-1"><span>Grassi</span><strong>{{ giorno.totali.get('grassi') | numero(1) }} g</strong></div>
+        <div class="d-flex justify-content-between py-1"><span>Fibre</span><strong>{{ giorno.totali.get('fibre') | numero(1) }} g</strong></div>
+        <div class="small text-tenue mt-2">
+          Ripartizione: proteine {{ giorno.macro.proteine }}% · carboidrati {{ giorno.macro.carboidrati }}% · grassi {{ giorno.macro.grassi }}%
+        </div>
+      </div>
+    </div>
+    <a class="btn btn-outline-secondary w-100" href="{{ url_for('plans.dettaglio', piano_id=piano.id) }}">
+      <i class="bi bi-arrow-left"></i> Torna al piano
+    </a>
+  </div>
+</div>
+{% endblock %}

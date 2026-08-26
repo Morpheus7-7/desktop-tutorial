@@ -1,0 +1,37 @@
+{% extends "portal/base.html" %}
+{% block title %}Blog{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">Informazioni e articoli</h1>
+<p class="text-tenue small">Quello che vale la pena sapere fra una visita e l'altra.</p>
+
+{% if categorie %}
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a class="btn btn-sm {{ 'btn-success' if not categoria else 'btn-outline-secondary' }}" href="{{ url_for('portal.blog') }}">Tutti</a>
+  {% for c in categorie %}
+  <a class="btn btn-sm {{ 'btn-success' if categoria == c else 'btn-outline-secondary' }}"
+     href="{{ url_for('portal.blog', categoria=c) }}">{{ c }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for a in articoli %}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="small-caps mb-1">{{ a.categoria or 'articolo' }}</div>
+        <h6><a class="text-decoration-none" href="{{ url_for('portal.articolo', slug=a.slug) }}">{{ a.titolo }}</a></h6>
+        <p class="small mb-2">{{ a.sommario | truncate(160) if a.sommario else '' }}</p>
+        <div class="small text-tenue">
+          {{ a.data_pubblicazione | data_it }}
+          {% if a.tempo_lettura %} · {{ a.tempo_lettura }} min di lettura{% endif %}
+          {% if a.autore %} · {{ a.autore }}{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><div class="alert alert-light border">Non ci sono ancora articoli pubblicati.</div></div>
+  {% endfor %}
+</div>
+{% endblock %}

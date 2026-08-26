@@ -27,7 +27,7 @@ jobs:
         run: python -m pytest -q
 
   build-windows:
-    name: Build eseguibile Windows (.exe)
+    name: Build eseguibili Windows (.exe)
     needs: test
     runs-on: windows-latest
     steps:
@@ -40,18 +40,26 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-build.txt
-      - name: Compila con PyInstaller
+      - name: Compila il Gestionale Assicurativo
         run: pyinstaller gestionale.spec --noconfirm
-      - name: Verifica che l'eseguibile esista
+      - name: Compila NutriStudio
+        run: pyinstaller nutristudio.spec --noconfirm
+      - name: Verifica che gli eseguibili esistano
         shell: pwsh
         run: |
-          if (-not (Test-Path "dist/GestionaleAssicurativo.exe")) {
-            throw "Eseguibile non trovato in dist/"
+          foreach ($exe in @("dist/GestionaleAssicurativo.exe", "dist/NutriStudio.exe")) {
+            if (-not (Test-Path $exe)) { throw "Eseguibile non trovato: $exe" }
+            Get-Item $exe | Format-List Name, Length
           }
-          Get-Item "dist/GestionaleAssicurativo.exe" | Format-List Name, Length
-      - name: Carica l'eseguibile come artifact
+      - name: Carica il Gestionale come artifact
         uses: actions/upload-artifact@v4
         with:
           name: GestionaleAssicurativo-windows
           path: dist/GestionaleAssicurativo.exe
+          if-no-files-found: error
+      - name: Carica NutriStudio come artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NutriStudio-windows
+          path: dist/NutriStudio.exe
           if-no-files-found: error

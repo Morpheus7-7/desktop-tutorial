@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tabella_copertura, pallino %}
+{% block title %}Analisi · {{ piano.titolo }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-0">Analisi nutrizionale</h1>
+    <p class="text-tenue small mb-0">{{ piano.titolo }} · {{ piano.assistito.nome_completo }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('plans.dettaglio', piano_id=piano.id) }}"><i class="bi bi-arrow-left"></i> Piano</a>
+    <button class="btn btn-outline-secondary ns-no-print" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="card ns-kpi h-100"><div class="card-body">
+      <div class="valore">{{ analisi.media_kcal }} {{ pallino(analisi.stato_media) }}</div>
+      <div class="etichetta">Media kcal / giorno</div>
+      <div class="small text-tenue mt-1">obiettivo {{ analisi.target }}</div>
+    </div></div>
+  </div>
+  {% for chiave, etichetta in [('proteine', 'Proteine'), ('carboidrati', 'Carboidrati'), ('grassi', 'Grassi')] %}
+  <div class="col-md-3">
+    <div class="card ns-kpi h-100"><div class="card-body">
+      <div class="valore">{{ analisi.macro_medi[chiave] }}%</div>
+      <div class="etichetta">{{ etichetta }} sulle calorie</div>
+      <div class="small text-tenue mt-1">{{ analisi.medie.get(chiave) | numero(1) }} g al giorno</div>
+    </div></div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card mb-3">
+      <div class="card-header">Giorno per giorno</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr><th>Giorno</th><th class="text-end">kcal</th><th class="text-end">% target</th>
+                <th class="text-end">Prot.</th><th class="text-end">Carb.</th><th class="text-end">Grassi</th>
+                <th class="text-end">Fibre</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for g in analisi.giorni %}
+            <tr class="{{ 'table-light' if g.vuoto }}">
+              <td><a href="{{ url_for('plans.giorno', piano_id=piano.id, giorno=g.indice) }}">{{ g.nome }}</a></td>
+              <td class="text-end fw-semibold">{{ g.kcal }}</td>
+              <td class="text-end">{{ g.perc_target ~ '%' if g.perc_target else '—' }}</td>
+              <td class="text-end">{{ g.totali.get('proteine') | numero(0) }}</td>
+              <td class="text-end">{{ g.totali.get('carboidrati') | numero(0) }}</td>
+              <td class="text-end">{{ g.totali.get('grassi') | numero(0) }}</td>
+              <td class="text-end">{{ g.totali.get('fibre') | numero(0) }}</td>
+              <td class="text-end">{{ pallino(g.stato) }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="table-light fw-semibold">
+              <td>Media settimanale</td>
+              <td class="text-end">{{ analisi.media_kcal }}</td>
+              <td class="text-end"></td>
+              <td class="text-end">{{ analisi.medie.get('proteine') | numero(0) }}</td>
+              <td class="text-end">{{ analisi.medie.get('carboidrati') | numero(0) }}</td>
+              <td class="text-end">{{ analisi.medie.get('grassi') | numero(0) }}</td>
+              <td class="text-end">{{ analisi.medie.get('fibre') | numero(0) }}</td>
+              <td class="text-end">{{ pallino(analisi.stato_media) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if analisi.conflitti %}
+    <div class="card border-warning-subtle">
+      <div class="card-header text-warning-emphasis">
+        <i class="bi bi-exclamation-triangle"></i> Voci in conflitto con la dieta «{{ piano.tipo_dieta }}»
+      </div>
+      <div class="list-group list-group-flush">
+        {% for c in analisi.conflitti %}
+        <div class="list-group-item d-flex justify-content-between">
+          <span>{{ c.voce.etichetta }} <span class="small text-tenue">— {{ c.giorno }}, {{ c.pasto }}</span></span>
+          <span class="small text-danger">{{ c.motivo }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="card-footer small text-tenue">
+        «Da verificare» significa che la fonte non dichiarava il dato: controlla l'alimento prima di consegnare il piano.
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header">Macronutrienti — media contro riferimento</div>
+      <div class="card-body p-0">{{ tabella_copertura(analisi.copertura, 'macro') }}</div>
+    </div>
+    <div class="card">
+      <div class="card-header">Micronutrienti — copertura settimanale</div>
+      <div class="card-body p-0">{{ tabella_copertura(analisi.copertura, 'micro') }}</div>
+      <div class="card-footer small text-tenue">
+        Verde dal 90% del riferimento, rosso sotto il 70%. L'asterisco segnala che il dato
+        non è analizzato per tutti gli alimenti: quel totale è sottostimato, non nullo.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

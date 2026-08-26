@@ -1,0 +1,42 @@
+{% extends "portal/base.html" %}
+{% from "_macros.html" import corpo_spesa, barra_carrelli %}
+{% block title %}Lista della spesa{% endblock %}
+{% block content %}
+
+{% if not piano %}
+<div class="alert alert-light border">La lista della spesa comparirà quando avrai un piano pubblicato.</div>
+{% else %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h4 mb-0">Lista della spesa</h1>
+    <p class="text-tenue small mb-0">Tutto quello che serve per la settimana di «{{ piano.titolo }}».</p>
+  </div>
+  <div class="d-flex gap-2 ns-no-print">
+    <a class="btn btn-outline-secondary" href="{{ url_for('portal.spesa_testo') }}"><i class="bi bi-download"></i> Scarica</a>
+    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+  </div>
+</div>
+
+<form class="card mb-3 ns-no-print" method="get">
+  <div class="card-body py-2 d-flex flex-wrap align-items-center gap-3">
+    <span class="small-caps">Giorni</span>
+    {% for indice in range(7) %}
+    <div class="form-check form-check-inline">
+      <input class="form-check-input" type="checkbox" name="giorno" value="{{ indice }}"
+             id="pg-{{ indice }}" {{ 'checked' if indice in giorni_scelti }}>
+      <label class="form-check-label small" for="pg-{{ indice }}">{{ GIORNI[indice][:3] }}</label>
+    </div>
+    {% endfor %}
+    <button class="btn btn-sm btn-outline-secondary" type="submit">Aggiorna</button>
+  </div>
+</form>
+
+{{ barra_carrelli(fornitori, carrelli) }}
+{{ corpo_spesa(gruppi, manuali, fornitori, carrelli) }}
+
+<p class="small text-tenue">
+  Le quantità sono crude o secche, come indicate nel piano. Spuntando le voci le barri dalla lista
+  (la spunta resta finché non ricarichi la pagina).
+</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Nuovo piano{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Nuovo piano alimentare</h1>
+
+<div class="row">
+<div class="col-lg-7">
+<form method="post">
+  <div class="card mb-3">
+    <div class="card-body row g-3">
+      <div class="col-12">
+        <label class="form-label" for="assistito_id">Assistito *</label>
+        <select class="form-select" id="assistito_id" name="assistito_id" required onchange="location.href='{{ url_for('plans.nuovo') }}?assistito=' + this.value">
+          <option value="">— scegli —</option>
+          {% for a in assistiti %}
+          <option value="{{ a.id }}" {{ 'selected' if assistito and a.id == assistito.id }}>{{ a.nome_completo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label" for="titolo">Titolo</label>
+        <input class="form-control" id="titolo" name="titolo"
+               placeholder="Piano {{ oggi.strftime('%B %Y') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="settimane">Durata (settimane)</label>
+        <input class="form-control" type="number" id="settimane" name="settimane" value="4" min="1" max="52">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="data_inizio">Inizio</label>
+        <input class="form-control" type="date" id="data_inizio" name="data_inizio" value="{{ oggi.isoformat() }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="target_kcal">Target kcal / giorno</label>
+        <input class="form-control" type="number" id="target_kcal" name="target_kcal"
+               value="{{ assistito.target_kcal if assistito else 1800 }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="tipo_dieta">Tipo di dieta</label>
+        <select class="form-select" id="tipo_dieta" name="tipo_dieta">
+          {% for d in diete %}
+          <option value="{{ d }}" {{ 'selected' if assistito and assistito.tipo_dieta == d }}>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if piani_esistenti %}
+      <div class="col-12">
+        <label class="form-label" for="copia_da">Parti da un piano già fatto</label>
+        <select class="form-select" id="copia_da" name="copia_da">
+          <option value="">— comincia da una settimana vuota —</option>
+          {% for p in piani_esistenti %}
+          <option value="{{ p.id }}">{{ p.titolo }} ({{ p.data_inizio | data_it }})</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Copia tutte le voci della settimana: poi correggi solo quello che cambia.</div>
+      </div>
+      {% endif %}
+      <div class="col-12">
+        <label class="form-label" for="note_cliente">Nota per il cliente</label>
+        <textarea class="form-control" id="note_cliente" name="note_cliente" rows="2"
+                  placeholder="Beve almeno 1,5 litri d'acqua al giorno; lo spuntino è facoltativo…"></textarea>
+        <div class="form-text">Comparirà nell'area riservata e nell'email di avviso.</div>
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="note_nutrizionista">Nota interna</label>
+        <textarea class="form-control" id="note_nutrizionista" name="note_nutrizionista" rows="2"></textarea>
+      </div>
+    </div>
+  </div>
+  <button class="btn btn-success" type="submit"><i class="bi bi-check2"></i> Crea e componi la settimana</button>
+  <a class="btn btn-outline-secondary" href="{{ url_for('plans.elenco') }}">Annulla</a>
+</form>
+</div>
+
+{% if assistito %}
+<div class="col-lg-5">
+  <div class="card">
+    <div class="card-header">{{ assistito.nome_completo }}</div>
+    <div class="card-body small">
+      <div class="d-flex justify-content-between border-bottom py-1"><span>Obiettivo</span><strong>{{ assistito.obiettivo or '—' }}</strong></div>
+      <div class="d-flex justify-content-between border-bottom py-1"><span>Peso attuale</span><strong>{{ assistito.peso_attuale | numero(1) }} kg</strong></div>
+      <div class="d-flex justify-content-between border-bottom py-1"><span>BMI</span><strong>{{ assistito.bmi | numero(1) }}</strong></div>
+      <div class="d-flex justify-content-between py-1"><span>Dieta</span><strong>{{ assistito.tipo_dieta }}</strong></div>
+      {% if assistito.allergie %}<div class="alert alert-warning py-2 mt-2 mb-0"><strong>Allergie:</strong> {{ assistito.allergie }}</div>{% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+</div>
+{% endblock %}

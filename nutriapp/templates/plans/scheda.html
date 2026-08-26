@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_macros.html" import scheda_giorno %}
+{% block title %}Scheda · {{ piano.assistito.nome_completo }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h1 class="h3 mb-1">{{ impostazioni.nome_studio }}</h1>
+    <p class="text-tenue mb-0">
+      {% if impostazioni.professionista %}{{ impostazioni.professionista }} · {% endif %}
+      {{ impostazioni.email_studio or '' }}
+      {% if impostazioni.telefono_studio %} · {{ impostazioni.telefono_studio }}{% endif %}
+    </p>
+  </div>
+  <button class="btn btn-success ns-no-print" onclick="window.print()"><i class="bi bi-printer"></i> Stampa o salva in PDF</button>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-6">
+        <h2 class="h5 mb-1">{{ piano.titolo }}</h2>
+        <p class="mb-0"><strong>{{ piano.assistito.nome_completo }}</strong></p>
+        <p class="text-tenue small mb-0">{{ piano.data_inizio | data_it }} – {{ piano.data_fine | data_it }}</p>
+      </div>
+      <div class="col-md-6 text-md-end">
+        <div><strong>{{ piano.target_kcal }} kcal</strong> al giorno indicativi</div>
+        <div class="small text-tenue">Media del piano: {{ analisi.media_kcal }} kcal · dieta {{ piano.tipo_dieta }}</div>
+      </div>
+    </div>
+    {% if piano.note_cliente %}
+    <div class="alert alert-light border mt-3 mb-0">{{ piano.note_cliente }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for giorno in analisi.giorni if not giorno.vuoto %}
+  <div class="col-md-6 col-lg-4">{{ scheda_giorno(giorno, piano, true) }}</div>
+  {% endfor %}
+</div>
+
+<div class="card mt-3">
+  <div class="card-body small text-tenue">
+    <p class="mb-1"><strong>Le porzioni sono indicative.</strong> Parla con il tuo nutrizionista prima di modificarle.</p>
+    <p class="mb-0">
+      {{ impostazioni.disclaimer }}
+      Valori nutrizionali: USDA FoodData Central, Foundation Foods (pubblico dominio, CC0).
+    </p>
+  </div>
+</div>
+{% endblock %}

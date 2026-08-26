@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Accedi · NutriStudio{% endblock %}
+
+{% block scripts %}
+{% if credenziali_iniziali %}
+<script>
+// Comodità del primo avvio: riempie i campi invece di far ricopiare a mano.
+document.getElementById('compilaAccesso').addEventListener('click', function () {
+  document.getElementById('email').value = {{ credenziali_iniziali[0] | tojson }};
+  document.getElementById('password').value = {{ credenziali_iniziali[1] | tojson }};
+  document.getElementById('password').focus();
+});
+</script>
+{% endif %}
+{% endblock %}
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: 78vh;">
+  <div class="col-md-6 col-lg-4">
+    <div class="text-center mb-4">
+      <div class="ns-avatar ns-avatar-lg mx-auto mb-2"><i class="bi bi-flower1 fs-4"></i></div>
+      <h1 class="h4 mb-1">NutriStudio</h1>
+      <p class="text-tenue small mb-0">Area riservata dello studio e degli assistiti</p>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="post" novalidate>
+          <input type="hidden" name="next" value="{{ next }}">
+          <div class="mb-3">
+            <label class="form-label" for="email">Email</label>
+            <input class="form-control" type="email" id="email" name="email" required autofocus autocomplete="username">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="password">Password</label>
+            <input class="form-control" type="password" id="password" name="password" required autocomplete="current-password">
+          </div>
+          <button class="btn btn-success w-100" type="submit"><i class="bi bi-box-arrow-in-right"></i> Entra</button>
+        </form>
+      </div>
+    </div>
+
+    {% if credenziali_iniziali %}
+    <div class="card border-success-subtle mt-3">
+      <div class="card-body">
+        <div class="small-caps mb-2"><i class="bi bi-stars text-success"></i> Primo avvio</div>
+        <p class="small mb-2">
+          Qui non ci si registra: l'accesso dello studio esiste già, e sarai tu ad
+          aprire quelli dei tuoi assistiti. Entra con queste credenziali —
+          ti verrà chiesto subito di scegliere una password tua.
+        </p>
+        <table class="table table-sm mb-2">
+          <tr>
+            <td class="text-tenue">Email</td>
+            <td><code>{{ credenziali_iniziali[0] }}</code></td>
+          </tr>
+          <tr>
+            <td class="text-tenue">Password</td>
+            <td><code>{{ credenziali_iniziali[1] }}</code></td>
+          </tr>
+        </table>
+        <button class="btn btn-sm btn-success w-100" type="button" id="compilaAccesso">
+          Compila il modulo
+        </button>
+        <p class="small text-tenue mb-0 mt-2">
+          Questo riquadro sparisce da solo appena cambi la password.
+        </p>
+      </div>
+    </div>
+    {% endif %}
+
+    <p class="text-center small text-tenue mt-3 mb-0">
+      Sei un assistito e non hai le credenziali? Chiedile al tuo nutrizionista:
+      le riceverai via email.
+    </p>
+  </div>
+</div>
+{% endblock %}
