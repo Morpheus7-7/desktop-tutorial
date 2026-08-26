@@ -8,9 +8,22 @@ email, ricettario, articoli e lista della spesa collegata ai carrelli online.
 
 ```bash
 pip install -r requirements.txt
-python seed_nutri.py     # (opzionale) studio già avviato con dati di esempio
-python nutri_app.py      # poi apri http://127.0.0.1:5001
+python seed_nutri.py       # (opzionale) studio già avviato con dati di esempio
+python nutri_app.py        # poi apri http://127.0.0.1:5001
 ```
+
+Oppure, senza riga di comando, l'avvio «desktop» che apre da solo il browser
+(è anche l'entry point dell'eseguibile `NutriStudio.exe`, vedi
+[PACKAGING.md](PACKAGING.md)):
+
+```bash
+python run_nutristudio.py
+```
+
+> **In questo repository ci sono due applicazioni.** `app.py`,
+> `run_desktop.py` e `GestionaleAssicurativo.exe` avviano il **gestionale
+> assicurativo** sulla porta 5000. NutriStudio è `nutri_app.py`,
+> `run_nutristudio.py` e `NutriStudio.exe`, sulla porta 5001.
 
 Accessi dopo il seed:
 
@@ -157,7 +170,9 @@ darlo a un cliente.
 ## Struttura
 
 ```
-nutri_app.py                # entry point (http://127.0.0.1:5001)
+nutri_app.py                # entry point per lo sviluppo (http://127.0.0.1:5001)
+run_nutristudio.py          # avvio «desktop»: apre il browser, dati accanto all'eseguibile
+nutristudio.spec            # ricetta PyInstaller → NutriStudio.exe
 seed_nutri.py               # dati di esempio (--reset per ricominciare)
 nutriapp/
   __init__.py               # application factory, filtri Jinja, primo avvio

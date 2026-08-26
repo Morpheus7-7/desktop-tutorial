@@ -754,3 +754,70 @@ def test_traduzione_delle_porzioni_usda():
     # parola che non conosciamo: resta com'è, non la inventiamo
     assert traduci_porzione("1 sprig (2 g)", porzioni) == "1 sprig (2 g)"
     assert traduci_porzione(None, porzioni) is None
+
+
+# ----------------------------------------------------------------------
+# Avvio desktop
+# ----------------------------------------------------------------------
+def test_le_due_applicazioni_non_si_scambiano_l_eseguibile():
+    """Ogni ricetta PyInstaller deve puntare alla *sua* applicazione.
+
+    È l'errore che si paga più caro: un `.exe` che si chiama NutriStudio e
+    avvia il gestionale assicurativo.
+    """
+    from pathlib import Path
+
+    radice = Path(__file__).resolve().parent.parent
+
+    def senza_commenti(percorso: Path) -> str:
+        """Solo le righe che PyInstaller legge davvero: i commenti possono
+        citare l'altra applicazione, il codice no."""
+        righe = percorso.read_text(encoding="utf-8").splitlines()
+        return "\n".join(r for r in righe if not r.lstrip().startswith("#"))
+
+    nutri = senza_commenti(radice / "nutristudio.spec")
+    assert '"run_nutristudio.py"' in nutri
+    assert 'name="NutriStudio"' in nutri
+    assert "nutriapp/data" in nutri  # senza i dati partirebbe con zero alimenti
+    assert "gestionale" not in nutri
+
+    gestionale = senza_commenti(radice / "gestionale.spec")
+    assert '"run_desktop.py"' in gestionale
+    assert 'name="GestionaleAssicurativo"' in gestionale
+    assert "nutriapp" not in gestionale
+
+
+def test_avvio_desktop_usa_la_propria_cartella_dati(monkeypatch, tmp_path):
+    import run_nutristudio
+
+    monkeypatch.setattr(run_nutristudio, "_base_dir", lambda: str(tmp_path))
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    # Ricostruiamo la sola parte di main() che decide dove finiscono i dati.
+    import os
+
+    data_dir = os.path.join(run_nutristudio._base_dir(), "dati_nutristudio")
+    os.makedirs(data_dir, exist_ok=True)
+    os.environ.setdefault("DATABASE_URL", "sqlite:///" + os.path.join(data_dir, "nutristudio.db"))
+
+    assert os.path.isdir(data_dir)
+    assert "nutristudio.db" in os.environ["DATABASE_URL"]
+    assert "gestionale" not in os.environ["DATABASE_URL"]
+
+
+def test_credenziali_iniziali_solo_finche_la_password_e_provvisoria(app):
+    import run_nutristudio
+
+    with app.app_context():
+        utente = User.query.filter_by(ruolo="nutrizionista").first()
+
+        utente.deve_cambiare_password = True
+        db.session.commit()
+        credenziali = run_nutristudio._credenziali_iniziali()
+        assert credenziali is not None
+        assert credenziali[0] == "studio@prova.it"
+
+        # una volta cambiata, non si stampa più niente in console
+        utente.deve_cambiare_password = False
+        db.session.commit()
+        assert run_nutristudio._credenziali_iniziali() is None

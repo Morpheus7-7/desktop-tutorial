@@ -19,3 +19,6 @@ dist/
 .DS_Store
 .idea/
 .vscode/
+
+# Dati locali di NutriStudio (eseguibile desktop)
+dati_nutristudio/

@@ -2,8 +2,15 @@
 
 > **In questo repository ci sono due applicazioni.** Questa è il gestionale
 > assicurativo; l'altra è **[NutriStudio](NUTRISTUDIO.md)**, l'app per studi di
-> nutrizione con area riservata per la nutrizionista e per i clienti
-> (`python nutri_app.py`).
+> nutrizione con area riservata per la nutrizionista e per i clienti.
+> Ognuna ha i suoi file di avvio — lanciare quelli sbagliati fa partire l'altra:
+>
+> | | Gestionale Assicurativo | NutriStudio |
+> |---|---|---|
+> | Sviluppo | `python app.py` | `python nutri_app.py` |
+> | Desktop | `python run_desktop.py` | `python run_nutristudio.py` |
+> | Eseguibile | `GestionaleAssicurativo.exe` | `NutriStudio.exe` |
+> | Indirizzo | `http://127.0.0.1:5000` | `http://127.0.0.1:5001` |
 
 Gestionale web per intermediari assicurativi che seguono **professionisti e
 aziende**. Permette di raccogliere in un unico posto anagrafiche, polizze e
