@@ -18,8 +18,9 @@
 <div class="card">
   <div class="card-body p-0">
     {% if followups %}
+    <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
-      <thead><tr><th>Data</th><th>Cliente</th><th>Attività</th><th>Tipo</th><th>Priorità</th><th>Stato</th><th></th></tr></thead>
+      <thead><tr><th scope="col">Data</th><th scope="col">Cliente</th><th scope="col">Attività</th><th scope="col">Tipo</th><th scope="col">Priorità</th><th scope="col">Stato</th><th scope="col"><span class="visually-hidden">Azioni</span></th></tr></thead>
       <tbody>
       {% for f in followups %}
         <tr {% if f.in_ritardo %}class="urgenza-scaduta"{% endif %}>
@@ -27,7 +28,7 @@
             {% if f.in_ritardo %}<br><span class="badge bg-danger">in ritardo</span>{% endif %}
           </td>
           <td><a href="{{ url_for('clients.detail', client_id=f.client_id) }}">{{ f.cliente.ragione_sociale }}</a></td>
-          <td>{{ f.titolo }}{% if f.policy_id %} <a class="small" href="{{ url_for('policies.detail', policy_id=f.policy_id) }}"><i class="bi bi-file-earmark-text"></i></a>{% endif %}{% if f.descrizione %}<br><span class="small text-muted">{{ f.descrizione }}</span>{% endif %}</td>
+          <td>{{ f.titolo }}{% if f.policy_id %} <a class="small" href="{{ url_for('policies.detail', policy_id=f.policy_id) }}" aria-label="Apri la polizza collegata" title="Polizza collegata"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></a>{% endif %}{% if f.descrizione %}<br><span class="small text-muted">{{ f.descrizione }}</span>{% endif %}</td>
           <td><span class="badge bg-light text-dark">{{ f.tipo_label }}</span></td>
           <td>{{ m.priorita(f.priorita) }}</td>
           <td><span class="badge {% if f.stato == 'aperto' %}bg-info text-dark{% elif f.stato == 'completato' %}bg-success{% else %}bg-secondary{% endif %}">{{ f.stato }}</span></td>
@@ -37,20 +38,23 @@
             <form class="d-inline" method="post" action="{{ url_for('followups.complete', followup_id=f.id) }}">
               {{ csrf_field() }}
               <input type="hidden" name="da_lista" value="1">
-              <button class="btn btn-sm btn-outline-success" title="Completa"><i class="bi bi-check-lg"></i></button>
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button class="btn btn-sm btn-outline-success" title="Completa" aria-label="Completa il follow-up {{ f.titolo }}"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
             </form>
             {% else %}
             <form class="d-inline" method="post" action="{{ url_for('followups.reopen', followup_id=f.id) }}">
               {{ csrf_field() }}
               <input type="hidden" name="da_lista" value="1">
-              <button class="btn btn-sm btn-outline-info" title="Riapri"><i class="bi bi-arrow-counterclockwise"></i></button>
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button class="btn btn-sm btn-outline-info" title="Riapri" aria-label="Riapri il follow-up {{ f.titolo }}"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
             </form>
             {% endif %}
             <form class="d-inline" method="post" action="{{ url_for('followups.delete', followup_id=f.id) }}"
                   data-confirm="Eliminare il follow-up?">
               {{ csrf_field() }}
               <input type="hidden" name="da_lista" value="1">
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button class="btn btn-sm btn-outline-danger" title="Elimina" aria-label="Elimina il follow-up {{ f.titolo }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
             </form>
             {% endif %}
           </td>
@@ -58,6 +62,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {{ m.paginazione(pagination) }}
     {% else %}
     <p class="text-muted p-4 mb-0">Nessun follow-up in questo stato. I follow-up si pianificano dalla scheda del cliente.</p>

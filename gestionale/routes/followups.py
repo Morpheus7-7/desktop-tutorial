@@ -9,9 +9,9 @@ from ..models import (
     db,
     now,
 )
-from ..notifications import segna_lette
+from ..notifications import elimina_notifiche, segna_lette
 from ..security import safe_next
-from ..utils import paginate, parse_date, parse_int
+from ..utils import leggi_data, paginate, parse_int
 
 bp = Blueprint("followups", __name__, url_prefix="/follow-up")
 
@@ -31,11 +31,17 @@ def list_followups():
 @bp.route("/nuovo/<int:client_id>", methods=["POST"])
 def new_followup(client_id):
     client = db.get_or_404(Client, client_id)
-    titolo = request.form.get("titolo", "").strip()
-    scadenza = parse_date(request.form.get("data_scadenza"))
-    if not titolo or not scadenza:
-        flash("Titolo e data del follow-up sono obbligatori.", "danger")
-        return redirect(url_for("clients.detail", client_id=client.id) + "#followup")
+    titolo = (request.form.get("titolo") or "").strip()[:200]
+    errori: list[str] = []
+    scadenza = leggi_data(request.form, "data_scadenza", "Data del follow-up", errori, obbligatoria=True)
+    if not titolo:
+        errori.append("Il titolo del follow-up è obbligatorio.")
+    if errori:
+        for e in errori:
+            flash(e, "danger")
+        return redirect(
+            safe_next(request.form.get("next")) or url_for("clients.detail", client_id=client.id) + "#followup"
+        )
     tipo = request.form.get("tipo")
     priorita = request.form.get("priorita")
     policy_id = parse_int(request.form.get("policy_id"))
@@ -72,6 +78,8 @@ def reopen(followup_id):
     fu = db.get_or_404(FollowUp, followup_id)
     fu.stato = "aperto"
     fu.completed_at = None
+    # Le notifiche ripartono da zero (es. di nuovo «in ritardo»).
+    elimina_notifiche(f"followup:{fu.id}:")
     db.session.commit()
     flash(f"Follow-up “{fu.titolo}” riaperto.", "info")
     return _back_to_origin(fu)
@@ -80,14 +88,12 @@ def reopen(followup_id):
 @bp.route("/<int:followup_id>/elimina", methods=["POST"])
 def delete(followup_id):
     fu = db.get_or_404(FollowUp, followup_id)
-    client_id = fu.client_id
-    segna_lette(f"followup:{fu.id}:")
+    torna = _back_to_origin(fu)  # prima dell'eliminazione (serve il cliente)
+    elimina_notifiche(f"followup:{fu.id}:")
     db.session.delete(fu)
     db.session.commit()
     flash("Follow-up eliminato.", "success")
-    if request.form.get("da_lista"):
-        return redirect(url_for("followups.list_followups"))
-    return redirect(url_for("clients.detail", client_id=client_id) + "#followup")
+    return torna
 
 
 def _back_to_origin(fu: FollowUp):

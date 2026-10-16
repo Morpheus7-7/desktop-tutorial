@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
+{% from "policies/_campi.html" import campi_polizza with context %}
 {% block title %}{{ client.ragione_sociale }} — Gestionale Assicurativo{% endblock %}
 {% block content %}
+{% if form_polizza %}<div data-tab-iniziale="polizze" hidden></div>{% endif %}
 <nav aria-label="breadcrumb"><ol class="breadcrumb">
   <li class="breadcrumb-item"><a href="{{ url_for('clients.list_clients') }}">Clienti</a></li>
   <li class="breadcrumb-item active">{{ client.ragione_sociale }}</li>
@@ -191,71 +193,11 @@
     {% if puo_modificare %}
     <hr>
     <h2 class="section-title">Aggiungi polizza</h2>
-    <form method="post" action="{{ url_for('policies.new_policy', client_id=client.id) }}" class="row g-3">
+    <form method="post" action="{{ url_for('policies.new_policy', client_id=client.id) }}" class="row g-3" id="form-nuova-polizza">
       {{ csrf_field() }}
-      <div class="col-md-3">
-        <label class="form-label">Compagnia *</label>
-        <input class="form-control" name="compagnia" required list="elenco-compagnie" autocomplete="off">
-        <datalist id="elenco-compagnie">{% for c in compagnie %}<option value="{{ c }}">{% endfor %}</datalist>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Numero polizza *</label>
-        <input class="form-control" name="numero_polizza" required>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Ramo</label>
-        <select class="form-select" name="ramo">
-          {% for value, label in policy_branches %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Stato</label>
-        <select class="form-select" name="stato">
-          {% for value, label in policy_statuses %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label">Premio annuo (€)</label>
-        <input class="form-control" name="premio_annuo" inputmode="decimal">
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label">Provvigione %</label>
-        <input class="form-control" name="provvigione_perc" placeholder="es. 15" inputmode="decimal">
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label">Massimale (€)</label>
-        <input class="form-control" name="massimale" inputmode="decimal">
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label">Frazionamento</label>
-        <select class="form-select" name="frazionamento">
-          {% for value, label in payment_frequencies %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label">Decorrenza</label>
-        <input type="date" class="form-control" name="data_decorrenza">
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label">Scadenza</label>
-        <input type="date" class="form-control" name="data_scadenza">
-      </div>
-      <div class="col-md-8">
-        <label class="form-label">Note</label>
-        <input class="form-control" name="note">
-      </div>
-      <div class="col-md-4 d-flex align-items-end gap-3 flex-wrap">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="tacito_rinnovo" id="tacito">
-          <label class="form-check-label" for="tacito">Tacito rinnovo</label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="genera_titoli" id="genera_titoli" checked>
-          <label class="form-check-label" for="genera_titoli">Genera i titoli da incassare</label>
-        </div>
-      </div>
+      {{ campi_polizza(None, form_polizza, 'np-', true, compagnie, policy_branches, policy_statuses, payment_frequencies) }}
       <div class="col-12">
-        <button class="btn btn-primary"><i class="bi bi-plus-lg"></i> Registra polizza</button>
+        <button class="btn btn-primary"><i class="bi bi-plus-lg" aria-hidden="true"></i> Registra polizza</button>
       </div>
     </form>
     {% endif %}
@@ -368,33 +310,33 @@
           <i class="bi bi-cloud-arrow-up d-block"></i>
           <div class="fw-semibold">Trascina qui i file oppure clicca per selezionarli</div>
           <div class="small">Puoi caricarne più di uno. PDF, immagini, Office, p7m, zip…</div>
-          <input type="file" class="d-none" name="file" id="input-file" multiple required>
+          <input type="file" class="visually-hidden" name="file" id="input-file" multiple aria-label="File da caricare">
         </div>
         <div id="file-list" class="mt-2"></div>
       </div>
       <div class="col-md-3">
-        <label class="form-label">Categoria</label>
-        <select class="form-select" name="categoria">
+        <label class="form-label" for="clients-detail-categoria">Categoria</label>
+        <select id="clients-detail-categoria" class="form-select" name="categoria">
           {% for value, label in document_categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
         </select>
       </div>
       <div class="col-md-3">
-        <label class="form-label">Polizza collegata</label>
-        <select class="form-select" name="policy_id">
+        <label class="form-label" for="clients-detail-policy-id">Polizza collegata</label>
+        <select id="clients-detail-policy-id" class="form-select" name="policy_id">
           <option value="">Nessuna</option>
           {% for p in client.polizze %}<option value="{{ p.id }}">{{ p.numero_polizza }} — {{ p.ramo_label }}</option>{% endfor %}
         </select>
       </div>
       <div class="col-md-3">
-        <label class="form-label">Sinistro collegato</label>
-        <select class="form-select" name="claim_id">
+        <label class="form-label" for="clients-detail-claim-id">Sinistro collegato</label>
+        <select id="clients-detail-claim-id" class="form-select" name="claim_id">
           <option value="">Nessuno</option>
           {% for s in client.sinistri %}<option value="{{ s.id }}">{{ s.numero }} — {{ s.data_evento | data_it }}</option>{% endfor %}
         </select>
       </div>
       <div class="col-md-3">
-        <label class="form-label">Note (a tutti i file)</label>
-        <input class="form-control" name="note">
+        <label class="form-label" for="clients-detail-note">Note (a tutti i file)</label>
+        <input id="clients-detail-note" class="form-control" name="note">
       </div>
       <div class="col-12">
         <button class="btn btn-primary"><i class="bi bi-upload"></i> Carica</button>
@@ -427,7 +369,7 @@
             <form method="post" action="{{ url_for('opportunities.change_stage', opportunity_id=o.id) }}">
               {{ csrf_field() }}
               <input type="hidden" name="next" value="{{ qui }}">
-              <select class="form-select form-select-sm" name="fase" onchange="this.form.submit()" style="min-width: 9rem;" aria-label="Fase" {% if not puo_modificare %}disabled{% endif %}>
+              <select class="form-select form-select-sm" name="fase" data-autosubmit style="min-width: 9rem;" aria-label="Fase" {% if not puo_modificare %}disabled{% endif %}>
                 {% for f, lab in [('lead','Lead'),('contatto','Contattato'),('preventivo','Preventivo inviato'),('trattativa','In trattativa'),('vinta','Vinta'),('persa','Persa')] %}
                 <option value="{{ f }}" {% if o.fase == f %}selected{% endif %}>{{ lab }}</option>{% endfor %}
               </select>
@@ -505,35 +447,35 @@
     <form method="post" action="{{ url_for('followups.new_followup', client_id=client.id) }}" class="row g-3">
       {{ csrf_field() }}
       <div class="col-md-4">
-        <label class="form-label">Titolo *</label>
-        <input class="form-control" name="titolo" required placeholder="es. Richiamare per rinnovo RC">
+        <label class="form-label" for="clients-detail-titolo">Titolo *</label>
+        <input id="clients-detail-titolo" class="form-control" name="titolo" required placeholder="es. Richiamare per rinnovo RC">
       </div>
       <div class="col-md-2">
-        <label class="form-label">Tipo</label>
-        <select class="form-select" name="tipo">
+        <label class="form-label" for="clients-detail-tipo">Tipo</label>
+        <select id="clients-detail-tipo" class="form-select" name="tipo">
           {% for value, label in followup_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
         </select>
       </div>
       <div class="col-md-2">
-        <label class="form-label">Data *</label>
-        <input type="date" class="form-control" name="data_scadenza" required>
+        <label class="form-label" for="clients-detail-data-scadenza">Data *</label>
+        <input id="clients-detail-data-scadenza" type="date" class="form-control" name="data_scadenza" required>
       </div>
       <div class="col-md-2">
-        <label class="form-label">Priorità</label>
-        <select class="form-select" name="priorita">
+        <label class="form-label" for="clients-detail-priorita">Priorità</label>
+        <select id="clients-detail-priorita" class="form-select" name="priorita">
           {% for value, label in followup_priorities %}<option value="{{ value }}" {% if value == 'media' %}selected{% endif %}>{{ label }}</option>{% endfor %}
         </select>
       </div>
       <div class="col-md-2">
-        <label class="form-label">Polizza</label>
-        <select class="form-select" name="policy_id">
+        <label class="form-label" for="clients-detail-policy-id-2">Polizza</label>
+        <select id="clients-detail-policy-id-2" class="form-select" name="policy_id">
           <option value="">—</option>
           {% for p in client.polizze %}<option value="{{ p.id }}">{{ p.numero_polizza }}</option>{% endfor %}
         </select>
       </div>
       <div class="col-md-10">
-        <label class="form-label">Descrizione</label>
-        <input class="form-control" name="descrizione">
+        <label class="form-label" for="clients-detail-descrizione">Descrizione</label>
+        <input id="clients-detail-descrizione" class="form-control" name="descrizione">
       </div>
       <div class="col-md-2 d-flex align-items-end">
         <button class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i> Pianifica</button>
@@ -554,7 +496,8 @@
         </p>
         <form method="post" action="{{ url_for('clients.run_analysis', client_id=client.id) }}">
           {{ csrf_field() }}
-          <textarea class="form-control mb-2" name="descrizione" rows="6"
+          <label class="visually-hidden" for="analisi-descrizione">Descrizione dell'attività</label>
+          <textarea class="form-control mb-2" id="analisi-descrizione" name="descrizione" rows="6"
                     placeholder="Descrizione dell'attività…" {% if not puo_modificare %}disabled{% endif %}>{{ client.descrizione_attivita or '' }}</textarea>
           {% if puo_modificare %}<button class="btn btn-primary"><i class="bi bi-magic"></i> Analizza i rischi</button>{% endif %}
         </form>
@@ -562,6 +505,7 @@
       <div class="col-lg-7">
         <h2 class="section-title">Storico analisi</h2>
         {% if client.analisi %}
+        <div class="table-responsive">
         <table class="table table-hover align-middle">
           <thead><tr><th>Data</th><th>Rischi rilevati</th><th>Rami scoperti</th><th></th></tr></thead>
           <tbody>
@@ -585,6 +529,7 @@
           {% endfor %}
           </tbody>
         </table>
+        </div>
         {% else %}
         <p class="ga-muted">Nessuna analisi eseguita finora.</p>
         {% endif %}

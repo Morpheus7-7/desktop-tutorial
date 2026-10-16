@@ -5,17 +5,19 @@
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
     <h1 class="page-title"><i class="bi bi-calendar-event me-2"></i>Scadenzario</h1>
-    <div class="page-subtitle">Polizze in scadenza, rate da incassare e follow-up nei prossimi {{ giorni }} giorni, arretrati compresi</div>
+    <div class="page-subtitle">Polizze in scadenza, rate da incassare, follow-up e altre scadenze fino al {{ limite | data_it }} (prossimi {{ giorni }} giorni), arretrati compresi</div>
   </div>
   <div class="d-flex gap-2 no-print">
     <form method="get">
-      <select class="form-select" name="giorni" onchange="this.form.submit()" aria-label="Periodo">
-        {% for g in [7, 30, 60, 90, 180, 365] %}
+      <select class="form-select" name="giorni" data-autosubmit aria-label="Periodo">
+        {% for g in periodi %}
         <option value="{{ g }}" {% if giorni == g %}selected{% endif %}>Prossimi {{ g }} giorni</option>
         {% endfor %}
+        {% if giorni not in periodi %}<option value="{{ giorni }}" selected>Prossimi {{ giorni }} giorni</option>{% endif %}
       </select>
     </form>
-    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i></button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.scadenzario_ics', giorni=giorni) }}" title="Importa in Outlook, Google Calendar…"><i class="bi bi-calendar-plus" aria-hidden="true"></i> Calendario (.ics)</a>
+    <button type="button" class="btn btn-outline-secondary" data-print aria-label="Stampa" title="Stampa"><i class="bi bi-printer" aria-hidden="true"></i></button>
   </div>
 </div>
 
@@ -26,22 +28,24 @@
       <div class="table-responsive">
         {% if polizze %}
         <table class="table table-hover mb-0 align-middle">
-          <thead><tr><th>Scadenza</th><th>Cliente</th><th>Polizza</th><th class="num">Premio</th><th>Rinnovo</th></tr></thead>
+          <thead><tr><th scope="col">Scadenza</th><th scope="col">Cliente</th><th scope="col">Polizza</th><th scope="col" class="num">Premio</th><th scope="col">Rinnovo</th></tr></thead>
           <tbody>
           {% for p in polizze %}
             <tr class="urgenza-{{ p.urgenza_scadenza }}">
               <td class="text-nowrap">
                 <strong>{{ p.data_scadenza | data_it }}</strong><br>
                 {% if p.giorni_alla_scadenza < 0 %}
-                  <span class="badge bg-danger">scaduta da {{ -p.giorni_alla_scadenza }} gg</span>
+                  <span class="badge bg-danger">scaduta {{ p.giorni_alla_scadenza | giorni }}</span>
                 {% else %}
-                  <span class="badge bg-secondary">tra {{ p.giorni_alla_scadenza }} gg</span>
+                  <span class="badge bg-secondary">{{ p.giorni_alla_scadenza | giorni }}</span>
                 {% endif %}
               </td>
               <td><a href="{{ url_for('clients.detail', client_id=p.client_id) }}">{{ p.cliente.ragione_sociale }}</a></td>
               <td><a href="{{ url_for('policies.detail', policy_id=p.id) }}">{{ p.numero_polizza }}</a><br><span class="small ga-muted">{{ p.compagnia }} · {{ p.ramo_label }}</span></td>
               <td class="num">{{ p.premio_annuo | euro }}</td>
-              <td>{% if p.tacito_rinnovo %}<span class="badge bg-info text-dark">tacito</span>{% else %}<span class="badge bg-warning text-dark">da rinnovare</span>{% endif %}</td>
+              <td>{% if p.disdetta_inviata %}<span class="badge bg-secondary">disdetta</span>
+                  {% elif p.tacito_rinnovo %}<span class="badge bg-info text-dark">tacito</span>{% if p.termine_disdetta and p.giorni_al_termine_disdetta is not none and p.giorni_al_termine_disdetta >= 0 %}<div class="small ga-muted">disdetta entro il {{ p.termine_disdetta | data_it }}</div>{% endif %}
+                  {% else %}<span class="badge bg-warning text-dark">da rinnovare</span>{% endif %}</td>
             </tr>
           {% endfor %}
           </tbody>
@@ -80,6 +84,25 @@
   </div>
 
   <div class="col-xl-5">
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between"><span><i class="bi bi-calendar-week me-1" aria-hidden="true"></i> Agenda: altre scadenze</span><span class="badge bg-secondary">{{ agenda | length }}</span></div>
+      {% if agenda %}
+      <ul class="list-group list-group-flush agenda">
+        {% for e in agenda %}
+        <li class="list-group-item d-flex gap-2 align-items-start">
+          <div class="text-nowrap small fw-semibold agenda-data">{{ e.data | data_it }}<div class="ga-muted fw-normal">{{ e.giorni | giorni }}</div></div>
+          <div class="flex-grow-1">
+            <span class="badge {{ e.badge }}"><i class="bi {{ e.icona }}" aria-hidden="true"></i> {{ e.etichetta }}</span>
+            <div><a href="{{ e.link }}">{{ e.titolo }}</a></div>
+            <div class="small ga-muted">{{ e.dettaglio }}</div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="ga-muted p-3 mb-0">Nessuna decorrenza, termine di disdetta o di denuncia, sospensione o scadenza di compliance nel periodo.</p>
+      {% endif %}
+    </div>
     <div class="card">
       <div class="card-header d-flex justify-content-between"><span><i class="bi bi-check2-square me-1"></i> Follow-up in scadenza</span><span class="badge bg-secondary">{{ followups | length }}</span></div>
       <div class="table-responsive">
@@ -99,7 +122,7 @@
                 <form method="post" action="{{ url_for('followups.complete', followup_id=f.id) }}">
                   {{ csrf_field() }}
                   <input type="hidden" name="next" value="{{ request.full_path }}">
-                  <button class="btn btn-sm btn-outline-success" title="Completa"><i class="bi bi-check-lg"></i></button>
+                  <button class="btn btn-sm btn-outline-success" title="Completa" aria-label="Completa il follow-up {{ f.titolo }}"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
                 </form>
                 {% endif %}
               </td>

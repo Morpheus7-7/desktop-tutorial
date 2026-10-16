@@ -1,7 +1,7 @@
 """Dashboard, scadenzario, ricerca globale e statistiche."""
 from datetime import date, timedelta
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, Response, render_template, request
 
 from ..models import (
     BRANCH_LABELS,
@@ -19,7 +19,10 @@ from ..models import (
     Title,
     db,
 )
+from ..agenda import eventi_agenda, esporta_ics
+from ..security import audit
 from ..titoli import add_months
+from ..utils import parse_int
 
 bp = Blueprint("main", __name__)
 
@@ -59,6 +62,21 @@ def _somma_titoli(*condizioni):
     )
 
 
+def _termini_disdetta(dal: date, al: date) -> list[Policy]:
+    """Polizze a tacito rinnovo, senza disdetta, con termine di preavviso in [dal, al]."""
+    candidate = Policy.query.filter(
+        Policy.stato.in_(STATI_ATTIVI),
+        Policy.tacito_rinnovo.is_(True),
+        Policy.data_disdetta.is_(None),
+        Policy.data_scadenza.isnot(None),
+        Policy.data_scadenza >= dal,
+    ).all()
+    return sorted(
+        (p for p in candidate if p.termine_disdetta and dal <= p.termine_disdetta <= al),
+        key=lambda p: p.termine_disdetta,
+    )
+
+
 @bp.route("/")
 def dashboard():
     today = date.today()
@@ -91,6 +109,10 @@ def dashboard():
         "polizze_scadute": attive.filter(
             Policy.data_scadenza.isnot(None), Policy.data_scadenza < today
         ).count(),
+        "polizze_non_in_vigore": attive.filter(
+            Policy.data_decorrenza.isnot(None), Policy.data_decorrenza > today
+        ).count(),
+        "termini_disdetta_30gg": len(_termini_disdetta(today, limite_30)),
         "followup_aperti": FollowUp.query.filter_by(stato="aperto").count(),
         "followup_in_ritardo": FollowUp.query.filter(
             FollowUp.stato == "aperto", FollowUp.data_scadenza < today
@@ -114,16 +136,22 @@ def dashboard():
         "clienti_senza_privacy": Client.query.filter(Client.data_consenso_privacy.is_(None)).count(),
     }
 
+    # Solo le scadenze future: le polizze già scadute sono conteggiate a parte
+    # (card «Scadute da rinnovare») e non devono nascondere quelle imminenti.
     prossime_scadenze = (
         Policy.query.filter(
             Policy.stato.in_(STATI_ATTIVI),
             Policy.data_scadenza.isnot(None),
+            Policy.data_scadenza >= today,
             Policy.data_scadenza <= limite_60,
         )
         .order_by(Policy.data_scadenza.asc())
         .limit(8)
         .all()
     )
+    prossimi_eventi = [
+        e for e in eventi_agenda(today, limite_30, {"decorrenza", "disdetta", "denuncia", "sospensione"})
+    ][:8]
     titoli_urgenti = (
         Title.query.filter(Title.stato == "da_incassare", Title.data_effetto <= limite_30)
         .order_by(Title.data_effetto.asc())
@@ -154,6 +182,7 @@ def dashboard():
         "dashboard.html",
         stats=stats,
         prossime_scadenze=prossime_scadenze,
+        prossimi_eventi=prossimi_eventi,
         titoli_urgenti=titoli_urgenti,
         prossimi_followup=prossimi_followup,
         ultimi_sinistri=ultimi_sinistri,
@@ -162,15 +191,18 @@ def dashboard():
     )
 
 
+PERIODI_SCADENZARIO = (7, 30, 60, 90, 180, 365)
+
+
+def _orizzonte() -> tuple[date, int]:
+    giorni = parse_int(request.args.get("giorni"), minimo=1, massimo=730) or 90
+    return date.today() + timedelta(days=giorni), giorni
+
+
 @bp.route("/scadenzario")
 def scadenzario():
     today = date.today()
-    try:
-        giorni = int(request.args.get("giorni", 90))
-    except ValueError:
-        giorni = 90
-    giorni = min(max(giorni, 1), 730)
-    limite = today + timedelta(days=giorni)
+    limite, giorni = _orizzonte()
 
     polizze = (
         Policy.query.filter(
@@ -193,8 +225,30 @@ def scadenzario():
         .order_by(FollowUp.data_scadenza.asc())
         .all()
     )
+    # Agenda: le altre scadenze future (decorrenze, termini di disdetta e di
+    # denuncia, sospensioni della copertura, compliance dei clienti).
+    agenda = eventi_agenda(
+        today, limite, {"decorrenza", "disdetta", "sospensione", "denuncia", "documento", "adeguatezza"}
+    )
     return render_template(
-        "scadenzario.html", polizze=polizze, titoli=titoli, followups=followups, giorni=giorni
+        "scadenzario.html", polizze=polizze, titoli=titoli, followups=followups, giorni=giorni,
+        agenda=agenda, periodi=PERIODI_SCADENZARIO, limite=limite,
+    )
+
+
+@bp.route("/scadenzario.ics")
+def scadenzario_ics():
+    """Esporta le scadenze del periodo in un file da importare in Outlook, Google Calendar…"""
+    today = date.today()
+    limite, giorni = _orizzonte()
+    eventi = eventi_agenda(today, limite)
+    audit("export", "scadenzario", None, f"Esportato lo scadenzario in calendario ({len(eventi)} eventi, {giorni} giorni)",
+          commit=True)
+    contenuto = esporta_ics(eventi, request.host_url, "Scadenze gestionale assicurativo")
+    return Response(
+        contenuto,
+        mimetype="text/calendar",
+        headers={"Content-Disposition": f'attachment; filename="scadenzario_{today:%Y%m%d}.ics"'},
     )
 
 
@@ -266,11 +320,25 @@ def analytics():
         r["numero"] += 1
         r["premi"] += p.premio_annuo or 0.0
         r["provvigioni"] += p.provvigione_annua or 0.0
-    for s in Claim.query.filter(Claim.policy_id.isnot(None)).all():
-        if s.polizza and s.polizza.ramo in per_ramo:
-            per_ramo[s.polizza.ramo]["sinistri"] += s.costo
-    for r in per_ramo.values():
-        r["rapporto_sp"] = (100.0 * r["sinistri"] / r["premi"]) if r["premi"] else None
+    # Rapporto sinistri/premi su un periodo omogeneo (ultimi 12 mesi): costo dei
+    # sinistri accaduti nel periodo / premi dei titoli con effetto nel periodo
+    # (anche di polizze poi cessate). Così non cresce con l'anzianità del portafoglio.
+    inizio_sp = add_months(today, -12)
+    premi_competenza = {}
+    for t in Title.query.filter(
+        Title.stato != "stornato", Title.data_effetto > inizio_sp, Title.data_effetto <= today
+    ).all():
+        ramo = t.polizza.ramo
+        premi_competenza[ramo] = premi_competenza.get(ramo, 0.0) + (t.premio_lordo or 0.0)
+    sinistri_periodo = Claim.query.filter(Claim.data_evento > inizio_sp, Claim.data_evento <= today).all()
+    costo_per_ramo = {}
+    for s in sinistri_periodo:
+        if s.polizza:
+            costo_per_ramo[s.polizza.ramo] = costo_per_ramo.get(s.polizza.ramo, 0.0) + s.costo
+    for ramo, r in per_ramo.items():
+        r["sinistri"] = costo_per_ramo.get(ramo, 0.0)
+        r["premi_competenza"] = premi_competenza.get(ramo, 0.0)
+        r["rapporto_sp"] = (100.0 * r["sinistri"] / r["premi_competenza"]) if r["premi_competenza"] else None
     rami = sorted(per_ramo.values(), key=lambda x: -x["premi"])
     premi_max = max([r["premi"] for r in rami], default=0.0)
 
@@ -365,7 +433,13 @@ def analytics():
         totale_polizze=len(polizze_attive),
         numero_sinistri=len(tutti_sinistri),
         costo_sinistri=costo_sinistri,
-        rapporto_sp=(100.0 * costo_sinistri / premi_totali) if premi_totali else None,
+        costo_sinistri_12m=sum(s.costo for s in sinistri_periodo),
+        premi_competenza_12m=sum(premi_competenza.values()),
+        rapporto_sp=(
+            100.0 * sum(s.costo for s in sinistri_periodo) / sum(premi_competenza.values())
+            if sum(premi_competenza.values()) else None
+        ),
+        sinistri_senza_polizza_12m=sum(s.costo for s in sinistri_periodo if not s.polizza),
         sinistri_per_stato=sinistri_per_stato,
         sinistri_tipologie=sinistri_tipologie,
     )

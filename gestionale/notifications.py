@@ -13,6 +13,8 @@ blocco gli avvisi di un record.
 """
 from __future__ import annotations
 
+import re
+
 import threading
 from datetime import date, timedelta
 
@@ -80,8 +82,13 @@ def elimina_notifiche(*prefissi: str) -> None:
         )
 
 
+_PUNTO_DOPPIO = re.compile(r"(?<!\.)\.\.(?!\.)")
+
+
 def aggiungi_notifica(tipo: str, livello: str, messaggio: str, link: str, dedup_key: str) -> bool:
     """Inserisce la notifica se la chiave non esiste ancora (in modo idempotente)."""
+    # Un nome che finisce col punto («Rossi S.r.l.») non deve dare «S.r.l..».
+    messaggio = _PUNTO_DOPPIO.sub(".", messaggio)
     valori = dict(
         tipo=tipo, livello=livello, messaggio=messaggio[:500], link=link,
         dedup_key=dedup_key, letta=False, inviata_email=False, created_at=now(),

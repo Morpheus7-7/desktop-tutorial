@@ -270,6 +270,34 @@ def create_app(test_config: dict | None = None) -> Flask:
             return "—"
         return f"{value:.{decimali}f}%".replace(".", ",")
 
+    @app.template_filter("num_input")
+    def num_input(value):
+        """Importo per un campo di input (es. 1234,56): vuoto se assente."""
+        if value is None or value == "":
+            return ""
+        if isinstance(value, str):
+            return value
+        return f"{value:.2f}".replace(".", ",")
+
+    @app.template_filter("giorni")
+    def giorni(value):
+        """Distanza in giorni in parole: «oggi», «domani», «tra 5 giorni», «da 3 giorni»."""
+        if value is None:
+            return "—"
+        if value == 0:
+            return "oggi"
+        if value == 1:
+            return "domani"
+        if value == -1:
+            return "da ieri"
+        return f"tra {value} giorni" if value > 0 else f"da {-value} giorni"
+
+    def plurale(numero, singolare: str, plurale_: str) -> str:
+        """«1 titolo», «3 titoli»."""
+        return f"{numero} {singolare if numero == 1 else plurale_}"
+
+    app.jinja_env.globals["plurale"] = plurale
+
     def url_pagina(numero: int) -> str:
         """URL della pagina corrente con un altro numero di pagina (paginazione)."""
         argomenti = dict(request.view_args or {})

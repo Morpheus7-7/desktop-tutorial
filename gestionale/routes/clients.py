@@ -99,6 +99,11 @@ def _populate_from_form(client: Client, form) -> list[str]:
         massimo=oggi + timedelta(days=365 * 20),
         msg_massimo="Scadenza documento: oltre 20 anni da oggi, controlla la data.",
     )
+    # Campi non pertinenti al tipo di cliente (nascosti nel modulo).
+    if client.tipo == "dipendente":
+        client.partita_iva = None
+    if client.tipo != "azienda":
+        client.codice_ateco = None
     if client.persona_fisica and not client.data_nascita:
         client.data_nascita = data_nascita_da_cf(client.codice_fiscale)
     return errori

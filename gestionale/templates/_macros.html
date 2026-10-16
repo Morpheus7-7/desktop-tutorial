@@ -29,6 +29,8 @@
 
 {% macro stato_polizza(p) -%}
 <span class="badge {% if p.stato == 'attiva' %}bg-success{% elif p.stato == 'in_rinnovo' %}bg-info text-dark{% elif p.stato == 'scaduta' %}bg-danger{% else %}bg-secondary{% endif %}">{{ p.stato_label }}</span>
+{%- set eff = p.stato_effettivo -%}
+{%- if eff and eff not in ('in_vigore', 'sospesa') %} <span class="badge {{ p.stato_effettivo_badge }}">{{ p.stato_effettivo_label }}</span>{% endif %}
 {%- endmacro %}
 
 {% macro stato_titolo(t) -%}
@@ -56,19 +58,19 @@
           data-action="{{ url_for('titles.collect', title_id=t.id) }}"
           data-fill-importo="{{ '%.2f' | format(t.premio_lordo or 0) | replace('.', ',') }}"
           data-fill-descrizione="{{ t.polizza.numero_polizza }} · {{ t.cliente.ragione_sociale }} · rata del {{ t.data_effetto | data_it }}"
-          data-fill-next="{{ next_url }}" title="Registra incasso">
-    <i class="bi bi-cash"></i><span class="d-none d-xl-inline"> Incassa</span>
+          data-fill-next="{{ next_url }}" title="Registra incasso" aria-label="Registra incasso">
+    <i class="bi bi-cash" aria-hidden="true"></i><span class="d-none d-xl-inline"> Incassa</span>
   </button>
   <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalStorno"
           data-action="{{ url_for('titles.cancel', title_id=t.id) }}"
           data-fill-descrizione="{{ t.polizza.numero_polizza }} · rata del {{ t.data_effetto | data_it }}"
-          data-fill-next="{{ next_url }}" title="Storna"><i class="bi bi-x-circle"></i></button>
+          data-fill-next="{{ next_url }}" title="Storna" aria-label="Storna titolo"><i class="bi bi-x-circle" aria-hidden="true"></i></button>
   {% elif t.stato == 'incassato' and not t.data_rimessa %}
   <form class="d-inline" method="post" action="{{ url_for('titles.undo_collect', title_id=t.id) }}"
         data-confirm="Annullare l'incasso di questo titolo?">
     {{ csrf_field() }}
     <input type="hidden" name="next" value="{{ next_url }}">
-    <button class="btn btn-sm btn-outline-warning" title="Annulla incasso"><i class="bi bi-arrow-counterclockwise"></i></button>
+    <button class="btn btn-sm btn-outline-warning" title="Annulla incasso" aria-label="Annulla incasso"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
   </form>
   {% endif %}
 {% endif %}
@@ -87,22 +89,24 @@
       <div class="modal-body row g-3">
         <div class="col-12 small ga-muted" data-field="descrizione"></div>
         <div class="col-md-6">
-          <label class="form-label">Data incasso</label>
-          <input type="date" class="form-control" name="data_incasso" value="{{ oggi.isoformat() }}" max="{{ oggi.isoformat() }}" required>
+          <label class="form-label" for="inc-data">Data incasso</label>
+          <input type="date" class="form-control" id="inc-data" name="data_incasso" value="{{ oggi.isoformat() }}" min="1900-01-01" max="{{ oggi.isoformat() }}" required>
         </div>
         <div class="col-md-6">
-          <label class="form-label">Importo (€)</label>
-          <input class="form-control" name="importo" data-field="importo" inputmode="decimal">
+          <label class="form-label" for="inc-importo">Importo (€)</label>
+          <input class="form-control" id="inc-importo" name="importo" data-field="importo" inputmode="decimal" readonly aria-describedby="inc-importo-help">
+          <div class="form-text" id="inc-importo-help">È il premio del titolo. Per un importo diverso modifica prima il titolo o aggiungi un'appendice.</div>
         </div>
         <div class="col-md-6">
-          <label class="form-label">Mezzo di pagamento</label>
-          <select class="form-select" name="mezzo_pagamento">
+          <label class="form-label" for="inc-mezzo">Mezzo di pagamento *</label>
+          <select class="form-select" id="inc-mezzo" name="mezzo_pagamento" required>
+            <option value="">Seleziona…</option>
             {% for v, l in payment_methods %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
           </select>
         </div>
         <div class="col-md-6">
-          <label class="form-label">Riferimento</label>
-          <input class="form-control" name="riferimento" placeholder="CRO, n. assegno…">
+          <label class="form-label" for="inc-rif">Riferimento</label>
+          <input class="form-control" id="inc-rif" name="riferimento" maxlength="120" placeholder="CRO, n. assegno…">
         </div>
       </div>
       <div class="modal-footer">
@@ -123,8 +127,8 @@
       </div>
       <div class="modal-body">
         <p class="small ga-muted" data-field="descrizione"></p>
-        <label class="form-label">Motivo dello storno</label>
-        <input class="form-control" name="motivo" placeholder="es. polizza disdetta, sostituzione…">
+        <label class="form-label" for="macros-motivo">Motivo dello storno</label>
+        <input id="macros-motivo" class="form-control" name="motivo" placeholder="es. polizza disdetta, sostituzione…">
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>

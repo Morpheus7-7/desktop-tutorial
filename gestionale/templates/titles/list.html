@@ -24,28 +24,28 @@
   <div class="col-12">
     <div class="btn-group flex-wrap" role="group">
       {% for v, l in viste %}
-      <input type="radio" class="btn-check" name="vista" id="v-{{ v }}" value="{{ v }}" {% if vista == v %}checked{% endif %} onchange="this.form.submit()">
+      <input type="radio" class="btn-check" name="vista" id="v-{{ v }}" value="{{ v }}" {% if vista == v %}checked{% endif %} data-autosubmit>
       <label class="btn btn-outline-primary btn-sm" for="v-{{ v }}">{{ l }}</label>
       {% endfor %}
     </div>
   </div>
   <div class="col-md-3">
-    <label class="form-label small">Compagnia</label>
-    <select class="form-select form-select-sm" name="compagnia">
+    <label class="form-label small" for="titles-list-compagnia">Compagnia</label>
+    <select id="titles-list-compagnia" class="form-select form-select-sm" name="compagnia">
       <option value="">Tutte</option>
       {% for c in compagnie %}<option {% if filtri.get('compagnia') == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
     </select>
   </div>
   <div class="col-6 col-md-2">
-    <label class="form-label small">{{ 'Incassati dal' if vista == 'incassati' else 'Effetto dal' }}</label>
-    <input type="date" class="form-control form-control-sm" name="dal" value="{{ filtri.get('dal', '') }}">
+    <label class="form-label small" for="titles-list-dal">{{ 'Incassati dal' if vista == 'incassati' else 'Effetto dal' }}</label>
+    <input id="titles-list-dal" type="date" class="form-control form-control-sm" name="dal" value="{{ filtri.get('dal', '') }}">
   </div>
   <div class="col-6 col-md-2">
-    <label class="form-label small">al</label>
-    <input type="date" class="form-control form-control-sm" name="al" value="{{ filtri.get('al', '') }}">
+    <label class="form-label small" for="titles-list-al">al</label>
+    <input id="titles-list-al" type="date" class="form-control form-control-sm" name="al" value="{{ filtri.get('al', '') }}">
   </div>
   <div class="col-md-5 d-flex gap-1">
-    <input class="form-control form-control-sm" name="q" value="{{ filtri.get('q', '') }}" placeholder="Cliente o numero polizza…">
+    <input class="form-control form-control-sm" name="q" value="{{ filtri.get('q', '') }}" placeholder="Cliente o numero polizza…" aria-label="Cerca">
     <button class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Filtra</button>
   </div>
 </form>

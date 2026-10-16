@@ -17,24 +17,29 @@
     </div>
   </div>
   <div class="d-flex gap-2 no-print">
-    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+    <button type="button" class="btn btn-outline-secondary" data-print><i class="bi bi-printer"></i> Stampa</button>
     {% if puo_modificare %}
     <a class="btn btn-outline-primary" href="{{ url_for('claims.edit_claim', claim_id=claim.id) }}"><i class="bi bi-pencil"></i> Modifica</a>
     <form method="post" action="{{ url_for('claims.delete_claim', claim_id=claim.id) }}" data-confirm="Eliminare definitivamente il sinistro {{ claim.numero }}?">
       {{ csrf_field() }}
-      <button class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
+      <button class="btn btn-outline-danger" title="Elimina sinistro" aria-label="Elimina sinistro"><i class="bi bi-trash" aria-hidden="true"></i></button>
     </form>
     {% endif %}
   </div>
 </div>
 
 {% if claim.aperto and not claim.data_denuncia %}
-<div class="alert alert-danger"><i class="bi bi-send-exclamation me-1"></i>
-  Il sinistro non risulta ancora denunciato alla compagnia. La denuncia va fatta entro 3 giorni dall'evento (art. 1913 c.c.).</div>
+{% set termine_denuncia = claim.data_evento + giorni_denuncia %}
+<div class="alert {% if termine_denuncia < oggi %}alert-danger{% else %}alert-warning{% endif %}"><i class="bi bi-send-exclamation me-1" aria-hidden="true"></i>
+  Il sinistro non risulta ancora denunciato alla compagnia: la denuncia va fatta entro 3 giorni dall'evento (art. 1913 c.c.),
+  {% if termine_denuncia < oggi %}<strong>termine scaduto il {{ termine_denuncia | data_it }}</strong>{% else %}entro il <strong>{{ termine_denuncia | data_it }}</strong>{% endif %}.</div>
 {% elif claim.denuncia_tardiva %}
 <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-1"></i>
   Denuncia effettuata {{ claim.giorni_alla_denuncia }} giorni dopo l'evento (oltre il termine di 3 giorni dell'art. 1913 c.c.).</div>
 {% endif %}
+{% for avviso in claim.avvisi_copertura %}
+<div class="alert alert-warning"><i class="bi bi-shield-exclamation me-1" aria-hidden="true"></i> <strong>Verifica la copertura:</strong> {{ avviso }}</div>
+{% endfor %}
 
 <div class="row g-4">
   <div class="col-lg-7">
@@ -91,11 +96,11 @@
             <div class="dropzone py-3" data-input="file-sinistro" data-list="lista-file-sinistro" tabindex="0" role="button">
               <i class="bi bi-cloud-arrow-up d-block"></i>
               <div class="small fw-semibold">Trascina qui i file o clicca per selezionarli</div>
-              <input type="file" class="d-none" name="file" id="file-sinistro" multiple required>
+              <input type="file" class="visually-hidden" name="file" id="file-sinistro" multiple aria-label="File da caricare">
             </div>
             <div id="lista-file-sinistro" class="mt-1"></div>
           </div>
-          <div class="col-md-9"><input class="form-control form-control-sm" name="note" placeholder="Note (facoltative)"></div>
+          <div class="col-md-9"><input class="form-control form-control-sm" name="note" placeholder="Note (facoltative)" aria-label="Note del documento"></div>
           <div class="col-md-3"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-upload"></i> Carica</button></div>
         </form>
       </div>
@@ -124,14 +129,14 @@
         <form method="post" action="{{ url_for('claims.change_status', claim_id=claim.id) }}" class="row g-2">
           {{ csrf_field() }}
           <div class="col-md-6">
-            <select class="form-select" name="stato" id="nuovo-stato">
+            <select class="form-select" name="stato" id="nuovo-stato" aria-label="Nuovo stato">
               {% for v, l in claim_statuses %}<option value="{{ v }}" {% if claim.stato == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
             </select>
           </div>
           <div class="col-md-6">
-            <input class="form-control" name="importo_liquidato" placeholder="Importo liquidato (se liquidato)" inputmode="decimal">
+            <input class="form-control" name="importo_liquidato" placeholder="Importo liquidato (se liquidato)" inputmode="decimal" aria-label="Importo liquidato">
           </div>
-          <div class="col-12"><input class="form-control" name="commento" placeholder="Commento (es. esito perizia, motivo del rifiuto)"></div>
+          <div class="col-12"><input class="form-control" name="commento" placeholder="Commento (es. esito perizia, motivo del rifiuto)" aria-label="Commento"></div>
           <div class="col-12"><button class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> Aggiorna stato</button></div>
         </form>
       </div>
@@ -145,7 +150,7 @@
         <form method="post" action="{{ url_for('claims.add_note', claim_id=claim.id) }}" class="mb-3 no-print">
           {{ csrf_field() }}
           <div class="input-group">
-            <input class="form-control" name="testo" placeholder="Aggiungi una nota (telefonata, sollecito, documenti ricevuti…)" required>
+            <input class="form-control" name="testo" placeholder="Aggiungi una nota (telefonata, sollecito, documenti ricevuti…)" required aria-label="Testo della nota">
             <button class="btn btn-outline-primary"><i class="bi bi-plus-lg"></i></button>
           </div>
         </form>

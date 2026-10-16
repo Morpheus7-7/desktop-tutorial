@@ -1,7 +1,8 @@
 """Pipeline commerciale: opportunità di vendita (stile CRM assicurativo)."""
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from ..models import (
+    FOLLOWUP_PRIORITIES,
     OPPORTUNITY_OPEN_STAGES,
     OPPORTUNITY_STAGES,
     POLICY_BRANCHES,
@@ -11,31 +12,52 @@ from ..models import (
     now,
 )
 from ..security import audit, safe_next
-from ..utils import parse_float, parse_int
+from ..utils import leggi_importo, parse_int
 
 bp = Blueprint("opportunities", __name__, url_prefix="/opportunita")
 
 _CHIUSE = {"vinta", "persa"}
 
 
-def _apply_form(opp: Opportunity, form) -> None:
-    opp.titolo = form.get("titolo", "").strip()
-    opp.ramo = form.get("ramo") or None
-    opp.premio_stimato = parse_float(form.get("premio_stimato"))
-    opp.provvigione_perc = parse_float(form.get("provvigione_perc"))
-    opp.priorita = form.get("priorita", "media")
-    opp.note = form.get("note", "").strip() or None
+def _apply_form(opp: Opportunity, form) -> list[str]:
+    """Copia i campi del form nell'opportunità e restituisce gli errori."""
+    errori: list[str] = []
+    opp.titolo = (form.get("titolo") or "").strip()[:200]
+    ramo = form.get("ramo") or None
+    opp.ramo = ramo if ramo in dict(POLICY_BRANCHES) else None
+    opp.premio_stimato = leggi_importo(form, "premio_stimato", "Premio stimato", errori, minimo=0)
+    opp.provvigione_perc = leggi_importo(form, "provvigione_perc", "Provvigione %", errori, minimo=0, massimo=100)
+    priorita = form.get("priorita")
+    opp.priorita = priorita if priorita in dict(FOLLOWUP_PRIORITIES) else "media"
+    opp.note = (form.get("note") or "").strip() or None
     nuova_fase = form.get("fase")
     if nuova_fase:
         _set_fase(opp, nuova_fase)
+    if not opp.titolo:
+        errori.append("Il titolo dell'opportunità è obbligatorio.")
+    return errori
 
 
 def _set_fase(opp: Opportunity, fase: str) -> None:
     valide = {f for f, _ in OPPORTUNITY_STAGES}
     if fase not in valide:
         return
+    if fase in _CHIUSE:
+        # La data di chiusura resta quella originale se la fase non cambia.
+        if opp.fase != fase or opp.chiusa_at is None:
+            opp.chiusa_at = now()
+    else:
+        opp.chiusa_at = None
     opp.fase = fase
-    opp.chiusa_at = now() if fase in _CHIUSE else None
+
+
+def _render_form(opp, client, valori=None):
+    clienti = None if client else Client.query.order_by(Client.ragione_sociale).all()
+    return render_template(
+        "opportunities/form.html",
+        opp=opp, client=client, clienti=clienti, valori=valori,
+        stages=OPPORTUNITY_STAGES, policy_branches=POLICY_BRANCHES, priorities=FOLLOWUP_PRIORITIES,
+    )
 
 
 @bp.route("/")
@@ -67,33 +89,28 @@ def board():
 @bp.route("/nuova", methods=["GET", "POST"])
 @bp.route("/nuova/<int:client_id>", methods=["GET", "POST"])
 def new_opportunity(client_id=None):
-    if request.method == "POST":
-        cid = client_id or parse_int(request.form.get("client_id"))
-        if not cid:
-            abort(400, description="Seleziona il cliente dell'opportunità.")
-        client = db.get_or_404(Client, cid)
-        opp = Opportunity(client_id=client.id, origine=request.form.get("origine", "manuale"))
-        _apply_form(opp, request.form)
-        if not opp.titolo:
-            flash("Il titolo dell'opportunità è obbligatorio.", "danger")
-        else:
-            if not opp.fase:
-                opp.fase = "lead"
-            db.session.add(opp)
-            db.session.flush()
-            audit("crea", "opportunita", opp.id, f"Nuova opportunità «{opp.titolo}» per «{client.ragione_sociale}»")
-            db.session.commit()
-            flash(f"Opportunità «{opp.titolo}» creata.", "success")
-            if client_id:
-                return redirect(url_for("clients.detail", client_id=client.id) + "#opportunita")
-            return redirect(url_for("opportunities.board"))
     client = db.get_or_404(Client, client_id) if client_id else None
-    clienti = None if client else Client.query.order_by(Client.ragione_sociale).all()
-    return render_template(
-        "opportunities/form.html",
-        opp=None, client=client, clienti=clienti,
-        stages=OPPORTUNITY_STAGES, policy_branches=POLICY_BRANCHES,
-    )
+    if request.method == "POST":
+        cid = client_id or parse_int(request.form.get("client_id"), minimo=1)
+        if not cid:
+            flash("Seleziona il cliente dell'opportunità.", "danger")
+            return _render_form(None, None, request.form), 400
+        cliente = db.get_or_404(Client, cid)
+        opp = Opportunity(client_id=cliente.id, origine=(request.form.get("origine") or "manuale")[:40], fase="lead")
+        errori = _apply_form(opp, request.form)
+        if errori:
+            for e in errori:
+                flash(e, "danger")
+            return _render_form(None, client, request.form), 400
+        db.session.add(opp)
+        db.session.flush()
+        audit("crea", "opportunita", opp.id, f"Nuova opportunità «{opp.titolo}» per «{cliente.ragione_sociale}»")
+        db.session.commit()
+        flash(f"Opportunità «{opp.titolo}» creata.", "success")
+        if client_id:
+            return redirect(url_for("clients.detail", client_id=cliente.id) + "#opportunita")
+        return redirect(url_for("opportunities.board"))
+    return _render_form(None, client)
 
 
 @bp.route("/da-gap/<int:client_id>", methods=["POST"])
@@ -130,18 +147,19 @@ def change_stage(opportunity_id):
 def edit_opportunity(opportunity_id):
     opp = db.get_or_404(Opportunity, opportunity_id)
     if request.method == "POST":
-        _apply_form(opp, request.form)
-        if not opp.titolo:
-            flash("Il titolo dell'opportunità è obbligatorio.", "danger")
-        else:
-            db.session.commit()
-            flash("Opportunità aggiornata.", "success")
-            return redirect(url_for("opportunities.board"))
-    return render_template(
-        "opportunities/form.html",
-        opp=opp, client=opp.cliente, clienti=None,
-        stages=OPPORTUNITY_STAGES, policy_branches=POLICY_BRANCHES,
-    )
+        with db.session.no_autoflush:
+            errori = _apply_form(opp, request.form)
+        if errori:
+            db.session.rollback()
+            for e in errori:
+                flash(e, "danger")
+            opp = db.session.get(Opportunity, opportunity_id)
+            return _render_form(opp, opp.cliente, request.form), 400
+        audit("modifica", "opportunita", opp.id, f"Modificata opportunità «{opp.titolo}» ({opp.fase_label})")
+        db.session.commit()
+        flash("Opportunità aggiornata.", "success")
+        return redirect(url_for("opportunities.board"))
+    return _render_form(opp, opp.cliente)
 
 
 @bp.route("/<int:opportunity_id>/elimina", methods=["POST"])

@@ -43,7 +43,7 @@
               <form method="post" action="{{ url_for('opportunities.change_stage', opportunity_id=o.id) }}" class="flex-fill">
                 {{ csrf_field() }}
                 <input type="hidden" name="next" value="{{ url_for('opportunities.board') }}">
-                <select class="form-select form-select-sm" name="fase" onchange="this.form.submit()" title="Sposta di fase">
+                <select class="form-select form-select-sm" name="fase" data-autosubmit title="Sposta di fase">
                   {% for f, lab in stages %}<option value="{{ f }}" {% if o.fase == f %}selected{% endif %}>{{ lab }}</option>{% endfor %}
                 </select>
               </form>

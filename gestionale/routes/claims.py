@@ -1,5 +1,5 @@
 """Gestione sinistri: apertura, lavorazione, cronologia e chiusura."""
-from datetime import date
+from datetime import date, timedelta
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 from sqlalchemy.exc import IntegrityError
@@ -10,6 +10,7 @@ from ..models import (
     CLAIM_STATUSES,
     CLAIM_TYPES,
     DOCUMENT_CATEGORIES,
+    GIORNI_DENUNCIA_SINISTRO,
     Claim,
     ClaimNote,
     Client,
@@ -233,6 +234,7 @@ def detail(claim_id):
     return render_template(
         "claims/detail.html",
         claim=claim,
+        giorni_denuncia=timedelta(days=GIORNI_DENUNCIA_SINISTRO),
         claim_statuses=CLAIM_STATUSES,
         document_categories=DOCUMENT_CATEGORIES,
     )

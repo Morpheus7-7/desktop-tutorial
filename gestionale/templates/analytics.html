@@ -3,7 +3,7 @@
 {% macro colonne(serie, campo, massimo, etichetta) -%}
 <div class="colchart" role="img" aria-label="{{ etichetta }}">
   {% for x in serie %}
-  <div class="col-slot" tabindex="0">
+  <div class="col-slot">
     <span class="col-tip">{{ x.label }} · {{ x[campo] | euro }}</span>
     <div class="col-bar" style="height: {{ ((100 * x[campo] / massimo) | round(1)) if massimo else 0 }}%;"></div>
   </div>
@@ -24,7 +24,7 @@
     <h1 class="page-title"><i class="bi bi-bar-chart-line me-2"></i>Statistiche di portafoglio</h1>
     <div class="page-subtitle">Situazione al {{ oggi | data_it }}</div>
   </div>
-  <button class="btn btn-outline-secondary no-print" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+  <button type="button" class="btn btn-outline-secondary no-print" data-print><i class="bi bi-printer"></i> Stampa</button>
 </div>
 
 <!-- KPI principali -->
@@ -48,9 +48,9 @@
   <div class="col-6 col-lg-3">
     <div class="card stat-card {% if rapporto_sp is not none and rapporto_sp > 70 %}accent-danger{% else %}accent-info{% endif %} h-100"><div class="card-body">
       <span class="stat-icon"><i class="bi bi-activity"></i></span>
-      <div class="stat-label">Rapporto sinistri / premi</div>
+      <div class="stat-label">Rapporto sinistri / premi (12 mesi)</div>
       <div class="stat-value small-value">{{ rapporto_sp | perc if rapporto_sp is not none else '—' }}</div>
-      <div class="small ga-muted">{{ numero_sinistri }} sinistri · costo {{ costo_sinistri | euro }}</div>
+      <div class="small ga-muted">sinistri {{ costo_sinistri_12m | euro }} su premi {{ premi_competenza_12m | euro }}</div>
     </div></div>
   </div>
   <div class="col-6 col-lg-3">
@@ -71,7 +71,7 @@
       <div class="table-responsive">
         {% if rami %}
         <table class="table table-sm mb-0 align-middle">
-          <thead><tr><th>Ramo</th><th class="num">Polizze</th><th style="min-width: 160px;">Premi</th><th class="num">Provvigioni</th><th class="num">S/P</th></tr></thead>
+          <thead><tr><th>Ramo</th><th class="num">Polizze</th><th style="min-width: 160px;">Premi</th><th class="num">Provvigioni</th><th class="num" title="Ultimi 12 mesi">S/P 12 mesi</th></tr></thead>
           <tbody>
           {% for r in rami %}
             <tr>
@@ -202,7 +202,9 @@
 
 <p class="ga-muted small mt-3">
   <i class="bi bi-info-circle me-1"></i>
-  Provvigioni stimate dalla percentuale di ciascuna polizza. Il rapporto S/P confronta il costo dei sinistri
-  (liquidato più riserva dei sinistri aperti) con i premi annui delle polizze attive.
+  Provvigioni stimate dalla percentuale di ciascuna polizza. Il rapporto S/P degli ultimi 12 mesi confronta il costo
+  dei sinistri accaduti nel periodo (liquidato più riserva dei sinistri aperti) con i premi dei titoli con effetto nel
+  periodo, comprese le polizze poi cessate.{% if sinistri_senza_polizza_12m %} Sinistri senza polizza collegata:
+  {{ sinistri_senza_polizza_12m | euro }} (esclusi dal rapporto per ramo).{% endif %}
 </p>
 {% endblock %}

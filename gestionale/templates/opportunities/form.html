@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{% if opp %}Modifica opportunità{% else %}Nuova opportunità{% endif %} — Gestionale Assicurativo{% endblock %}
 {% block content %}
+{% set v = valori or {} %}
+{% set inviato = v | length > 0 %}
 <h1 class="page-title mb-3">
-  <i class="bi bi-funnel me-2"></i>{% if opp %}Modifica opportunità{% else %}Nuova opportunità{% endif %}
+  <i class="bi bi-funnel me-2" aria-hidden="true"></i>{% if opp %}Modifica opportunità{% else %}Nuova opportunità{% endif %}
 </h1>
 
 <form method="post" class="card"
@@ -11,58 +13,61 @@
   <div class="card-body row g-3">
     {% if client %}
     <div class="col-12">
-      <label class="form-label">Cliente</label>
-      <input class="form-control" value="{{ client.ragione_sociale }}" disabled>
+      <label class="form-label" for="op-cliente">Cliente</label>
+      <input class="form-control" id="op-cliente" value="{{ client.ragione_sociale }}" disabled>
     </div>
     {% else %}
     <div class="col-12">
-      <label class="form-label">Cliente *</label>
-      <select class="form-select" name="client_id" required>
+      <label class="form-label" for="op-cliente">Cliente *</label>
+      <select class="form-select" id="op-cliente" name="client_id" required>
         <option value="">Seleziona…</option>
-        {% for c in clienti %}<option value="{{ c.id }}">{{ c.ragione_sociale }}</option>{% endfor %}
+        {% for c in clienti %}<option value="{{ c.id }}" {% if v.get('client_id') == c.id | string %}selected{% endif %}>{{ c.ragione_sociale }}</option>{% endfor %}
       </select>
     </div>
     {% endif %}
 
     <div class="col-md-8">
-      <label class="form-label">Titolo *</label>
-      <input class="form-control" name="titolo" required placeholder="es. Proposta polizza Cyber"
-             value="{{ opp.titolo if opp else '' }}">
+      <label class="form-label" for="op-titolo">Titolo *</label>
+      <input class="form-control" id="op-titolo" name="titolo" required maxlength="200" placeholder="es. Proposta polizza Cyber"
+             value="{{ v.get('titolo', opp.titolo if opp else '') }}">
     </div>
+    {% set fase_sel = v.get('fase', opp.fase if opp else 'lead') %}
     <div class="col-md-4">
-      <label class="form-label">Fase</label>
-      <select class="form-select" name="fase">
-        {% for f, lab in stages %}<option value="{{ f }}" {% if opp and opp.fase == f %}selected{% endif %}>{{ lab }}</option>{% endfor %}
+      <label class="form-label" for="op-fase">Fase</label>
+      <select class="form-select" id="op-fase" name="fase">
+        {% for f, lab in stages %}<option value="{{ f }}" {% if fase_sel == f %}selected{% endif %}>{{ lab }}</option>{% endfor %}
       </select>
     </div>
+    {% set ramo_sel = v.get('ramo', opp.ramo if opp else '') %}
     <div class="col-md-4">
-      <label class="form-label">Ramo</label>
-      <select class="form-select" name="ramo">
+      <label class="form-label" for="op-ramo">Ramo</label>
+      <select class="form-select" id="op-ramo" name="ramo">
         <option value="">—</option>
-        {% for value, label in policy_branches %}<option value="{{ value }}" {% if opp and opp.ramo == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        {% for value, label in policy_branches %}<option value="{{ value }}" {% if ramo_sel == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Premio stimato (€)</label>
-      <input class="form-control" name="premio_stimato" value="{{ opp.premio_stimato if opp and opp.premio_stimato is not none else '' }}">
+      <label class="form-label" for="op-premio">Premio stimato (€)</label>
+      <input class="form-control" id="op-premio" name="premio_stimato" inputmode="decimal" value="{{ v.get('premio_stimato', (opp.premio_stimato | num_input) if opp else '') }}">
     </div>
     <div class="col-md-2">
-      <label class="form-label">Provvigione %</label>
-      <input class="form-control" name="provvigione_perc" value="{{ opp.provvigione_perc if opp and opp.provvigione_perc is not none else '' }}">
+      <label class="form-label" for="op-provv">Provvigione %</label>
+      <input class="form-control" id="op-provv" name="provvigione_perc" inputmode="decimal" value="{{ v.get('provvigione_perc', (opp.provvigione_perc | num_input) if opp else '') }}">
     </div>
+    {% set prio_sel = v.get('priorita', opp.priorita if opp else 'media') %}
     <div class="col-md-3">
-      <label class="form-label">Priorità</label>
-      <select class="form-select" name="priorita">
-        {% for p in ['alta', 'media', 'bassa'] %}<option value="{{ p }}" {% if (opp and opp.priorita == p) or (not opp and p == 'media') %}selected{% endif %}>{{ p|capitalize }}</option>{% endfor %}
+      <label class="form-label" for="op-priorita">Priorità</label>
+      <select class="form-select" id="op-priorita" name="priorita">
+        {% for val, lab in priorities %}<option value="{{ val }}" {% if prio_sel == val %}selected{% endif %}>{{ lab }}</option>{% endfor %}
       </select>
     </div>
     <div class="col-12">
-      <label class="form-label">Note</label>
-      <textarea class="form-control" name="note" rows="3">{{ opp.note or '' if opp else '' }}</textarea>
+      <label class="form-label" for="op-note">Note</label>
+      <textarea class="form-control" id="op-note" name="note" rows="3">{{ v.get('note', (opp.note or '') if opp else '') }}</textarea>
     </div>
   </div>
   <div class="card-footer d-flex gap-2">
-    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Salva</button>
+    <button class="btn btn-primary"><i class="bi bi-check-lg" aria-hidden="true"></i> Salva</button>
     <a class="btn btn-outline-secondary"
        href="{% if client %}{{ url_for('clients.detail', client_id=client.id) }}#opportunita{% else %}{{ url_for('opportunities.board') }}{% endif %}">Annulla</a>
   </div>

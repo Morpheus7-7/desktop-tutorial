@@ -241,9 +241,11 @@ def clean(form, nome: str, upper: bool = False) -> str | None:
 def paginate(query):
     """Pagina la query secondo il parametro ``page`` della richiesta."""
     pagina = parse_int(request.args.get("page"), minimo=1, massimo=1_000_000) or 1
-    return query.paginate(
-        page=pagina,
-        per_page=current_app.config.get("ELEMENTI_PER_PAGINA", 25),
-        error_out=False,
-    )
+    per_pagina = current_app.config.get("ELEMENTI_PER_PAGINA", 25)
+    risultato = query.paginate(page=pagina, per_page=per_pagina, error_out=False)
+    if risultato.pages and pagina > risultato.pages:
+        # Oltre l'ultima pagina (es. dopo aver completato l'ultimo elemento):
+        # si mostra l'ultima pagina invece di una lista vuota.
+        risultato = query.paginate(page=risultato.pages, per_page=per_pagina, error_out=False)
+    return risultato
 

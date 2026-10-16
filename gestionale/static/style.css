@@ -12,7 +12,7 @@
   --ga-surface: #ffffff;
   --ga-border: #e4e7ef;
   --ga-text: #1f2937;
-  --ga-muted: #64748b;
+  --ga-muted: #5b6678;        /* ≥ 4,5:1 anche sullo sfondo pagina */
   --ga-sidebar: #0f1d3d;
   --ga-sidebar-2: #15284f;
   --ga-sidebar-text: #c3cde3;
@@ -182,7 +182,7 @@ body { background: var(--ga-bg); color: var(--ga-text); }
 
 /* ---------- Badge ---------------------------------------------------------- */
 .tipo-azienda { background: var(--ga-primary) !important; }
-.tipo-professionista { background: var(--ga-success) !important; }
+.tipo-professionista { background: #15803d !important; }
 .tipo-dipendente { background: #7c3aed !important; }
 .badge-soft { background: #eef2f7; color: #334155; font-weight: 500; }
 
@@ -208,11 +208,16 @@ body { background: var(--ga-bg); color: var(--ga-text); }
 .colchart .col-tip {
   position: absolute; bottom: calc(100% - .2rem); left: 50%; transform: translateX(-50%);
   background: #0f172a; color: #fff; font-size: .72rem; padding: .2rem .45rem; border-radius: .3rem; white-space: nowrap;
-  opacity: 0; pointer-events: none; transition: opacity .1s ease; z-index: 2;
+  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .1s ease; z-index: 2;
 }
-.colchart .col-slot:hover .col-tip, .colchart .col-slot:focus-within .col-tip { opacity: 1; }
+.colchart .col-slot:hover .col-tip, .colchart .col-slot:focus-within .col-tip { opacity: 1; visibility: visible; }
+/* I suggerimenti delle ultime colonne si allineano a destra: non escono dalla pagina. */
+.colchart .col-slot:nth-last-child(-n+2) .col-tip { left: auto; right: 0; transform: none; }
 .colchart-labels { display: flex; gap: 2px; }
-.colchart-labels span { flex: 1; text-align: center; font-size: .7rem; color: var(--ga-muted); min-width: 0; }
+.colchart-labels span { flex: 1; text-align: center; font-size: .7rem; color: var(--ga-muted); min-width: 0; white-space: nowrap; overflow: hidden; }
+@media (max-width: 575.98px) {
+  .colchart-labels span:nth-child(even) { visibility: hidden; }
+}
 
 /* ---------- Pagine di accesso --------------------------------------------- */
 .ga-auth {
@@ -233,7 +238,35 @@ body { background: var(--ga-bg); color: var(--ga-text); }
   .ga-main { margin-left: 0 !important; }
   .ga-content { padding: 0; max-width: none; }
   .print-header { display: block; border-bottom: 2px solid #1e3a8a; padding-bottom: .4rem; margin-bottom: 1rem; font-size: .85rem; }
-  .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+  .card { box-shadow: none; border: 1px solid #ccc; break-inside: auto; }
+  .stat-card { break-inside: avoid; }
+  .table-responsive { overflow: visible !important; }
+  table { font-size: .8rem; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  /* Badge colorati e righe di urgenza anche senza «grafica di sfondo». */
+  .badge, [class*="urgenza-"], [class*="urgenza-"] > td, .hbar-fill, .col-bar, .legend-dot {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
   body { background: #fff; }
   a { color: inherit; text-decoration: none; }
 }
+
+/* ---------- Contrasto (WCAG 1.4.3: testo ≥ 4,5:1) -------------------------- */
+.text-warning { color: #b45309 !important; }
+.btn-outline-warning { --bs-btn-color: #b45309; --bs-btn-border-color: #d97706; --bs-btn-hover-bg: #d97706; --bs-btn-hover-border-color: #d97706; --bs-btn-hover-color: #fff; }
+.btn-outline-info { --bs-btn-color: #0369a1; --bs-btn-border-color: #0369a1; --bs-btn-hover-bg: #0369a1; --bs-btn-hover-border-color: #0369a1; --bs-btn-hover-color: #fff; }
+
+/* Card cliccabili (stretched-link): indicatore visibile del focus da tastiera. */
+.card:has(.stretched-link:focus-visible) { outline: 3px solid var(--ga-primary-2); outline-offset: 2px; }
+.stretched-link:focus-visible { outline: none; }
+
+/* Agenda dello scadenzario */
+.agenda .agenda-data { min-width: 6.5rem; }
+
+/* Previsione incassi: barre impilate emesse/stimate */
+.hbar-track.d-flex .hbar-fill { min-width: 0; border-radius: 0; }
+.hbar-track.d-flex .hbar-fill:last-child { border-radius: 0 4px 4px 0; }
+.hbar-fill-alt { background: #e0a43a; }
+.legend-dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; vertical-align: middle; background: var(--ga-chart); }
+.legend-dot.legend-stimati { background: #e0a43a; }

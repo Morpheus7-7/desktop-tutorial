@@ -12,25 +12,28 @@
 
 <form class="filter-bar row g-2 align-items-end" method="get">
   <div class="col-md-3">
-    <select class="form-select form-select-sm" name="ramo" onchange="this.form.submit()" aria-label="Ramo">
+    <select class="form-select form-select-sm" name="ramo" data-autosubmit aria-label="Ramo">
       <option value="">Tutti i rami</option>
       {% for value, label in policy_branches %}<option value="{{ value }}" {% if ramo == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
     </select>
   </div>
   <div class="col-md-2">
-    <select class="form-select form-select-sm" name="stato" onchange="this.form.submit()" aria-label="Stato">
+    <select class="form-select form-select-sm" name="stato" data-autosubmit aria-label="Stato">
       <option value="">Tutti gli stati</option>
+      <option value="vigenti" {% if stato == 'vigenti' %}selected{% endif %}>Attive e in rinnovo</option>
+      <option value="non_in_vigore" {% if stato == 'non_in_vigore' %}selected{% endif %}>Non ancora in vigore</option>
+      <option value="da_rinnovare" {% if stato == 'da_rinnovare' %}selected{% endif %}>Scadute da rinnovare</option>
       {% for value, label in policy_statuses %}<option value="{{ value }}" {% if stato == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
     </select>
   </div>
   <div class="col-md-3">
-    <select class="form-select form-select-sm" name="compagnia" onchange="this.form.submit()" aria-label="Compagnia">
+    <select class="form-select form-select-sm" name="compagnia" data-autosubmit aria-label="Compagnia">
       <option value="">Tutte le compagnie</option>
       {% for c in compagnie %}<option {% if filtri.get('compagnia') == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
     </select>
   </div>
   <div class="col-md-4 d-flex gap-1">
-    <input class="form-control form-control-sm" name="q" value="{{ filtri.get('q', '') }}" placeholder="Numero polizza o cliente…">
+    <input class="form-control form-control-sm" name="q" value="{{ filtri.get('q', '') }}" placeholder="Numero polizza o cliente…" aria-label="Cerca">
     <button class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
   </div>
 </form>

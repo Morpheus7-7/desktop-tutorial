@@ -36,25 +36,25 @@
   <div class="col-md-3">
     <div class="btn-group w-100" role="group">
       {% for v, l in [('aperti', 'Aperti'), ('chiusi', 'Chiusi'), ('tutti', 'Tutti')] %}
-      <input type="radio" class="btn-check" name="filtro" id="f-{{ v }}" value="{{ v }}" {% if filtro == v %}checked{% endif %} onchange="this.form.submit()">
+      <input type="radio" class="btn-check" name="filtro" id="f-{{ v }}" value="{{ v }}" {% if filtro == v %}checked{% endif %} data-autosubmit>
       <label class="btn btn-outline-primary btn-sm" for="f-{{ v }}">{{ l }}</label>
       {% endfor %}
     </div>
   </div>
   <div class="col-md-3">
-    <select class="form-select form-select-sm" name="tipologia" onchange="this.form.submit()">
+    <select class="form-select form-select-sm" name="tipologia" data-autosubmit aria-label="Tipologia">
       <option value="">Tutte le tipologie</option>
       {% for v, l in claim_types %}<option value="{{ v }}" {% if filtri.get('tipologia') == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select>
   </div>
   <div class="col-md-2">
-    <select class="form-select form-select-sm" name="stato" onchange="this.form.submit()">
+    <select class="form-select form-select-sm" name="stato" data-autosubmit aria-label="Stato">
       <option value="">Ogni stato</option>
       {% for v, l in claim_statuses %}<option value="{{ v }}" {% if filtri.get('stato') == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select>
   </div>
   <div class="col-md-4 d-flex gap-1">
-    <input class="form-control form-control-sm" name="q" value="{{ filtri.get('q', '') }}" placeholder="Numero, cliente, polizza, controparte…">
+    <input class="form-control form-control-sm" name="q" value="{{ filtri.get('q', '') }}" placeholder="Numero, cliente, polizza, controparte…" aria-label="Cerca">
     <button class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
   </div>
 </form>

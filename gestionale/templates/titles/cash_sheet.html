@@ -8,16 +8,16 @@
   </div>
   <div class="d-flex gap-2 no-print">
     <a class="btn btn-outline-secondary" href="{{ url_for('titles.cash_sheet_csv', dal=dal.isoformat(), al=al.isoformat(), compagnia=compagnia) }}"><i class="bi bi-filetype-csv"></i> Esporta</a>
-    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+    <button type="button" class="btn btn-outline-secondary" data-print><i class="bi bi-printer"></i> Stampa</button>
   </div>
 </div>
 {% include "titles/_nav.html" %}
 
 <form class="filter-bar row g-2 align-items-end" method="get">
-  <div class="col-6 col-md-3"><label class="form-label small">Dal</label><input type="date" class="form-control form-control-sm" name="dal" value="{{ dal.isoformat() }}"></div>
-  <div class="col-6 col-md-3"><label class="form-label small">Al</label><input type="date" class="form-control form-control-sm" name="al" value="{{ al.isoformat() }}"></div>
-  <div class="col-md-4"><label class="form-label small">Compagnia</label>
-    <select class="form-select form-select-sm" name="compagnia"><option value="">Tutte</option>
+  <div class="col-6 col-md-3"><label class="form-label small" for="titles-cash-sheet-dal">Dal</label><input id="titles-cash-sheet-dal" type="date" class="form-control form-control-sm" name="dal" value="{{ dal.isoformat() }}"></div>
+  <div class="col-6 col-md-3"><label class="form-label small" for="titles-cash-sheet-al">Al</label><input id="titles-cash-sheet-al" type="date" class="form-control form-control-sm" name="al" value="{{ al.isoformat() }}"></div>
+  <div class="col-md-4"><label class="form-label small" for="titles-cash-sheet-compagnia">Compagnia</label>
+    <select id="titles-cash-sheet-compagnia" class="form-select form-select-sm" name="compagnia"><option value="">Tutte</option>
       {% for c in compagnie %}<option {% if compagnia == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></div>
   <div class="col-md-2"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-funnel"></i> Aggiorna</button></div>
 </form>

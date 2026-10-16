@@ -96,7 +96,9 @@ def _query_portafoglio():
     oggi = date.today()
     if ramo:
         query = query.filter(Policy.ramo == ramo)
-    if stato == "non_in_vigore":
+    if stato == "vigenti":
+        query = query.filter(Policy.stato.in_(["attiva", "in_rinnovo"]))
+    elif stato == "non_in_vigore":
         query = query.filter(Policy.stato.in_(["attiva", "in_rinnovo"]), Policy.data_decorrenza > oggi)
     elif stato == "da_rinnovare":
         query = query.filter(Policy.stato.in_(["attiva", "in_rinnovo"]), Policy.data_scadenza < oggi)
@@ -223,7 +225,10 @@ def detail(policy_id):
         "da_incassare": sum(t.premio_lordo or 0 for t in policy.titoli if t.stato == "da_incassare"),
         "arretrato": sum(t.premio_lordo or 0 for t in policy.titoli_arretrati),
     }
-    proposta = prossima_scadenza_utile(policy.data_scadenza) if policy.data_scadenza else None
+    # Rinnovo: si propone l'annualità successiva; se la polizza è scaduta da
+    # oltre un anno si indica anche la prima scadenza utile futura.
+    proposta = add_months_sicuro(policy.data_scadenza, 12)
+    prossima_utile = prossima_scadenza_utile(policy.data_scadenza) if policy.data_scadenza else None
     return render_template(
         "policies/detail.html",
         policy=policy,
@@ -233,6 +238,8 @@ def detail(policy_id):
         situazione=situazione,
         storico=storico,
         proposta_scadenza=proposta,
+        prossima_utile=prossima_utile if prossima_utile != proposta else None,
+        massimo_rinnovo=add_months_sicuro(policy.data_scadenza, 12 * DURATA_MASSIMA_ANNI),
         oggi_iso=date.today().isoformat(),
         payment_methods=PAYMENT_METHODS,
         title_types=TITLE_TYPES,
@@ -251,7 +258,7 @@ def edit_policy(policy_id):
         if errori:
             for e in errori:
                 flash(e, "danger")
-            risposta = _form_polizza(policy)
+            risposta = _form_polizza(policy, request.form)
             db.session.rollback()
             return risposta, 400
         dettagli = []
@@ -282,10 +289,11 @@ def edit_policy(policy_id):
     return _form_polizza(policy)
 
 
-def _form_polizza(policy: Policy):
+def _form_polizza(policy: Policy, valori=None):
     return render_template(
         "policies/form.html",
         policy=policy,
+        valori=valori,
         compagnie=compagnie_note(),
         policy_branches=POLICY_BRANCHES,
         policy_statuses=POLICY_STATUSES,

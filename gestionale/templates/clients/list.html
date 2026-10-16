@@ -19,7 +19,7 @@
            placeholder="Cerca per nome, referente, P.IVA, CF, città, settore, email…" aria-label="Cerca">
   </div>
   <div class="col-md-3">
-    <select class="form-select form-select-sm" name="tipo" onchange="this.form.submit()" aria-label="Tipo cliente">
+    <select class="form-select form-select-sm" name="tipo" data-autosubmit aria-label="Tipo cliente">
       <option value="">Tutti i tipi</option>
       {% for value, label in client_types %}<option value="{{ value }}" {% if tipo == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
     </select>

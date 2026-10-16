@@ -29,8 +29,8 @@
       <span class="stat-icon"><i class="bi bi-file-earmark-text"></i></span>
       <div class="stat-label">Premi in portafoglio</div>
       <div class="stat-value small-value">{{ stats.premi_totali | euro }}</div>
-      <div class="small ga-muted">{{ stats.polizze_attive }} polizze attive</div>
-      <a class="stretched-link" href="{{ url_for('policies.list_policies', stato='attiva') }}" aria-label="Vai alle polizze"></a>
+      <div class="small ga-muted">{{ plurale(stats.polizze_attive, 'polizza attiva', 'polizze attive') }}{% if stats.polizze_non_in_vigore %} · {{ stats.polizze_non_in_vigore }} non ancora in vigore{% endif %}</div>
+      <a class="stretched-link" href="{{ url_for('policies.list_policies', stato='vigenti') }}" aria-label="Vai alle polizze attive e in rinnovo"></a>
     </div></div>
   </div>
   <div class="col-6 col-xl-3">
@@ -38,7 +38,7 @@
       <span class="stat-icon"><i class="bi bi-wallet2"></i></span>
       <div class="stat-label">Provvigioni annue stimate</div>
       <div class="stat-value small-value">{{ stats.provvigioni_totali | euro }}</div>
-      <div class="small ga-muted">pipeline: {{ stats.opportunita_aperte }} opp. · {{ stats.pipeline_valore | euro }}</div>
+      <div class="small ga-muted">trattative: {{ stats.opportunita_aperte }} aperte · {{ stats.pipeline_valore | euro }}</div>
     </div></div>
   </div>
   <div class="col-6 col-xl-3">
@@ -46,7 +46,7 @@
       <span class="stat-icon"><i class="bi bi-cash-stack"></i></span>
       <div class="stat-label">Incassato nel mese</div>
       <div class="stat-value small-value">{{ stats.incassato_mese | euro }}</div>
-      <div class="small ga-muted">{{ stats.incassi_mese }} titoli incassati</div>
+      <div class="small ga-muted">{{ plurale(stats.incassi_mese, 'titolo incassato', 'titoli incassati') }}</div>
       <a class="stretched-link" href="{{ url_for('titles.cash_sheet') }}" aria-label="Vai al foglio cassa"></a>
     </div></div>
   </div>
@@ -59,7 +59,8 @@
       <span class="stat-icon"><i class="bi bi-calendar-event"></i></span>
       <div class="stat-label">Polizze in scadenza (30 gg)</div>
       <div class="stat-value">{{ stats.scadenze_30gg }}</div>
-      {% if stats.polizze_scadute %}<div class="small text-danger">{{ stats.polizze_scadute }} già scadute da rinnovare</div>{% else %}<div class="small ga-muted">nessuna scaduta</div>{% endif %}
+      {% if stats.polizze_scadute %}<div class="small text-danger">{{ stats.polizze_scadute }} {{ 'già scaduta' if stats.polizze_scadute == 1 else 'già scadute' }} da rinnovare</div>{% else %}<div class="small ga-muted">nessuna scaduta</div>{% endif %}
+      {% if stats.termini_disdetta_30gg %}<div class="small text-warning-emphasis">{{ plurale(stats.termini_disdetta_30gg, 'termine', 'termini') }} di disdetta in arrivo</div>{% endif %}
       <a class="stretched-link" href="{{ url_for('main.scadenzario', giorni=30) }}" aria-label="Vai allo scadenzario"></a>
     </div></div>
   </div>
@@ -68,7 +69,7 @@
       <span class="stat-icon"><i class="bi bi-hourglass-split"></i></span>
       <div class="stat-label">Titoli arretrati</div>
       <div class="stat-value">{{ stats.titoli_arretrati }}</div>
-      <div class="small {% if stats.titoli_arretrati %}text-danger{% else %}ga-muted{% endif %}">{{ stats.importo_arretrati | euro }} non incassati</div>
+      <div class="small {% if stats.titoli_arretrati %}text-danger{% else %}ga-muted{% endif %}">{{ stats.importo_arretrati | euro }} non {{ 'incassato' if stats.titoli_arretrati == 1 else 'incassati' }}</div>
       <a class="stretched-link" href="{{ url_for('titles.portfolio', vista='arretrati') }}" aria-label="Vai ai titoli arretrati"></a>
     </div></div>
   </div>
@@ -116,8 +117,8 @@
               <td><a href="{{ url_for('clients.detail', client_id=p.client_id) }}">{{ p.cliente.ragione_sociale }}</a></td>
               <td class="small"><a href="{{ url_for('policies.detail', policy_id=p.id) }}">{{ p.numero_polizza }}</a><div class="ga-muted">{{ p.ramo_label }}</div></td>
               <td class="text-nowrap">{{ p.data_scadenza | data_it }}
-                {% if p.giorni_alla_scadenza < 0 %}<span class="badge bg-danger">scaduta</span>
-                {% else %}<span class="badge bg-secondary">{{ p.giorni_alla_scadenza }} gg</span>{% endif %}
+                <span class="badge bg-secondary">{{ p.giorni_alla_scadenza | giorni }}</span>
+                {% if p.termine_disdetta and not p.disdetta_inviata and p.giorni_al_termine_disdetta is not none and p.giorni_al_termine_disdetta >= 0 %}<div class="small ga-muted">disdetta entro il {{ p.termine_disdetta | data_it }}</div>{% endif %}
               </td>
               <td class="num small">{{ p.premio_annuo | euro }}</td>
             </tr>
@@ -128,6 +129,19 @@
         <p class="ga-muted p-3 mb-0">Nessuna polizza in scadenza nei prossimi 60 giorni.</p>
         {% endif %}
       </div>
+      {% if prossimi_eventi %}
+      <div class="card-body border-top py-2">
+        <div class="small fw-semibold mb-1">Altre scadenze nei prossimi 30 giorni</div>
+        <ul class="list-unstyled mb-0 small">
+          {% for e in prossimi_eventi %}
+          <li class="d-flex gap-2 align-items-start py-1">
+            <span class="badge {{ e.badge }} text-nowrap">{{ e.data | data_it }}</span>
+            <a href="{{ e.link }}">{{ e.titolo }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
     </div>
   </div>
 
@@ -181,7 +195,7 @@
                 <form method="post" action="{{ url_for('followups.complete', followup_id=f.id) }}" class="d-inline">
                   {{ csrf_field() }}
                   <input type="hidden" name="next" value="{{ url_for('main.dashboard') }}">
-                  <button class="btn btn-sm btn-outline-success" title="Completa"><i class="bi bi-check-lg"></i></button>
+                  <button class="btn btn-sm btn-outline-success" title="Completa" aria-label="Completa il follow-up {{ f.titolo }}"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
                 </form>
                 {% endif %}
               </td>
