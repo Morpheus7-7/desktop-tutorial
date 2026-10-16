@@ -25,27 +25,46 @@ attività** e **backup** integrati.
     sinistri e **rapporto sinistri/premi**.
 - **Polizze** con scheda dedicata: compagnia (con suggerimenti), ramo,
   massimale, premio, **percentuale di provvigione**, frazionamento, decorrenza,
-  scadenza, tacito rinnovo e stato; oltre 20 rami precompilati. Storico delle
-  modifiche dal registro attività.
-- **Rinnovo in un clic**: nuova scadenza, nuovo premio, generazione dei titoli
-  della nuova annualità e chiusura automatica dei follow-up di rinnovo.
+  scadenza, tacito rinnovo con **preavviso di disdetta** e stato; oltre 20 rami
+  precompilati. Storico delle modifiche dal registro attività.
+  - **Stato effettivo** calcolato dalle date: *non ancora in vigore* (decorrenza
+    futura), *in vigore*, *copertura sospesa*, *disdetta inviata*, *scaduta da
+    rinnovare*, *rinnovo tacito da registrare*.
+  - **Annualità** della polizza calcolate a ritroso dalla scadenza: poliennali
+    con tutte le annualità, eventuale **rateo** iniziale (es. allineamento al
+    31/12) con premio pro rata giorni; i titoli si generano per ogni annualità.
+  - **Disdetta**: termine di preavviso (default 30 giorni, il tacito rinnovo non
+    è ammesso per l'RC auto), registrazione alla scadenza o con cessazione
+    anticipata, storno delle rate successive, avviso se inviata oltre il termine.
+- **Rinnovo in un clic**: nuova scadenza (proposta a 12 mesi, con la prima
+  scadenza utile se la polizza è scaduta da tempo), nuovo premio, rinnovo
+  **pluriennale** con conferma esplicita (massimo 10 anni), quietanza della
+  prima annualità e chiusura automatica dei follow-up di rinnovo.
 - **Titoli e incassi**:
   - generazione automatica delle **rate dell'annualità** in base al
     frazionamento (annuale → mensile), con arrotondamenti che quadrano sempre
     con il premio annuo; perfezionamento, quietanze, rate e appendici manuali;
-  - **incasso** con data, importo, mezzo di pagamento e riferimento (CRO,
-    assegno…), annullamento e **storno**;
+  - **incasso** con data (mai futura), mezzo di pagamento e riferimento (CRO,
+    assegno…) per l'importo del titolo, annullamento (gli incassi dei mesi già
+    chiusi solo dall'amministratore) e **storno**;
   - **arretrati** evidenziati con lo stato della copertura secondo
     l'**art. 1901 c.c.** (primo premio non pagato → copertura non operante;
     rate successive → sospesa dal 15° giorno);
   - **foglio cassa** (prima nota incassi) per periodo, con riepilogo per mezzo
     di pagamento, provvigioni maturate e netto da rimettere;
-  - **estratto conto per compagnia** con registrazione delle **rimesse**.
-- **Sinistri**: apertura con numerazione progressiva (SIN-anno-numero),
+  - **estratto conto per compagnia** che include gli incassi dei periodi
+    precedenti non ancora rimessi; la **rimessa** registra esattamente i titoli
+    mostrati e confermati, con data validata, ed è annullabile dall'amministratore;
+  - **previsione incassi** a 6-24 mesi: rate già emesse, quietanze stimate dei
+    rinnovi e delle annualità future, provvigioni e netto per mese (esportabile).
+- **Sinistri**: apertura con numerazione progressiva (SIN-anno-numero, mai
+  riassegnata dopo un'eliminazione),
   polizza coinvolta, tipologia, controparte, perito e liquidatore; importi
   richiesti, riservati, franchigia e liquidati; **cronologia** con note e
-  cambi di stato; documenti collegati (denuncia, foto, perizia…); avviso di
-  **denuncia oltre i 3 giorni** (art. 1913 c.c.).
+  cambi di stato; documenti collegati (denuncia, foto, perizia…); promemoria
+  e avviso di **denuncia oltre i 3 giorni** (art. 1913 c.c.); controllo della
+  **copertura alla data dell'evento** (prima della decorrenza, dopo la scadenza,
+  rata impagata). Le date di evento, denuncia e liquidazione non possono essere future.
 - **Archivio documenti**: caricamento **multiplo con drag & drop**, download ed
   eliminazione, collegabili a una polizza o a un sinistro, con ricerca.
 
@@ -61,19 +80,32 @@ attività** e **backup** integrati.
     un clic. Ogni analisi è salvata nello storico ed è stampabile.
 - **Pipeline commerciale (opportunità)** a fasi in stile CRM (lead → contatto →
   preventivo → trattativa → vinta/persa), con premio e provvigione stimati.
-- **Statistiche**: premi, provvigioni e **rapporto S/P per ramo**, premi per
+- **Statistiche**: premi, provvigioni e **rapporto S/P per ramo sugli ultimi
+  12 mesi** (sinistri accaduti nel periodo su premi di competenza), premi per
   compagnia, incassi degli ultimi 12 mesi, premi in scadenza, primi 10 clienti,
   sinistri per tipologia e conversione della pipeline.
 
 ### Operatività quotidiana
-- **Dashboard** con indicatori chiave e avvisi: scadenze, titoli arretrati,
-  sinistri da denunciare, follow-up in ritardo, clienti senza consenso privacy.
-- **Scadenzario** unificato di polizze, rate da incassare e follow-up.
+- **Dashboard** con indicatori chiave e avvisi: scadenze future, polizze non
+  ancora in vigore, termini di disdetta in arrivo, titoli arretrati, sinistri da
+  denunciare, follow-up in ritardo, clienti senza consenso privacy.
+- **Scadenzario** unificato di polizze, rate da incassare e follow-up, con
+  un'**agenda** delle altre date da rispettare (decorrenze, termini di disdetta
+  e di denuncia, sospensioni della copertura, documenti d'identità e
+  questionari di adeguatezza in scadenza) ed **esportazione in calendario
+  (.ics)** per Outlook, Google Calendar o il telefono.
+- **Automatismi sulle date** (attivabili dalle *Impostazioni*, registrati come
+  utente «sistema»): **rinnovo tacito** delle polizze arrivate a scadenza senza
+  disdetta, **emissione delle quietanze** dell'annualità successiva con anticipo
+  configurabile, **scadenza automatica** delle polizze non rinnovate dopo i
+  giorni di tolleranza (con storno delle rate future).
 - **Follow-up** con scadenza, tipo e priorità; i **follow-up di rinnovo**
   vengono generati automaticamente prima della scadenza delle polizze.
 - **Notifiche automatiche** per polizze in scadenza (60/30/7 giorni e
-  scadute), rate in scadenza o non pagate, coperture sospese, sinistri da
-  denunciare o aperti da troppo tempo, documenti d'identità in scadenza e
+  scadute), termini di disdetta, decorrenze imminenti con il primo premio da
+  incassare, rate in scadenza o non pagate, coperture sospese e risoluzione
+  dopo 6 mesi (art. 1901 c. 3), sinistri da denunciare o aperti da troppo
+  tempo, documenti d'identità e questionari di adeguatezza in scadenza e
   follow-up. Le notifiche superate (rata incassata, sinistro denunciato…) si
   chiudono da sole.
 - **Notifiche via email**: riepilogo automatico via SMTP configurabile dalla
@@ -87,17 +119,29 @@ attività** e **backup** integrati.
   creare l'**amministratore** (nessuna password predefinita).
 - **Ruoli**: *Amministratore* (tutto, compresi utenti, impostazioni, backup e
   registro), *Operatore* (lavoro quotidiano), *Sola consultazione*.
-- Password con hash (scrypt), **blocco dopo 5 tentativi errati** (15 minuti),
+- Password con hash (scrypt), **blocco dopo 5 tentativi errati** (15 minuti,
+  contatore atomico, stesso messaggio per utente inesistente o password errata),
   protezione **CSRF** su tutti i form, cookie di sessione `HttpOnly` e
-  `SameSite`, header di sicurezza, chiave di sessione generata casualmente al
-  primo avvio, protezione da redirect esterni e da *CSV injection*.
+  `SameSite`, **sessioni revocabili** (uscita, cambio o reimpostazione della
+  password, disattivazione, cambio di ruolo, ripristino di un backup),
+  **Content-Security-Policy** senza script inline, header di sicurezza, chiave
+  di sessione generata casualmente al primo avvio, protezione da redirect
+  esterni e da *CSV injection*.
+- **Date e importi validati**: date nell'intervallo 1900-2100 con regole su
+  passato e futuro (es. incasso, denuncia e rimessa non future), importi in
+  formato italiano (1.234,56) senza ambiguità; i moduli con errori conservano
+  i dati inseriti.
 - **Registro attività**: accessi (anche falliti), creazioni, modifiche,
   eliminazioni, incassi, storni, rinnovi, rimesse, esportazioni, backup e
   ripristini, con utente, data e IP; filtrabile ed esportabile.
 - **Backup**: archivio ZIP con database e documenti scaricabile in un clic,
   **backup automatico giornaliero** con rotazione degli archivi e
   **ripristino** guidato (con copia di sicurezza dei dati attuali).
-- Stampe con l'intestazione dello studio (ragione sociale, RUI, P.IVA).
+- Stampe con l'intestazione dello studio (ragione sociale, RUI, P.IVA),
+  ottimizzate per A4 (tabelle intere, badge e righe di urgenza a colori).
+- Interfaccia **responsive e accessibile**: etichette associate ai campi,
+  pulsanti con nome leggibile dagli screen reader, contrasto WCAG AA, focus
+  visibile da tastiera, nessun doppio invio dei moduli.
 
 ## Applicazione desktop (.exe)
 
@@ -236,14 +280,16 @@ gestionale/
   __init__.py              # application factory, filtri, errori e micro-migrazioni
   models.py                # modelli e vocabolari (clienti, polizze, titoli, sinistri, utenti…)
   security.py              # accesso, ruoli, CSRF, redirect sicuri, registro attività
-  titoli.py                # generazione delle rate di premio e calcolo delle annualità
+  titoli.py                # annualità (poliennali, rateo), generazione delle rate, rinnovi
+  automatismi.py           # rinnovo tacito, emissione quietanze, scadenza automatica
+  agenda.py                # agenda delle scadenze future ed esportazione iCalendar
   validators.py            # codice fiscale, partita IVA, CAP, provincia, email
   backup.py                # backup ZIP, backup automatico e ripristino
   export.py                # esportazione CSV per Excel
   risk_engine.py           # motore di analisi automatica dei rischi
   notifications.py         # notifiche da scadenze, rate, sinistri e follow-up
   mailer.py                # invio email (SMTP stdlib) e digest notifiche
-  scheduler.py             # thread in background: email e backup automatico
+  scheduler.py             # thread in background: automatismi, notifiche, email e backup
   routes/                  # blueprint: auth, main (dashboard, ricerca, statistiche),
                            #   clients, policies, titles, claims, documents, followups,
                            #   opportunities, notifications, settings, users, audit
