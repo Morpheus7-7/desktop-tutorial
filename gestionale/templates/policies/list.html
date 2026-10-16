@@ -53,7 +53,7 @@
           <td class="text-nowrap">{{ p.data_scadenza | data_it }}
             {% if p.giorni_alla_scadenza is not none and p.attiva %}
               {% if p.giorni_alla_scadenza < 0 %}<span class="badge bg-danger">scaduta</span>
-              {% elif p.giorni_alla_scadenza <= 30 %}<span class="badge bg-warning text-dark">{{ p.giorni_alla_scadenza }} gg</span>{% endif %}
+              {% elif p.giorni_alla_scadenza <= 30 %}<span class="badge bg-warning text-dark">{{ p.giorni_alla_scadenza | giorni }}</span>{% endif %}
             {% endif %}
           </td>
           <td>{{ m.stato_polizza(p) }}

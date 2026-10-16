@@ -13,36 +13,36 @@
 <form class="filter-bar row g-2 align-items-end" method="get">
   {% if filtri.get('entita_id') %}<input type="hidden" name="entita_id" value="{{ filtri.get('entita_id') }}">{% endif %}
   <div class="col-6 col-md-2">
-    <label class="form-label small">Utente</label>
-    <select class="form-select form-select-sm" name="utente">
+    <label class="form-label small" for="audit-list-utente">Utente</label>
+    <select id="audit-list-utente" class="form-select form-select-sm" name="utente">
       <option value="">Tutti</option>
       {% for u in utenti %}<option {% if filtri.get('utente') == u %}selected{% endif %}>{{ u }}</option>{% endfor %}
     </select>
   </div>
   <div class="col-6 col-md-2">
-    <label class="form-label small">Azione</label>
-    <select class="form-select form-select-sm" name="azione">
+    <label class="form-label small" for="audit-list-azione">Azione</label>
+    <select id="audit-list-azione" class="form-select form-select-sm" name="azione">
       <option value="">Tutte</option>
       {% for v, l in azioni %}<option value="{{ v }}" {% if filtri.get('azione') == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select>
   </div>
   <div class="col-6 col-md-2">
-    <label class="form-label small">Elemento</label>
-    <select class="form-select form-select-sm" name="entita">
+    <label class="form-label small" for="audit-list-entita">Elemento</label>
+    <select id="audit-list-entita" class="form-select form-select-sm" name="entita">
       <option value="">Tutti</option>
       {% for v, l in entita %}<option value="{{ v }}" {% if filtri.get('entita') == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select>
   </div>
   <div class="col-6 col-md-2">
-    <label class="form-label small">Dal</label>
-    <input type="date" class="form-control form-control-sm" name="dal" value="{{ filtri.get('dal', '') }}">
+    <label class="form-label small" for="audit-list-dal">Dal</label>
+    <input id="audit-list-dal" type="date" class="form-control form-control-sm" name="dal" value="{{ filtri.get('dal', '') }}">
   </div>
   <div class="col-6 col-md-2">
-    <label class="form-label small">Al</label>
-    <input type="date" class="form-control form-control-sm" name="al" value="{{ filtri.get('al', '') }}">
+    <label class="form-label small" for="audit-list-al">Al</label>
+    <input id="audit-list-al" type="date" class="form-control form-control-sm" name="al" value="{{ filtri.get('al', '') }}">
   </div>
   <div class="col-6 col-md-2 d-flex gap-1">
-    <input class="form-control form-control-sm" name="q" value="{{ filtri.get('q', '') }}" placeholder="Testo…">
+    <input class="form-control form-control-sm" name="q" value="{{ filtri.get('q', '') }}" placeholder="Testo…" aria-label="Cerca nel registro">
     <button class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i></button>
   </div>
 </form>

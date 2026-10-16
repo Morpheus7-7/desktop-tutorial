@@ -270,3 +270,7 @@ body { background: var(--ga-bg); color: var(--ga-text); }
 .hbar-fill-alt { background: #e0a43a; }
 .legend-dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; vertical-align: middle; background: var(--ga-chart); }
 .legend-dot.legend-stimati { background: #e0a43a; }
+
+/* Gli elementi solo per screen reader (.visually-hidden, assoluti) restano
+   dentro il contenitore che scorre: niente scorrimento orizzontale della pagina. */
+.table-responsive { position: relative; }

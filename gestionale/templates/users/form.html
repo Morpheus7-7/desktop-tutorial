@@ -11,31 +11,31 @@
   <div class="card-header">{{ 'Nuovo utente' if nuovo else 'Modifica utente «' ~ user.username ~ '»' }}</div>
   <div class="card-body row g-3">
     <div class="col-md-6">
-      <label class="form-label">Nome utente *</label>
-      <input class="form-control" name="username" value="{{ user.username or '' }}" maxlength="60" {% if not nuovo %}disabled{% else %}required{% endif %} autocomplete="off">
+      <label class="form-label" for="users-form-username">Nome utente *</label>
+      <input id="users-form-username" class="form-control" name="username" value="{{ user.username or '' }}" maxlength="60" {% if not nuovo %}disabled{% else %}required{% endif %} autocomplete="off">
     </div>
     <div class="col-md-6">
-      <label class="form-label">Ruolo</label>
-      <select class="form-select" name="ruolo">
+      <label class="form-label" for="users-form-ruolo">Ruolo</label>
+      <select id="users-form-ruolo" class="form-select" name="ruolo">
         {% for v, l in roles %}<option value="{{ v }}" {% if user.ruolo == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
       </select>
     </div>
     <div class="col-md-6">
-      <label class="form-label">Nome e cognome</label>
-      <input class="form-control" name="nome" value="{{ user.nome or '' }}">
+      <label class="form-label" for="users-form-nome">Nome e cognome</label>
+      <input id="users-form-nome" class="form-control" name="nome" value="{{ user.nome or '' }}">
     </div>
     <div class="col-md-6">
-      <label class="form-label">Email</label>
-      <input class="form-control" name="email" type="email" value="{{ user.email or '' }}">
+      <label class="form-label" for="users-form-email">Email</label>
+      <input id="users-form-email" class="form-control" name="email" type="email" value="{{ user.email or '' }}">
     </div>
     <div class="col-md-6">
-      <label class="form-label">{{ 'Password *' if nuovo else 'Nuova password' }}</label>
-      <input class="form-control" name="password" type="password" autocomplete="new-password" {% if nuovo %}required minlength="8"{% endif %}>
+      <label class="form-label" for="users-form-password">{{ 'Password *' if nuovo else 'Nuova password' }}</label>
+      <input id="users-form-password" class="form-control" name="password" type="password" autocomplete="new-password" {% if nuovo %}required minlength="8"{% endif %}>
       {% if not nuovo %}<div class="form-text">Compila solo per reimpostarla.</div>{% endif %}
     </div>
     <div class="col-md-6">
-      <label class="form-label">Conferma password</label>
-      <input class="form-control" name="conferma" type="password" autocomplete="new-password">
+      <label class="form-label" for="users-form-conferma">Conferma password</label>
+      <input id="users-form-conferma" class="form-control" name="conferma" type="password" autocomplete="new-password">
     </div>
     {% if not nuovo %}
     <div class="col-12">

@@ -14,7 +14,7 @@ import click
 from flask import Flask
 
 from .models import User, db
-from .security import audit, password_problem
+from .security import audit, invalida_sessioni, password_problem
 
 
 def reimposta_password(username: str, password: str) -> str:
@@ -32,6 +32,7 @@ def reimposta_password(username: str, password: str) -> str:
     user.attivo = True
     user.tentativi_falliti = 0
     user.bloccato_fino = None
+    invalida_sessioni(user)
     audit("modifica", "utente", user.id, "Password reimpostata da riga di comando", user=user)
     db.session.commit()
     return f"Password di «{user.username}» ({user.ruolo_label}) reimpostata."

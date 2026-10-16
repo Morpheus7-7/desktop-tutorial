@@ -485,7 +485,7 @@ def _dati_di_prova(app, client):
 
 # Pagine escluse dalle verifiche di sola lettura perché rotte indipendentemente
 # dai permessi (a3b1ea1: manca il template titles/forecast.html).
-PAGINE_ROTTE = {"titles.forecast"}
+PAGINE_ROTTE: set[str] = set()
 
 
 def _endpoint_moduli(app):

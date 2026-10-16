@@ -176,7 +176,7 @@
           <td class="text-nowrap">{{ p.data_scadenza | data_it }}
             {% if p.giorni_alla_scadenza is not none and p.attiva %}
               {% if p.giorni_alla_scadenza < 0 %}<br><span class="badge bg-danger">scaduta</span>
-              {% elif p.giorni_alla_scadenza <= 30 %}<br><span class="badge bg-warning text-dark">{{ p.giorni_alla_scadenza }} gg</span>{% endif %}
+              {% elif p.giorni_alla_scadenza <= 30 %}<br><span class="badge bg-warning text-dark">{{ p.giorni_alla_scadenza | giorni }}</span>{% endif %}
             {% endif %}
           </td>
           <td>{{ m.stato_polizza(p) }}{% if p.copertura_sospesa and p.attiva %}<div><span class="badge bg-danger-subtle text-danger-emphasis"><i class="bi bi-shield-x"></i> sospesa</span></div>{% endif %}</td>

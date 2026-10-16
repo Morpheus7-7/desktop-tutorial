@@ -79,7 +79,7 @@
           <td class="num">{{ s.importo_riservato | euro }}</td>
           <td class="num">{{ s.importo_liquidato | euro }}</td>
           <td><span class="badge {{ s.stato_badge }}">{{ s.stato_label }}</span>
-            {% if s.aperto %}<div class="small ga-muted">{{ s.giorni_apertura }} gg</div>{% endif %}</td>
+            {% if s.aperto %}<div class="small ga-muted">{{ 'aperto oggi' if s.giorni_apertura == 0 else plurale(s.giorni_apertura, 'giorno', 'giorni') }}</div>{% endif %}</td>
         </tr>
       {% else %}
         <tr><td colspan="9" class="text-muted p-4">Nessun sinistro con questi filtri.</td></tr>

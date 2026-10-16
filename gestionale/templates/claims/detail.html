@@ -13,7 +13,7 @@
     <div class="page-subtitle">
       {{ claim.tipologia_label }} · evento del {{ claim.data_evento | data_it }}
       {% if claim.numero_compagnia %} · n. compagnia {{ claim.numero_compagnia }}{% endif %}
-      · {{ 'aperto da' if claim.aperto else 'durata' }} {{ claim.giorni_apertura }} giorni
+      · {% if claim.aperto and claim.giorni_apertura == 0 %}aperto oggi{% else %}{{ 'aperto da' if claim.aperto else 'durata' }} {{ plurale(claim.giorni_apertura, 'giorno', 'giorni') }}{% endif %}
     </div>
   </div>
   <div class="d-flex gap-2 no-print">

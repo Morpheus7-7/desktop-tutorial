@@ -222,7 +222,7 @@
           <div>
             <a href="{{ url_for('claims.detail', claim_id=s.id) }}" class="fw-semibold text-decoration-none">{{ s.numero }}</a>
             <span class="small ga-muted">· {{ s.cliente.ragione_sociale }} · {{ s.tipologia_label }}</span>
-            <div class="small ga-muted">evento {{ s.data_evento | data_it }} · aperto da {{ s.giorni_apertura }} gg</div>
+            <div class="small ga-muted">evento {{ s.data_evento | data_it }} · {{ 'aperto oggi' if s.giorni_apertura == 0 else 'aperto da ' ~ plurale(s.giorni_apertura, 'giorno', 'giorni') }}</div>
           </div>
           <span class="text-end">
             <span class="badge {{ s.stato_badge }}">{{ s.stato_label }}</span>

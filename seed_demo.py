@@ -22,7 +22,7 @@ from gestionale.models import (
     db,
 )
 from gestionale.risk_engine import analyze_client
-from gestionale.titoli import genera_titoli
+from gestionale.titoli import add_months, genera_titoli
 
 app = create_app()
 
@@ -144,7 +144,7 @@ with app.app_context():
             ramo="rct_rco", premio_annuo=2_450, massimale=3_000_000, provvigione_perc=20,
             frazionamento="trimestrale",
             data_decorrenza=oggi - timedelta(days=200), data_scadenza=oggi + timedelta(days=165),
-            tacito_rinnovo=True, stato="attiva",
+            tacito_rinnovo=True, preavviso_disdetta_giorni=60, stato="attiva",
         ),
         Policy(
             client_id=studio.id, compagnia="Lloyd's", numero_polizza="LL-RCPRO-5521",
@@ -164,6 +164,28 @@ with app.app_context():
             frazionamento="mensile",
             data_decorrenza=oggi - timedelta(days=100), data_scadenza=oggi + timedelta(days=265),
             tacito_rinnovo=True, stato="attiva",
+        ),
+        # Date future: polizza che decorre tra 20 giorni (non ancora in vigore),
+        # poliennale di 3 anni e polizza con il termine di disdetta tra 15 giorni.
+        Policy(
+            client_id=falegnameria.id, compagnia="AXA", numero_polizza="AXA-CYB-2031",
+            ramo="cyber", premio_annuo=1_200, massimale=500_000, provvigione_perc=15,
+            data_decorrenza=oggi + timedelta(days=20), data_scadenza=add_months(oggi + timedelta(days=20), 12),
+            tacito_rinnovo=False, stato="attiva",
+        ),
+        Policy(
+            client_id=ristorante.id, compagnia="Cattolica", numero_polizza="CAT-INC-4410",
+            ramo="incendio", premio_annuo=2_100, massimale=1_000_000, provvigione_perc=17,
+            frazionamento="semestrale",
+            data_decorrenza=oggi - timedelta(days=420),
+            data_scadenza=add_months(oggi - timedelta(days=420), 36),
+            tacito_rinnovo=False, stato="attiva",
+        ),
+        Policy(
+            client_id=studio.id, compagnia="Reale Mutua", numero_polizza="RM-FUR-0937",
+            ramo="furto", premio_annuo=680, massimale=50_000, provvigione_perc=20,
+            data_decorrenza=oggi - timedelta(days=290), data_scadenza=oggi + timedelta(days=75),
+            tacito_rinnovo=True, preavviso_disdetta_giorni=60, stato="attiva",
         ),
     ]
     db.session.add_all(polizze)
@@ -258,7 +280,7 @@ with app.app_context():
 
     db.session.commit()
     print(
-        "Dati demo caricati: 4 clienti, 5 polizze con i relativi titoli, 2 sinistri, "
+        "Dati demo caricati: 4 clienti, 8 polizze con i relativi titoli, 2 sinistri, "
         "3 follow-up, 3 opportunità, 4 analisi rischi.\n"
         "Avvia il gestionale: al primo accesso ti verrà chiesto di creare l'amministratore."
     )
