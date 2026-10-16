@@ -11,6 +11,7 @@
 </div>
 
 <form class="filter-bar row g-2 align-items-end" method="get">
+  {% if filtri.get('entita_id') %}<input type="hidden" name="entita_id" value="{{ filtri.get('entita_id') }}">{% endif %}
   <div class="col-6 col-md-2">
     <label class="form-label small">Utente</label>
     <select class="form-select form-select-sm" name="utente">

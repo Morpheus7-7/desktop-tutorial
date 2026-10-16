@@ -1,12 +1,12 @@
 """Registro attività (solo amministratori)."""
-from datetime import timedelta
+from datetime import datetime, time
 
 from flask import Blueprint, render_template, request
 
 from ..export import csv_response
 from ..models import AuditLog, User, db
 from ..security import audit, require_admin
-from ..utils import paginate, parse_date
+from ..utils import fine_giornata, paginate, parse_date, parse_int
 
 bp = Blueprint("audit", __name__, url_prefix="/registro")
 bp.before_request(require_admin)
@@ -39,26 +39,40 @@ ENTITA = [
 ]
 
 
+def _escape_like(testo: str) -> str:
+    """Il testo cercato vale alla lettera: «%» e «_» non fanno da jolly."""
+    return testo.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def _query():
     query = AuditLog.query
-    utente = request.args.get("utente", "")
-    azione = request.args.get("azione", "")
-    entita = request.args.get("entita", "")
+    utente = request.args.get("utente") or ""
+    azione = request.args.get("azione") or ""
+    entita = request.args.get("entita") or ""
+    # Date fuori dall'intervallo 1900–2100 o non valide vengono ignorate
+    # (niente errori per valori come 9999-12-31).
     dal = parse_date(request.args.get("dal"))
     al = parse_date(request.args.get("al"))
-    q = (request.args.get("q") or "").strip()
+    if dal and al and al < dal:
+        dal, al = al, dal
+    # Interi enormi o negativi vengono ignorati invece di arrivare a SQLite (OverflowError).
+    entita_id = parse_int(request.args.get("entita_id"), minimo=1)
+    q = (request.args.get("q") or "").strip()[:200]
     if utente:
         query = query.filter(AuditLog.username == utente)
     if azione:
         query = query.filter(AuditLog.azione == azione)
     if entita:
         query = query.filter(AuditLog.entita == entita)
+    if entita_id:
+        query = query.filter(AuditLog.entita_id == entita_id)
     if dal:
-        query = query.filter(AuditLog.created_at >= dal)
+        query = query.filter(AuditLog.created_at >= datetime.combine(dal, time.min))
     if al:
-        query = query.filter(AuditLog.created_at < al + timedelta(days=1))
+        # «Al» incluso: fino all'ultimo istante del giorno.
+        query = query.filter(AuditLog.created_at <= fine_giornata(al))
     if q:
-        query = query.filter(AuditLog.descrizione.ilike(f"%{q}%"))
+        query = query.filter(AuditLog.descrizione.ilike(f"%{_escape_like(q)}%", escape="\\"))
     return query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
 
 

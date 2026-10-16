@@ -12,7 +12,7 @@
   <div class="card-body row g-3">
     <div class="col-md-6">
       <label class="form-label">Nome utente *</label>
-      <input class="form-control" name="username" value="{{ user.username or '' }}" {% if not nuovo %}disabled{% else %}required{% endif %} autocomplete="off">
+      <input class="form-control" name="username" value="{{ user.username or '' }}" maxlength="60" {% if not nuovo %}disabled{% else %}required{% endif %} autocomplete="off">
     </div>
     <div class="col-md-6">
       <label class="form-label">Ruolo</label>
@@ -44,6 +44,7 @@
         <label class="form-check-label" for="attivo">Utente attivo (può accedere)</label>
       </div>
       <div class="form-text">Gli utenti non si eliminano: si disattivano, così il registro attività resta completo.</div>
+      <div class="form-text">Cambiando ruolo, stato o password, le sessioni aperte da questo utente vengono chiuse.</div>
     </div>
     {% endif %}
   </div>
