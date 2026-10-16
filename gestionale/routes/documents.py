@@ -12,8 +12,10 @@ from flask import (
     send_from_directory,
     url_for,
 )
+from werkzeug.security import safe_join
 from werkzeug.utils import secure_filename
 
+from ..backup import cartella_documenti
 from ..models import DOCUMENT_CATEGORIES, Client, Document, db
 from ..security import audit, safe_next
 from ..utils import paginate, parse_int
@@ -25,9 +27,31 @@ ALLOWED_EXTENSIONS = {
     "png", "jpg", "jpeg", "gif", "txt", "csv", "p7m", "eml", "zip",
 }
 
+# Nome su disco «<uuid>_<nome sicuro>» al massimo di 100 caratteri: con la
+# cartella dati in un percorso lungo (es. OneDrive aziendale) si resta sotto
+# il limite di 260 caratteri dei percorsi di Windows.
+LUNGHEZZA_MAX_NOME_FILE = 100
+LUNGHEZZA_MAX_NOME_ORIGINALE = Document.__table__.c.original_name.type.length or 300
+
 
 def _allowed(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def tronca_nome(nome: str, massimo: int) -> str:
+    """Accorcia un nome di file a ``massimo`` caratteri conservando l'estensione."""
+    if len(nome) <= massimo:
+        return nome
+    base, estensione = os.path.splitext(nome)
+    estensione = estensione[:16] if len(estensione) < massimo else ""
+    return base[: massimo - len(estensione)] + estensione
+
+
+def nome_su_disco(originale: str) -> str:
+    """Nome univoco e sicuro con cui salvare il file (al massimo 100 caratteri)."""
+    prefisso = f"{uuid.uuid4().hex}_"
+    sicuro = secure_filename(originale) or "documento"
+    return prefisso + tronca_nome(sicuro, LUNGHEZZA_MAX_NOME_FILE - len(prefisso))
 
 
 @bp.route("/")
@@ -82,18 +106,27 @@ def upload(client_id):
     policy_id = _resolve_policy_id(client, request.form.get("policy_id"))
     categoria = request.form.get("categoria", "altro")
     note = request.form.get("note", "").strip() or None
-    upload_folder = current_app.config["UPLOAD_FOLDER"]
+    upload_folder = cartella_documenti()
+    os.makedirs(upload_folder, exist_ok=True)
 
-    caricati, scartati = 0, []
+    caricati, scartati, non_salvati = 0, [], []
     for file in files:
         original = file.filename
         if not _allowed(original):
             scartati.append(original)
             continue
-        safe = secure_filename(original) or "documento"
-        stored_name = f"{uuid.uuid4().hex}_{safe}"
+        stored_name = nome_su_disco(original)
         path = os.path.join(upload_folder, stored_name)
-        file.save(path)
+        try:
+            file.save(path)
+        except OSError:
+            current_app.logger.exception("Salvataggio del documento %s non riuscito", path)
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+            non_salvati.append(original)
+            continue
         try:
             dimensione = os.path.getsize(path)
         except OSError:
@@ -105,7 +138,7 @@ def upload(client_id):
                 claim_id=claim_id,
                 categoria=categoria if categoria in dict(DOCUMENT_CATEGORIES) else "altro",
                 filename=stored_name,
-                original_name=original,
+                original_name=tronca_nome(original, LUNGHEZZA_MAX_NOME_ORIGINALE),
                 dimensione=dimensione,
                 note=note,
             )
@@ -122,6 +155,9 @@ def upload(client_id):
         )
     if scartati:
         flash("Tipo di file non consentito: " + ", ".join(scartati), "danger")
+    if non_salvati:
+        flash("Impossibile salvare su disco: " + ", ".join(non_salvati)
+              + ". Controlla lo spazio libero e i permessi della cartella dei documenti.", "danger")
     return redirect(_destinazione(client.id, claim_id))
 
 
@@ -129,7 +165,7 @@ def upload(client_id):
 def download(document_id):
     doc = db.get_or_404(Document, document_id)
     return send_from_directory(
-        current_app.config["UPLOAD_FOLDER"],
+        cartella_documenti(),
         doc.filename,
         as_attachment=True,
         download_name=doc.original_name,
@@ -140,14 +176,30 @@ def download(document_id):
 def delete(document_id):
     doc = db.get_or_404(Document, document_id)
     client_id, claim_id = doc.client_id, doc.claim_id
-    path = os.path.join(current_app.config["UPLOAD_FOLDER"], doc.filename)
+    # Il nome arriva dal database (anche da un backup ripristinato): mai fuori
+    # dalla cartella dei documenti.
+    path = safe_join(cartella_documenti(), doc.filename)
+    if path is None:
+        current_app.logger.warning("Documento #%s con nome file non valido: %r", doc.id, doc.filename)
     audit("elimina", "documento", doc.id,
           f"Eliminato il documento «{doc.original_name}» di «{doc.cliente.ragione_sociale}»")
     db.session.delete(doc)
     db.session.commit()
-    if os.path.exists(path):
-        os.remove(path)
-    flash("Documento eliminato.", "success")
+    file_rimasto = False
+    if path:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        except OSError:  # es. Windows: file aperto in un altro programma
+            current_app.logger.warning("File del documento non rimosso: %s", path, exc_info=True)
+            file_rimasto = True
+    if file_rimasto:
+        flash("Documento eliminato dall'archivio, ma il file su disco è in uso (ad esempio aperto in un "
+              "altro programma) e non è stato rimosso: resta nella cartella dei documenti, non più "
+              "collegato al gestionale.", "warning")
+    else:
+        flash("Documento eliminato.", "success")
     if request.form.get("da_archivio"):
         return redirect(url_for("documents.list_documents"))
     return redirect(_destinazione(client_id, claim_id if request.form.get("da_sinistro") else None))

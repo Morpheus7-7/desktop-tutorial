@@ -117,21 +117,35 @@ server locale e apre il browser da solo. Il modo più semplice per ottenere il
 ```bash
 pip install -r requirements.txt
 
-# (opzionale) carica dati di esempio: clienti, polizze, titoli, sinistri…
-python seed_demo.py
-
-python app.py
-# apri http://127.0.0.1:5000
+python run_desktop.py
+# si apre il browser su http://127.0.0.1:5000
 ```
+
+Per provare il gestionale con dati di esempio (clienti, polizze, titoli,
+sinistri…) nella cartella `instance/`, con il server di sviluppo:
+
+```bash
+python seed_demo.py
+python app.py
+```
+
+`run_desktop.py` è il modo consigliato per l'uso quotidiano (è lo stesso avvio
+dell'eseguibile): usa il server [waitress](https://github.com/Pylons/waitress),
+avvia lo **scheduler** (email automatiche e backup giornaliero), apre il
+browser e salva i dati nella cartella dati dell'utente (vedi
+[PACKAGING.md](PACKAGING.md#cartella-dei-dati); per tenerli altrove imposta
+`GESTIONALE_DATI`).
+
+Per lo sviluppo c'è anche `python app.py`, che usa il server di sviluppo di
+Flask e salva i dati nella cartella `instance/` (esclusa dal versionamento).
+Non usarlo in produzione né in rete; il debugger interattivo si attiva solo con
+`FLASK_DEBUG=1 python app.py`. Con `flask --app app run` lo scheduler **non
+parte**: niente email automatiche né backup giornaliero.
 
 Al primo accesso il gestionale chiede di creare l'account **amministratore**;
 gli altri utenti si aggiungono poi dalla pagina **Utenti**. Se l'unico
 amministratore dimentica la password: `flask --app app reimposta-password NOMEUTENTE`
 (con l'eseguibile: `GestionaleAssicurativo.exe --reimposta-password NOMEUTENTE`).
-
-Il database SQLite, i documenti caricati, i backup automatici e la chiave di
-sessione vengono salvati nella cartella `instance/` (esclusa dal
-versionamento).
 
 ## Configurazione
 
@@ -140,11 +154,19 @@ Variabili d'ambiente supportate:
 | Variabile               | Default                              | Descrizione                                         |
 |-------------------------|--------------------------------------|-----------------------------------------------------|
 | `SECRET_KEY`            | generata e salvata al primo avvio    | Chiave di sessione Flask                            |
-| `SECRET_KEY_FILE`       | `instance/secret_key`                | Dove salvare la chiave generata                     |
-| `DATABASE_URL`          | `sqlite:///instance/gestionale.db`   | URI del database SQLAlchemy                         |
-| `UPLOAD_FOLDER`         | `instance/uploads`                   | Cartella dei documenti caricati                     |
-| `BACKUP_FOLDER`         | `instance/backups`                   | Cartella dei backup automatici                      |
+| `SECRET_KEY_FILE`       | `<instance>/secret_key`              | Dove salvare la chiave generata                     |
+| `DATABASE_URL`          | `sqlite:///<instance>/gestionale.db` | URI del database SQLAlchemy                         |
+| `UPLOAD_FOLDER`         | `<instance>/uploads`                 | Cartella dei documenti caricati                     |
+| `BACKUP_FOLDER`         | `<instance>/backups`                 | Cartella dei backup automatici                      |
 | `SESSION_COOKIE_SECURE` | `false`                              | `true` se il gestionale è servito in HTTPS          |
+| `GESTIONALE_DATI`       | cartella dati dell'utente            | Solo `run_desktop.py`/eseguibile: cartella di tutti i dati |
+| `PORT`                  | `5000`                               | Solo `run_desktop.py`/eseguibile: porta preferita   |
+
+`<instance>` è la cartella `instance/` del progetto (con `python app.py`); con
+`run_desktop.py` e con l'eseguibile i quattro percorsi stanno nella cartella
+dati. Un percorso SQLite relativo in `DATABASE_URL` (es. `sqlite:///gestionale.db`)
+e i percorsi relativi di `UPLOAD_FOLDER` e `BACKUP_FOLDER` sono risolti
+rispetto a `instance/`.
 
 > **In rete**: il server integrato ascolta solo su `127.0.0.1`. Per usarlo da
 > più postazioni pubblicalo dietro un reverse proxy **HTTPS** (es. Caddy o
@@ -157,7 +179,11 @@ a destra): server SMTP, porta, sicurezza (STARTTLS/SSL), utente, password,
 mittente e destinatari. Da lì puoi **attivare l'invio automatico**, mandare
 un'**email di prova** e **inviare subito** il riepilogo delle notifiche in
 attesa. Lo scheduler in background genera le notifiche e invia un unico *digest*
-delle novità con la cadenza scelta (campo «Controllo automatico ogni N minuti»).
+delle novità con la cadenza scelta (campo «Controllo automatico ogni N minuti»,
+da 1 a 1440). Un solo invio alla volta: se premi «Invia ora» mentre lo
+scheduler sta spedendo, le stesse notifiche non partono due volte. I dati
+inseriti dagli utenti (nomi dei clienti, titoli dei follow-up…) compaiono
+nell'email HTML sempre come testo, mai come codice.
 
 In alternativa (o in produzione) i parametri SMTP possono arrivare da variabili
 d'ambiente, che **hanno la precedenza** su quanto salvato nel database:
@@ -179,15 +205,31 @@ d'ambiente, che **hanno la precedenza** su quanto salvato nel database:
 Da **Impostazioni → Backup** l'amministratore può scaricare un backup completo
 (database + documenti in un unico ZIP), salvarne uno nella cartella dei backup,
 configurare il **backup automatico giornaliero** (attivo di default, ultimi 14
-archivi conservati) e **ripristinare** un archivio. Prima di ogni ripristino
-viene salvata una copia di sicurezza dei dati attuali (`pre_ripristino_…zip`).
+archivi conservati) e **ripristinare** un archivio.
+
+- Il backup automatico parte al primo controllo di ogni giornata di calendario
+  (anche se il programma viene aperto ogni giorno a orari diversi); una data
+  dell'ultimo backup nel futuro, dovuta a un orologio corretto, non lo blocca.
+- Gli archivi vengono scritti con un nome temporaneo e rinominati solo quando
+  sono completi: un'interruzione non lascia archivi troncati nell'elenco.
+- Il download dal browser non lascia copie dei dati nella cartella temporanea
+  del sistema.
+- Prima di ogni ripristino viene salvata una copia di sicurezza dei dati attuali
+  (`pre_ripristino_…zip`), elencata tra i backup salvati; se ne conservano le
+  ultime 5, a parte rispetto ai backup giornalieri.
+- Il ripristino accetta solo archivi creati dal gestionale (database,
+  `manifest.json` e documenti in `uploads/`: niente percorsi assoluti, `..` o
+  collegamenti) con un database valido che contenga almeno un amministratore
+  attivo. Al termine **tutti gli utenti vengono disconnessi** e si accede con le
+  credenziali presenti nel backup.
+
 Conserva periodicamente una copia dei backup su un disco esterno o in cloud.
 
 ## Struttura
 
 ```
-app.py                     # entry point (server di sviluppo)
-run_desktop.py             # avvio «desktop»: server + browser (usato dall'exe)
+app.py                     # avvio per lo sviluppo (server di Flask, senza scheduler con `flask run`)
+run_desktop.py             # avvio «desktop» consigliato: cartella dati, istanza unica, server + browser (usato dall'exe)
 seed_demo.py               # dati di esempio
 gestionale.spec            # ricetta PyInstaller per l'eseguibile
 gestionale/

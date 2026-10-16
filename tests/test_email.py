@@ -166,3 +166,102 @@ def test_settings_send_now_route(client, app, monkeypatch):
     assert resp.status_code == 200
     with app.app_context():
         assert Notification.query.filter_by(inviata_email=True).count() == 1
+
+
+# ----------------------------------------------------------------------
+# Sicurezza e concorrenza del digest
+# ----------------------------------------------------------------------
+def test_build_digest_escape_dati_utente(app, monkeypatch):
+    monkeypatch.setenv("APP_BASE_URL", "http://127.0.0.1:5000")
+    with app.app_context():
+        n = Notification(
+            tipo="followup", livello="danger", dedup_key="h1",
+            messaggio='Follow-up per <b>X</b> & Y <a href="https://phish.example">Rinnova qui</a>',
+            link="/clienti/1?a=1&b='2'", created_at=datetime(2026, 1, 1),
+        )
+        _, text_body, html_body = mailer.build_digest([n])
+    assert "&lt;b&gt;X&lt;/b&gt; &amp; Y" in html_body
+    assert "<b>X</b>" not in html_body and 'href="https://phish.example"' not in html_body
+    assert "href='http://127.0.0.1:5000/clienti/1?a=1&amp;b=&#39;2&#39;'" in html_body
+    # Il testo semplice resta leggibile così com'è.
+    assert '<b>X</b> & Y <a href="https://phish.example">' in text_body
+
+
+def test_invii_contemporanei_un_solo_digest(app, monkeypatch):
+    import threading
+    import time
+
+    inviati = []
+
+    def _smtp_lento(cfg, msg, **kw):
+        time.sleep(0.3)
+        inviati.append(msg)
+
+    monkeypatch.setattr(mailer, "_send", _smtp_lento)
+    _configura(app)
+    with app.app_context():
+        db.session.add(Notification(tipo="info", livello="info", messaggio="Uno", dedup_key="c1"))
+        db.session.commit()
+
+    risultati = []
+
+    def _invia():
+        with app.app_context():
+            risultati.append(mailer.send_pending_notifications())
+            db.session.remove()
+
+    fili = [threading.Thread(target=_invia) for _ in range(2)]  # scheduler e «Invia ora»
+    for f in fili:
+        f.start()
+    for f in fili:
+        f.join(10)
+    assert len(inviati) == 1
+    assert sorted(risultati) == [0, 1]
+    with app.app_context():
+        assert Notification.query.filter_by(inviata_email=True).count() == 1
+
+
+def test_commit_fallito_dopo_invio_annulla_e_riprova(app, monkeypatch):
+    from sqlalchemy.exc import OperationalError
+
+    monkeypatch.setattr(mailer, "_send", lambda cfg, msg, **kw: None)
+    _configura(app)
+    with app.app_context():
+        db.session.add(Notification(tipo="info", livello="info", messaggio="Uno", dedup_key="f1"))
+        db.session.commit()
+        commit_vero = db.session.commit
+        fallimenti = {"restanti": 1}
+
+        def _commit_instabile():
+            if fallimenti["restanti"]:
+                fallimenti["restanti"] -= 1
+                raise OperationalError("COMMIT", {}, Exception("database is locked"))
+            return commit_vero()
+
+        monkeypatch.setattr(db.session, "commit", _commit_instabile)
+        assert mailer.send_pending_notifications() == 1
+        monkeypatch.setattr(db.session, "commit", commit_vero)
+        db.session.expire_all()
+        assert Notification.query.filter_by(inviata_email=True).count() == 1
+
+
+def test_commit_sempre_fallito_dopo_invio_non_solleva(app, monkeypatch, caplog):
+    from sqlalchemy.exc import OperationalError
+
+    monkeypatch.setattr(mailer, "_send", lambda cfg, msg, **kw: None)
+    _configura(app)
+    with app.app_context():
+        db.session.add(Notification(tipo="info", livello="info", messaggio="Uno", dedup_key="f2"))
+        db.session.commit()
+        commit_vero = db.session.commit
+
+        def _commit_rotto():
+            raise OperationalError("COMMIT", {}, Exception("disk I/O error"))
+
+        monkeypatch.setattr(db.session, "commit", _commit_rotto)
+        assert mailer.send_pending_notifications() == 1  # l'email è comunque partita
+        monkeypatch.setattr(db.session, "commit", commit_vero)
+        db.session.expire_all()
+        assert Notification.query.filter_by(inviata_email=True).count() == 0
+    assert "potrebbero essere spedite di nuovo" in caplog.text
+    assert not mailer._invio_lock.locked()

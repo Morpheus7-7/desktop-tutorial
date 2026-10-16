@@ -12,7 +12,7 @@
 <form class="filter-bar row g-2" method="get">
   <div class="col-md-5 d-flex gap-1">
     <input class="form-control form-control-sm" name="q" value="{{ q }}" placeholder="Nome file o cliente…" aria-label="Cerca">
-    <button class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
+    <button class="btn btn-sm btn-primary" aria-label="Cerca" title="Cerca"><i class="bi bi-search" aria-hidden="true"></i></button>
   </div>
   <div class="col-md-4">
     <select class="form-select form-select-sm" name="categoria" onchange="this.form.submit()" aria-label="Categoria">
@@ -27,6 +27,7 @@
 <div class="card">
   <div class="card-body p-0">
     {% if documenti %}
+    <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr><th>Documento</th><th>Cliente</th><th>Categoria</th><th>Collegato a</th><th>Dim.</th><th>Caricato il</th><th></th></tr></thead>
       <tbody>
@@ -45,13 +46,14 @@
           <td class="small text-nowrap">{{ d.dimensione_leggibile if d.dimensione else '—' }}</td>
           <td class="small">{{ d.uploaded_at | dataora_it }}</td>
           <td class="text-end text-nowrap">
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}"><i class="bi bi-download"></i></a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}"
+               aria-label="Scarica {{ d.original_name }}" title="Scarica"><i class="bi bi-download" aria-hidden="true"></i></a>
             {% if puo_modificare %}
             <form class="d-inline" method="post" action="{{ url_for('documents.delete', document_id=d.id) }}"
                   data-confirm="Eliminare il documento {{ d.original_name }}?">
               {{ csrf_field() }}
               <input type="hidden" name="da_archivio" value="1">
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-sm btn-outline-danger" aria-label="Elimina {{ d.original_name }}" title="Elimina"><i class="bi bi-trash" aria-hidden="true"></i></button>
             </form>
             {% endif %}
           </td>
@@ -59,6 +61,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {{ m.paginazione(pagination) }}
     {% else %}
     <p class="text-muted p-4 mb-0">Nessun documento. I documenti si caricano dalla scheda del cliente.</p>
