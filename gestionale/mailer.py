@@ -7,20 +7,33 @@ resta leggero.
 La configurazione SMTP arriva dalla tabella ``Settings`` (modificabile dalla
 pagina «Impostazioni»); le variabili d'ambiente omonime, se presenti, hanno la
 precedenza — utile per non salvare la password nel database in produzione.
+
+L'invio del digest è serializzato da ``_invio_lock``: il pulsante «Invia ora»
+e lo scheduler non possono spedire due volte le stesse notifiche.
 """
 from __future__ import annotations
 
 import os
 import smtplib
 import ssl
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from email.message import EmailMessage
 from email.utils import formataddr
 
 from flask import current_app
+from markupsafe import escape
 
 from .models import LIVELLO_ORDINE, Notification, Settings, db
+
+# Un solo invio del digest alla volta (scheduler e richieste web nello stesso processo).
+_invio_lock = threading.Lock()
+ATTESA_INVIO_S = 60  # attesa massima se un altro invio è in corso (timeout SMTP: 20 s)
+
+
+class InvioInCorso(Exception):
+    """Un altro invio del digest è ancora in corso."""
 
 
 @dataclass
@@ -195,6 +208,8 @@ def build_digest(notifiche: list[Notification]) -> tuple[str, str, str]:
     text_body = "\n".join(righe)
 
     # --- html ---
+    # I messaggi contengono dati inseriti dagli utenti (ragione sociale, numero
+    # di polizza, titolo del follow-up): vanno sempre convertiti in testo.
     colore = {"danger": "#dc3545", "warning": "#fd7e14", "info": "#0d6efd"}
     items = []
     for x in ordinate:
@@ -203,13 +218,13 @@ def build_digest(notifiche: list[Notification]) -> tuple[str, str, str]:
         if x.link and base:
             link_html = (
                 f"<div style='margin-top:4px;'>"
-                f"<a href='{base}{x.link}' style='color:#0d6efd;font-size:13px;'>Apri la scheda cliente →</a>"
-                f"</div>"
+                f"<a href='{escape(base + x.link)}' style='color:#0d6efd;font-size:13px;'>"
+                f"Apri la scheda cliente →</a></div>"
             )
         items.append(
             f"<li style='list-style:none;margin:0 0 10px;padding:12px 14px;"
             f"border-left:4px solid {col};background:#f8f9fc;border-radius:6px;'>"
-            f"<div style='font-size:14px;'>{x.messaggio}</div>{link_html}</li>"
+            f"<div style='font-size:14px;'>{escape(x.messaggio or '')}</div>{link_html}</li>"
         )
     corpo = (
         f"<p>Hai <strong>{n}</strong> notific{'a' if n == 1 else 'he'} da controllare"
@@ -227,6 +242,12 @@ def send_pending_notifications(settings: Settings | None = None) -> int:
 
     Va chiamata dentro un app context. Ritorna il numero di notifiche incluse
     nell'email inviata (0 se non c'è nulla da inviare o le email sono disattive).
+
+    Lettura, invio e marcatura avvengono nella stessa sezione critica: chi
+    arriva mentre un altro invio è in corso aspetta e poi trova le notifiche
+    già marcate. Se dopo l'invio il salvataggio fallisce si annulla la
+    transazione e si riprova una volta a marcare le notifiche; l'errore
+    finisce comunque nel log.
     """
     settings = settings or Settings.get()
     if not email_attive(settings):
@@ -235,20 +256,49 @@ def send_pending_notifications(settings: Settings | None = None) -> int:
     if not cfg.valida:
         return 0
 
-    pending = _pending_query()
-    if not pending:
-        return 0
+    if not _invio_lock.acquire(timeout=ATTESA_INVIO_S):
+        raise InvioInCorso("è già in corso un altro invio delle notifiche: riprova tra qualche istante.")
+    try:
+        # Letta solo ora: un invio appena concluso potrebbe averle già marcate.
+        pending = _pending_query()
+        if not pending:
+            return 0
 
-    subject, text_body, html_body = build_digest(pending)
-    _send(cfg, _build_message(cfg, subject, text_body, html_body))
+        subject, text_body, html_body = build_digest(pending)
+        _send(cfg, _build_message(cfg, subject, text_body, html_body))
+        _marca_inviate(pending)
+        current_app.logger.info("Inviato digest email con %d notifiche.", len(pending))
+        return len(pending)
+    finally:
+        _invio_lock.release()
 
+
+def _marca_inviate(notifiche: list[Notification]) -> None:
+    """Segna le notifiche come inviate; in caso di errore annulla e riprova una volta."""
     ora = datetime.now()
-    for x in pending:
+    ids = [x.id for x in notifiche]
+    for x in notifiche:
         x.inviata_email = True
         x.inviata_email_at = ora
-    db.session.commit()
-    current_app.logger.info("Inviato digest email con %d notifiche.", len(pending))
-    return len(pending)
+    try:
+        db.session.commit()
+        return
+    except Exception:  # noqa: BLE001 - l'email è già partita: non va segnalato come invio fallito
+        db.session.rollback()
+        current_app.logger.exception(
+            "Digest inviato ma salvataggio non riuscito: nuovo tentativo di marcare %d notifiche.", len(ids)
+        )
+    try:
+        Notification.query.filter(Notification.id.in_(ids)).update(
+            {Notification.inviata_email: True, Notification.inviata_email_at: ora},
+            synchronize_session=False,
+        )
+        db.session.commit()
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        current_app.logger.exception(
+            "Notifiche inviate via email ma non marcate come inviate: potrebbero essere spedite di nuovo."
+        )
 
 
 def contatore_pending() -> int:
