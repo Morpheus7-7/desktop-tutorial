@@ -70,12 +70,12 @@ ESITO_ERRATA = "errata"
 ESITO_BLOCCATO_ORA = "bloccato_ora"  # questo errore ha fatto scattare il blocco
 ESITO_BLOCCATO = "bloccato"  # account già bloccato: password non verificata
 
-# Policy di sicurezza dei contenuti. 'unsafe-inline' sugli script resta finché
-# i template usano gestori inline (onchange/onclick) e lo <script> del modulo
-# cliente; gli stili inline (attributi style) sono usati ovunque.
+# Policy di sicurezza dei contenuti. Nessuno script inline: i comportamenti
+# dell'interfaccia sono tutti in static/app.js (data-print, data-autosubmit…).
+# Gli stili inline (attributi style, es. larghezza delle barre) restano ammessi.
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline'; "
+    "script-src 'self'; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data:; "
     "font-src 'self'; "

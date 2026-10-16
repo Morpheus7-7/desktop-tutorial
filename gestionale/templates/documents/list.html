@@ -15,7 +15,7 @@
     <button class="btn btn-sm btn-primary" aria-label="Cerca" title="Cerca"><i class="bi bi-search" aria-hidden="true"></i></button>
   </div>
   <div class="col-md-4">
-    <select class="form-select form-select-sm" name="categoria" onchange="this.form.submit()" aria-label="Categoria">
+    <select class="form-select form-select-sm" name="categoria" data-autosubmit aria-label="Categoria">
       <option value="">Tutte le categorie</option>
       {% for value, label in document_categories %}
       <option value="{{ value }}" {% if categoria == value %}selected{% endif %}>{{ label }}</option>

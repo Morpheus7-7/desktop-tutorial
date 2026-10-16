@@ -33,7 +33,6 @@ import zipfile
 from datetime import datetime
 
 from flask import Flask, current_app
-from sqlalchemy import func
 from werkzeug.utils import secure_filename
 
 from .models import Claim, Client, Policy, Settings, Title, User, db, now
@@ -466,10 +465,9 @@ def ripristina_backup(file_zip) -> dict:
 
     init_db()
     # Invalida i cookie di sessione emessi prima del ripristino (tutti gli utenti).
-    User.query.update(
-        {User.sessione_versione: func.coalesce(User.sessione_versione, 0) + 1},
-        synchronize_session=False,
-    )
+    from .security import invalida_tutte_le_sessioni
+
+    invalida_tutte_le_sessioni()
     db.session.commit()
     return {
         "documenti": documenti,

@@ -6,6 +6,7 @@ documenti, analisi automatica dei rischi, pipeline commerciale, follow-up,
 scadenzario e notifiche. Accesso con utenti e ruoli, registro attività e
 backup.
 """
+import mimetypes
 import os
 import re
 import secrets
@@ -198,6 +199,22 @@ def _secret_key(app: Flask) -> str:
     return chiave
 
 
+# Su Windows il registro può associare .js a text/plain: con «nosniff» il
+# browser non eseguirebbe gli script. I tipi impostati qui prevalgono.
+TIPI_MIME = {
+    ".js": "text/javascript",
+    ".css": "text/css",
+    ".svg": "image/svg+xml",
+    ".woff2": "font/woff2",
+    ".woff": "font/woff",
+}
+
+
+def _registra_tipi_mime() -> None:
+    for estensione, tipo in TIPI_MIME.items():
+        mimetypes.add_type(tipo, estensione)
+
+
 def create_app(test_config: dict | None = None) -> Flask:
     app = Flask(__name__, instance_relative_config=True)
 
@@ -229,6 +246,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     if not app.config.get("SECRET_KEY"):
         app.config["SECRET_KEY"] = _secret_key(app)
 
+    # Cartelle assolute per tutti i punti di ingresso (desktop, flask run,
+    # WSGI esterno, test) e tipi MIME corretti per i file statici.
+    from .backup import normalizza_cartelle
+
+    normalizza_cartelle(app)
+    _registra_tipi_mime()
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
     db.init_app(app)

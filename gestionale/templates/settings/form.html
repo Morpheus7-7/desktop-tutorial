@@ -30,24 +30,24 @@
     {{ csrf_field() }}
     <div class="col-12 small ga-muted">Questi dati compaiono nell'intestazione delle stampe (report, foglio cassa, estratti conto).</div>
     <div class="col-md-8">
-      <label class="form-label">Ragione sociale dello studio / agenzia</label>
-      <input class="form-control" name="studio_nome" value="{{ s.studio_nome or '' }}">
+      <label class="form-label" for="settings-form-studio-nome">Ragione sociale dello studio / agenzia</label>
+      <input id="settings-form-studio-nome" class="form-control" name="studio_nome" value="{{ s.studio_nome or '' }}">
     </div>
     <div class="col-md-4">
-      <label class="form-label">Iscrizione RUI</label>
-      <input class="form-control text-uppercase" name="studio_rui" value="{{ s.studio_rui or '' }}" placeholder="A000123456">
+      <label class="form-label" for="settings-form-studio-rui">Iscrizione RUI</label>
+      <input id="settings-form-studio-rui" class="form-control text-uppercase" name="studio_rui" value="{{ s.studio_rui or '' }}" placeholder="A000123456">
     </div>
     <div class="col-md-4">
-      <label class="form-label">Partita IVA</label>
-      <input class="form-control" name="studio_piva" value="{{ s.studio_piva or '' }}">
+      <label class="form-label" for="settings-form-studio-piva">Partita IVA</label>
+      <input id="settings-form-studio-piva" class="form-control" name="studio_piva" value="{{ s.studio_piva or '' }}">
     </div>
     <div class="col-md-8">
-      <label class="form-label">Indirizzo</label>
-      <input class="form-control" name="studio_indirizzo" value="{{ s.studio_indirizzo or '' }}">
+      <label class="form-label" for="settings-form-studio-indirizzo">Indirizzo</label>
+      <input id="settings-form-studio-indirizzo" class="form-control" name="studio_indirizzo" value="{{ s.studio_indirizzo or '' }}">
     </div>
     <div class="col-12">
-      <label class="form-label">Contatti (telefono, email, PEC)</label>
-      <input class="form-control" name="studio_contatti" value="{{ s.studio_contatti or '' }}">
+      <label class="form-label" for="settings-form-studio-contatti">Contatti (telefono, email, PEC)</label>
+      <input id="settings-form-studio-contatti" class="form-control" name="studio_contatti" value="{{ s.studio_contatti or '' }}">
     </div>
     <div class="col-12"><button class="btn btn-primary"><i class="bi bi-save"></i> Salva dati studio</button></div>
   </form>
@@ -73,8 +73,8 @@
 
           <div class="row g-3">
             <div class="col-md-8">
-              <label class="form-label">Server SMTP</label>
-              <input class="form-control" name="smtp_host" value="{{ s.smtp_host or '' }}"
+              <label class="form-label" for="settings-form-smtp-host">Server SMTP</label>
+              <input id="settings-form-smtp-host" class="form-control" name="smtp_host" value="{{ s.smtp_host or '' }}"
                      placeholder="es. smtp.gmail.com">
             </div>
             <div class="col-md-4">
@@ -83,8 +83,8 @@
                      value="{{ s.smtp_port or 587 }}">
             </div>
             <div class="col-md-6">
-              <label class="form-label">Sicurezza</label>
-              <select class="form-select" name="smtp_security">
+              <label class="form-label" for="settings-form-smtp-security">Sicurezza</label>
+              <select id="settings-form-smtp-security" class="form-select" name="smtp_security">
                 {% for val, lab in security_choices %}
                 <option value="{{ val }}" {% if s.smtp_security == val %}selected{% endif %}>{{ lab }}</option>
                 {% endfor %}
@@ -97,25 +97,25 @@
               <div class="form-text">Da 1 a 1440 minuti (una volta al giorno).</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Utente SMTP</label>
-              <input class="form-control" name="smtp_user" value="{{ s.smtp_user or '' }}"
+              <label class="form-label" for="settings-form-smtp-user">Utente SMTP</label>
+              <input id="settings-form-smtp-user" class="form-control" name="smtp_user" value="{{ s.smtp_user or '' }}"
                      placeholder="di solito il tuo indirizzo email" autocomplete="username">
             </div>
             <div class="col-md-6">
-              <label class="form-label">Password SMTP</label>
-              <input class="form-control" name="smtp_password" type="password"
+              <label class="form-label" for="settings-form-smtp-password">Password SMTP</label>
+              <input id="settings-form-smtp-password" class="form-control" name="smtp_password" type="password"
                      placeholder="{% if s.smtp_password %}•••••••• (invariata){% else %}password o app password{% endif %}"
                      autocomplete="new-password">
               <div class="form-text">Lascia vuoto per non modificare la password già salvata.</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Mittente (From)</label>
-              <input class="form-control" name="mail_from" value="{{ s.mail_from or '' }}"
+              <label class="form-label" for="settings-form-mail-from">Mittente (From)</label>
+              <input id="settings-form-mail-from" class="form-control" name="mail_from" value="{{ s.mail_from or '' }}"
                      placeholder="es. gestionale@tuostudio.it">
             </div>
             <div class="col-md-6">
-              <label class="form-label">Destinatari</label>
-              <input class="form-control" name="mail_to" value="{{ s.mail_to or '' }}"
+              <label class="form-label" for="settings-form-mail-to">Destinatari</label>
+              <input id="settings-form-mail-to" class="form-control" name="mail_to" value="{{ s.mail_to or '' }}"
                      placeholder="uno o più indirizzi separati da virgola">
             </div>
           </div>
@@ -339,8 +339,8 @@
           <p class="small ga-muted">Sostituisce <strong>tutti i dati attuali</strong> con quelli del backup. Prima del ripristino viene comunque salvata una copia di sicurezza dello stato attuale (elencata tra i backup salvati). Vengono accettati solo archivi creati dal gestionale, con almeno un amministratore attivo. Dopo il ripristino tutti gli utenti vengono disconnessi e dovrai accedere con le credenziali contenute nel backup.</p>
           <form method="post" action="{{ url_for('settings.restore_backup') }}" enctype="multipart/form-data" class="row g-2">
             {{ csrf_field() }}
-            <div class="col-12"><input class="form-control" type="file" name="archivio" accept=".zip" required></div>
-            <div class="col-md-7"><input class="form-control" name="conferma" placeholder="Scrivi RIPRISTINA per confermare" required autocomplete="off"></div>
+            <div class="col-12"><input class="form-control" type="file" name="archivio" accept=".zip" required aria-label="Archivio di backup (.zip)"></div>
+            <div class="col-md-7"><input class="form-control" name="conferma" placeholder="Scrivi RIPRISTINA per confermare" required autocomplete="off" aria-label="Conferma del ripristino"></div>
             <div class="col-md-5"><button class="btn btn-danger w-100"><i class="bi bi-arrow-counterclockwise"></i> Ripristina</button></div>
           </form>
         </div>

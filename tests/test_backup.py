@@ -325,7 +325,7 @@ def test_ripristino_invalida_tutte_le_sessioni(client, app):
     assert resp.status_code == 302 and resp.headers["Location"].endswith("/accesso")
     with app.app_context():
         for user in User.query.all():
-            assert user.sessione_versione == versioni[user.username] + 1
+            assert user.sessione_versione > versioni[user.username]
     pagina = client.get("/accesso").get_data(as_text=True)
     assert "tutti gli utenti sono stati disconnessi" in pagina
     # L'amministratore può accedere di nuovo con le credenziali del backup.

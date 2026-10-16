@@ -31,6 +31,7 @@ from ..models import (
     RiskAnalysis,
     db,
 )
+from ..backup import cartella_documenti
 from ..notifications import elimina_notifiche
 from ..risk_engine import analyze_client
 from ..security import audit
@@ -292,7 +293,7 @@ def delete_client(client_id):
             "danger",
         )
         return redirect(url_for("clients.detail", client_id=client.id))
-    cartella = current_app.config["UPLOAD_FOLDER"]
+    cartella = cartella_documenti()
     file_da_rimuovere = [p for p in (safe_join(cartella, d.filename) for d in client.documenti) if p]
     prefissi = [f"cliente:{client.id}:"]
     for p in client.polizze:

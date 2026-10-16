@@ -556,3 +556,15 @@ def test_filtri_dei_template(app):
             "oggi", "domani", "da ieri", "tra 5 giorni", "da 3 giorni"]
         plurale = app.jinja_env.globals["plurale"]
         assert plurale(1, "titolo", "titoli") == "1 titolo" and plurale(3, "titolo", "titoli") == "3 titoli"
+
+
+def test_csp_senza_script_inline_e_template_senza_gestori(client, app):
+    import pathlib
+    import re
+    csp = client.get("/").headers["Content-Security-Policy"]
+    assert "script-src 'self';" in csp and "'unsafe-inline'" not in csp.split("script-src")[1].split(";")[0]
+    cartella = pathlib.Path(app.root_path) / "templates"
+    for f in cartella.rglob("*.html"):
+        testo = f.read_text()
+        assert not re.search(r"\son[a-z]+\s*=\s*\"", testo), f"gestore inline in {f.name}"
+        assert not re.search(r"<script(?![^>]*\bsrc=)", testo), f"script inline in {f.name}"
