@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Sinistri — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title"><i class="bi bi-exclamation-octagon me-2"></i>Sinistri</h1>
+    <div class="page-subtitle">Denunce, perizie e liquidazioni dei clienti</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('claims.export_claims', **filtri.to_dict()) }}"><i class="bi bi-filetype-csv"></i> Esporta</a>
+    {% if puo_modificare %}<a class="btn btn-primary" href="{{ url_for('claims.new_claim') }}"><i class="bi bi-plus-lg"></i> Nuovo sinistro</a>{% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card stat-card h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-folder2-open"></i></span>
+    <div class="stat-label">Sinistri aperti</div><div class="stat-value">{{ riepilogo.aperti }}</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat-card accent-warning h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-safe"></i></span>
+    <div class="stat-label">Riserve sui sinistri aperti</div><div class="stat-value small-value">{{ riepilogo.riservato | euro }}</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat-card accent-success h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-cash-stack"></i></span>
+    <div class="stat-label">Liquidato nell'anno</div><div class="stat-value small-value">{{ riepilogo.liquidato_anno | euro }}</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat-card {% if riepilogo.da_denunciare %}accent-danger stat-alert{% endif %} h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-send-exclamation"></i></span>
+    <div class="stat-label">Da denunciare alla compagnia</div><div class="stat-value">{{ riepilogo.da_denunciare }}</div>
+  </div></div></div>
+</div>
+
+<form class="filter-bar row g-2 align-items-end" method="get">
+  <div class="col-md-3">
+    <div class="btn-group w-100" role="group">
+      {% for v, l in [('aperti', 'Aperti'), ('chiusi', 'Chiusi'), ('tutti', 'Tutti')] %}
+      <input type="radio" class="btn-check" name="filtro" id="f-{{ v }}" value="{{ v }}" {% if filtro == v %}checked{% endif %} onchange="this.form.submit()">
+      <label class="btn btn-outline-primary btn-sm" for="f-{{ v }}">{{ l }}</label>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="col-md-3">
+    <select class="form-select form-select-sm" name="tipologia" onchange="this.form.submit()">
+      <option value="">Tutte le tipologie</option>
+      {% for v, l in claim_types %}<option value="{{ v }}" {% if filtri.get('tipologia') == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select class="form-select form-select-sm" name="stato" onchange="this.form.submit()">
+      <option value="">Ogni stato</option>
+      {% for v, l in claim_statuses %}<option value="{{ v }}" {% if filtri.get('stato') == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-4 d-flex gap-1">
+    <input class="form-control form-control-sm" name="q" value="{{ filtri.get('q', '') }}" placeholder="Numero, cliente, polizza, controparte…">
+    <button class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Numero</th><th>Cliente</th><th>Polizza</th><th>Tipologia</th><th>Evento</th><th>Denuncia</th><th class="num">Riserva</th><th class="num">Liquidato</th><th>Stato</th></tr></thead>
+      <tbody>
+      {% for s in sinistri %}
+        <tr>
+          <td><a class="fw-semibold" href="{{ url_for('claims.detail', claim_id=s.id) }}">{{ s.numero }}</a>
+            {% if s.numero_compagnia %}<div class="small ga-muted">{{ s.numero_compagnia }}</div>{% endif %}</td>
+          <td><a href="{{ url_for('clients.detail', client_id=s.client_id) }}">{{ s.cliente.ragione_sociale }}</a></td>
+          <td class="small">{% if s.polizza %}<a href="{{ url_for('policies.detail', policy_id=s.policy_id) }}">{{ s.polizza.numero_polizza }}</a><div class="ga-muted">{{ s.polizza.compagnia }}</div>{% else %}—{% endif %}</td>
+          <td class="small">{{ s.tipologia_label }}{% if s.controparte %}<div class="ga-muted">vs {{ s.controparte }}</div>{% endif %}</td>
+          <td class="small text-nowrap">{{ s.data_evento | data_it }}</td>
+          <td class="small text-nowrap">
+            {% if s.data_denuncia %}{{ s.data_denuncia | data_it }}{% if s.denuncia_tardiva %} <i class="bi bi-exclamation-triangle text-warning" title="Denuncia oltre 3 giorni (art. 1913 c.c.)"></i>{% endif %}
+            {% else %}<span class="badge bg-danger">da denunciare</span>{% endif %}
+          </td>
+          <td class="num">{{ s.importo_riservato | euro }}</td>
+          <td class="num">{{ s.importo_liquidato | euro }}</td>
+          <td><span class="badge {{ s.stato_badge }}">{{ s.stato_label }}</span>
+            {% if s.aperto %}<div class="small ga-muted">{{ s.giorni_apertura }} gg</div>{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9" class="text-muted p-4">Nessun sinistro con questi filtri.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ m.paginazione(pagination) }}
+</div>
+{% endblock %}

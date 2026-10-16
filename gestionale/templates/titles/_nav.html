@@ -1,0 +1,5 @@
+<ul class="nav nav-pills mb-3 no-print">
+  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'titles.portfolio' %}active{% endif %}" href="{{ url_for('titles.portfolio') }}"><i class="bi bi-cash-coin"></i> Portafoglio titoli</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'titles.cash_sheet' %}active{% endif %}" href="{{ url_for('titles.cash_sheet') }}"><i class="bi bi-journal-check"></i> Foglio cassa</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'titles.statement' %}active{% endif %}" href="{{ url_for('titles.statement') }}"><i class="bi bi-building"></i> Estratto conto compagnie</a></li>
+</ul>

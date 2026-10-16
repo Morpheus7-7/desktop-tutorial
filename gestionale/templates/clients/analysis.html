@@ -6,12 +6,12 @@
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="{{ url_for('clients.list_clients') }}">Clienti</a></li>
     <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.ragione_sociale }}</a></li>
-    <li class="breadcrumb-item active">Analisi rischi del {{ analysis.created_at.strftime('%d/%m/%Y %H:%M') }}</li>
+    <li class="breadcrumb-item active">Analisi rischi del {{ analysis.created_at | dataora_it }}</li>
   </ol>
 </nav>
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-  <h1 class="h3 mb-0"><i class="bi bi-clipboard2-pulse me-2"></i>Report analisi dei rischi</h1>
+  <h1 class="page-title"><i class="bi bi-clipboard2-pulse me-2"></i>Report analisi dei rischi</h1>
   <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
 </div>
 
@@ -109,7 +109,9 @@
               <strong>{{ gap.nome_ramo }}</strong>
               <div class="small text-muted">Per: {{ gap.rischi | join(', ') }}</div>
             </div>
+            {% if puo_modificare %}
             <form method="post" action="{{ url_for('opportunities.from_gap', client_id=client.id) }}" class="no-print">
+              {{ csrf_field() }}
               <input type="hidden" name="ramo" value="{{ gap.ramo }}">
               <input type="hidden" name="titolo" value="Proposta {{ gap.nome_ramo }}">
               <input type="hidden" name="next" value="{{ url_for('clients.view_analysis', client_id=client.id, analysis_id=analysis.id) }}">
@@ -117,6 +119,7 @@
                 <i class="bi bi-funnel"></i> In pipeline
               </button>
             </form>
+            {% endif %}
           </div>
           {% if gap.trattativa %}
           {% set t = gap.trattativa %}

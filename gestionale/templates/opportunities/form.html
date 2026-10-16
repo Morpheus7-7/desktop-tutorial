@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 {% block title %}{% if opp %}Modifica opportunità{% else %}Nuova opportunità{% endif %} — Gestionale Assicurativo{% endblock %}
 {% block content %}
-<h1 class="h3 mb-4">
+<h1 class="page-title mb-3">
   <i class="bi bi-funnel me-2"></i>{% if opp %}Modifica opportunità{% else %}Nuova opportunità{% endif %}
 </h1>
 
 <form method="post" class="card"
       action="{% if opp %}{{ url_for('opportunities.edit_opportunity', opportunity_id=opp.id) }}{% elif client %}{{ url_for('opportunities.new_opportunity', client_id=client.id) }}{% else %}{{ url_for('opportunities.new_opportunity') }}{% endif %}">
+  {{ csrf_field() }}
   <div class="card-body row g-3">
     {% if client %}
     <div class="col-12">

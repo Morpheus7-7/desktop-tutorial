@@ -1,10 +1,21 @@
 """Modelli del database (SQLAlchemy)."""
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
+from flask import current_app
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import check_password_hash, generate_password_hash
 
 db = SQLAlchemy()
+
+
+def now() -> datetime:
+    """Data e ora locali.
+
+    Il gestionale gira sul computer dello studio: gli orari (registro attività,
+    notifiche, note dei sinistri) vanno salvati e mostrati nell'ora locale.
+    """
+    return datetime.now()
 
 # ----------------------------------------------------------------------
 # Vocabolari condivisi (usati da form, motore di analisi e report)
@@ -105,6 +116,89 @@ OPPORTUNITY_STAGES = [
 OPPORTUNITY_STAGE_LABELS = dict(OPPORTUNITY_STAGES)
 OPPORTUNITY_OPEN_STAGES = {"lead", "contatto", "preventivo", "trattativa"}
 
+# Numero di rate annue per ciascun frazionamento del premio.
+RATE_PER_FRAZIONAMENTO = {
+    "annuale": 1,
+    "semestrale": 2,
+    "quadrimestrale": 3,
+    "trimestrale": 4,
+    "mensile": 12,
+}
+
+# Titoli di premio (quietanze) e incassi.
+TITLE_TYPES = [
+    ("perfezionamento", "Perfezionamento"),
+    ("quietanza", "Quietanza di rinnovo"),
+    ("rata", "Rata di frazionamento"),
+    ("appendice", "Appendice / regolazione"),
+]
+TITLE_TYPE_LABELS = dict(TITLE_TYPES)
+TITLE_STATUSES = [
+    ("da_incassare", "Da incassare"),
+    ("incassato", "Incassato"),
+    ("stornato", "Stornato"),
+]
+TITLE_STATUS_LABELS = dict(TITLE_STATUSES)
+PAYMENT_METHODS = [
+    ("bonifico", "Bonifico"),
+    ("pos", "POS / Carta"),
+    ("contanti", "Contanti"),
+    ("assegno", "Assegno"),
+    ("sdd", "Addebito SDD / RID"),
+    ("altro", "Altro"),
+]
+PAYMENT_METHOD_LABELS = dict(PAYMENT_METHODS)
+# Art. 1901 c.c., comma 2: per i premi successivi al primo la copertura resta
+# sospesa dalle ore 24 del quindicesimo giorno dopo la scadenza non pagata.
+GIORNI_TOLLERANZA_PREMIO = 15
+
+# Sinistri.
+CLAIM_TYPES = [
+    ("danni_terzi", "Danni a terzi (RC)"),
+    ("danni_propri", "Danni a beni propri"),
+    ("incendio", "Incendio / esplosione"),
+    ("acqua", "Danni da acqua"),
+    ("eventi_atmosferici", "Eventi atmosferici / catastrofali"),
+    ("furto", "Furto / rapina"),
+    ("rca", "RC Auto / incidente stradale"),
+    ("cristalli", "Cristalli"),
+    ("infortunio", "Infortunio"),
+    ("malattia", "Malattia / ricovero"),
+    ("cyber", "Attacco informatico"),
+    ("tutela_legale", "Vertenza legale"),
+    ("altro", "Altro"),
+]
+CLAIM_TYPE_LABELS = dict(CLAIM_TYPES)
+CLAIM_STATUSES = [
+    ("aperto", "Aperto"),
+    ("istruttoria", "In istruttoria"),
+    ("perizia", "In perizia"),
+    ("liquidato", "Liquidato"),
+    ("respinto", "Respinto"),
+    ("chiuso", "Chiuso senza seguito"),
+]
+CLAIM_STATUS_LABELS = dict(CLAIM_STATUSES)
+CLAIM_OPEN_STATUSES = {"aperto", "istruttoria", "perizia"}
+# Art. 1913 c.c.: la denuncia va fatta entro tre giorni dal sinistro.
+GIORNI_DENUNCIA_SINISTRO = 3
+
+# Documenti di identità (adeguata verifica antiriciclaggio).
+ID_DOCUMENT_TYPES = [
+    ("carta_identita", "Carta d'identità"),
+    ("patente", "Patente di guida"),
+    ("passaporto", "Passaporto"),
+    ("permesso_soggiorno", "Permesso di soggiorno"),
+    ("altro", "Altro"),
+]
+
+# Utenti e ruoli.
+USER_ROLES = [
+    ("admin", "Amministratore"),
+    ("operatore", "Operatore"),
+    ("consultazione", "Sola consultazione"),
+]
+USER_ROLE_LABELS = dict(USER_ROLES)
+
 
 class Client(db.Model):
     __tablename__ = "clients"
@@ -130,8 +224,16 @@ class Client(db.Model):
     fatturato_annuo = db.Column(db.Float)
     descrizione_attivita = db.Column(db.Text)
     note = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Persone fisiche e compliance (GDPR, IVASS Reg. 40/2018, antiriciclaggio).
+    data_nascita = db.Column(db.Date)
+    data_consenso_privacy = db.Column(db.Date)
+    consenso_marketing = db.Column(db.Boolean, default=False, nullable=False)
+    data_adeguatezza = db.Column(db.Date)  # ultimo questionario demands & needs
+    documento_tipo = db.Column(db.String(30))
+    documento_numero = db.Column(db.String(40))
+    documento_scadenza = db.Column(db.Date)
+    created_at = db.Column(db.DateTime, default=now)
+    updated_at = db.Column(db.DateTime, default=now, onupdate=now)
 
     polizze = db.relationship(
         "Policy", backref="cliente", cascade="all, delete-orphan", lazy=True
@@ -156,10 +258,98 @@ class Client(db.Model):
         lazy=True,
         order_by="Opportunity.created_at.desc()",
     )
+    sinistri = db.relationship(
+        "Claim",
+        backref="cliente",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="Claim.data_evento.desc()",
+    )
+    # I titoli appartengono alla polizza (e con essa vengono eliminati): dal
+    # cliente li leggiamo soltanto.
+    titoli = db.relationship(
+        "Title", viewonly=True, lazy=True, order_by="Title.data_effetto.desc()"
+    )
 
     @property
     def tipo_label(self):
         return dict(CLIENT_TYPES).get(self.tipo, self.tipo)
+
+    @property
+    def persona_fisica(self):
+        return self.tipo in ("professionista", "dipendente")
+
+    @property
+    def eta(self):
+        if not self.data_nascita:
+            return None
+        oggi = date.today()
+        return oggi.year - self.data_nascita.year - (
+            (oggi.month, oggi.day) < (self.data_nascita.month, self.data_nascita.day)
+        )
+
+    # --- Compliance -----------------------------------------------------
+    @property
+    def adeguatezza_stato(self):
+        """mancante | da_aggiornare (oltre 12 mesi) | ok."""
+        if not self.data_adeguatezza:
+            return "mancante"
+        if (date.today() - self.data_adeguatezza).days > 365:
+            return "da_aggiornare"
+        return "ok"
+
+    @property
+    def documento_stato(self):
+        """mancante | scaduto | in_scadenza (entro 30 giorni) | ok."""
+        if not self.documento_scadenza:
+            return "mancante"
+        giorni = (self.documento_scadenza - date.today()).days
+        if giorni < 0:
+            return "scaduto"
+        if giorni <= 30:
+            return "in_scadenza"
+        return "ok"
+
+    @property
+    def compliance_problemi(self):
+        """Elenco leggibile delle carenze di compliance del cliente."""
+        problemi = []
+        if not self.data_consenso_privacy:
+            problemi.append("Consenso privacy (GDPR) non registrato")
+        if self.adeguatezza_stato == "mancante":
+            problemi.append("Questionario di adeguatezza mancante")
+        elif self.adeguatezza_stato == "da_aggiornare":
+            problemi.append("Questionario di adeguatezza più vecchio di 12 mesi")
+        if self.persona_fisica and self.documento_stato == "mancante":
+            problemi.append("Documento d'identità non registrato")
+        elif self.documento_stato == "scaduto":
+            problemi.append("Documento d'identità scaduto")
+        return problemi
+
+    # --- Indicatori economici ------------------------------------------
+    @property
+    def premi_attivi(self):
+        return sum(p.premio_annuo or 0.0 for p in self.polizze_attive)
+
+    @property
+    def provvigioni_attive(self):
+        return sum(p.provvigione_annua or 0.0 for p in self.polizze_attive)
+
+    @property
+    def costo_sinistri(self):
+        return sum(s.costo for s in self.sinistri)
+
+    @property
+    def rapporto_sp(self):
+        """Rapporto sinistri/premi (loss ratio) in percentuale, se calcolabile."""
+        premi = self.premi_attivi
+        if not premi:
+            return None
+        return 100.0 * self.costo_sinistri / premi
+
+    @property
+    def titoli_da_incassare(self):
+        return [t for t in self.titoli if t.stato == "da_incassare"]
 
     @property
     def tipo_badge(self):
@@ -196,13 +386,48 @@ class Policy(db.Model):
     tacito_rinnovo = db.Column(db.Boolean, default=False)
     stato = db.Column(db.String(20), nullable=False, default="attiva")
     note = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=now)
 
     documenti = db.relationship("Document", backref="polizza", lazy=True)
+    titoli = db.relationship(
+        "Title",
+        backref="polizza",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="Title.data_effetto.asc()",
+    )
+    sinistri = db.relationship(
+        "Claim", backref="polizza", lazy=True, order_by="Claim.data_evento.desc()"
+    )
 
     @property
     def ramo_label(self):
         return BRANCH_LABELS.get(self.ramo, self.ramo)
+
+    @property
+    def frazionamento_label(self):
+        return dict(PAYMENT_FREQUENCIES).get(self.frazionamento, self.frazionamento or "—")
+
+    @property
+    def rate_annue(self):
+        return RATE_PER_FRAZIONAMENTO.get(self.frazionamento or "annuale", 1)
+
+    @property
+    def attiva(self):
+        return self.stato in ("attiva", "in_rinnovo")
+
+    @property
+    def titoli_arretrati(self):
+        return [t for t in self.titoli if t.arretrato]
+
+    @property
+    def titoli_incassati(self):
+        return [t for t in self.titoli if t.stato == "incassato"]
+
+    @property
+    def copertura_sospesa(self):
+        """True se almeno un titolo non pagato sospende la copertura (art. 1901 c.c.)."""
+        return any(t.copertura_sospesa for t in self.titoli)
 
     @property
     def stato_label(self):
@@ -246,12 +471,13 @@ class Document(db.Model):
         db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
     )
     policy_id = db.Column(db.Integer, db.ForeignKey("policies.id"), index=True)
+    claim_id = db.Column(db.Integer, db.ForeignKey("claims.id"), index=True)
     categoria = db.Column(db.String(40), nullable=False, default="altro")
     filename = db.Column(db.String(300), nullable=False)  # nome su disco (sicuro)
     original_name = db.Column(db.String(300), nullable=False)
     dimensione = db.Column(db.Integer)  # dimensione in byte
     note = db.Column(db.Text)
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    uploaded_at = db.Column(db.DateTime, default=now)
 
     @property
     def categoria_label(self):
@@ -302,7 +528,7 @@ class FollowUp(db.Model):
     stato = db.Column(db.String(20), nullable=False, default="aperto")
     auto_generato = db.Column(db.Boolean, default=False, nullable=False)
     completed_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=now)
 
     @property
     def tipo_label(self):
@@ -330,8 +556,8 @@ class Opportunity(db.Model):
     priorita = db.Column(db.String(10), nullable=False, default="media")
     origine = db.Column(db.String(40))  # es. manuale | analisi_rischi | rinnovo
     note = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=now)
+    updated_at = db.Column(db.DateTime, default=now, onupdate=now)
     chiusa_at = db.Column(db.DateTime)
 
     @property
@@ -362,7 +588,7 @@ class RiskAnalysis(db.Model):
     )
     input_text = db.Column(db.Text, nullable=False)
     results_json = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=now)
 
     @property
     def results(self):
@@ -383,7 +609,7 @@ class Notification(db.Model):
     # marcata come inviata (una sola email per notifica).
     inviata_email = db.Column(db.Boolean, default=False, nullable=False)
     inviata_email_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=now)
 
 
 # Livelli di preavviso per l'ordinamento del digest (dal più urgente).
@@ -411,7 +637,17 @@ class Settings(db.Model):
     mail_from = db.Column(db.String(200))
     mail_to = db.Column(db.String(500))  # destinatari separati da virgola/;
     intervallo_minuti = db.Column(db.Integer, default=30)  # cadenza controllo automatico
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Dati dell'intermediario: intestazione di stampe e report.
+    studio_nome = db.Column(db.String(200))
+    studio_rui = db.Column(db.String(40))  # iscrizione al Registro Unico Intermediari
+    studio_piva = db.Column(db.String(16))
+    studio_indirizzo = db.Column(db.String(250))
+    studio_contatti = db.Column(db.String(250))
+    # Backup automatico giornaliero del database e dei documenti.
+    backup_automatico = db.Column(db.Boolean, default=True, nullable=False)
+    backup_conservati = db.Column(db.Integer, default=14)
+    ultimo_backup_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, default=now, onupdate=now)
 
     @staticmethod
     def get() -> "Settings":
@@ -434,3 +670,277 @@ class Settings(db.Model):
     def configurato(self) -> bool:
         """True se ci sono i dati minimi per inviare (host + almeno un destinatario)."""
         return bool(self.smtp_host and self.destinatari)
+
+
+class Title(db.Model):
+    """Titolo di premio (quietanza): una rata da incassare per una polizza.
+
+    Il ciclo di vita è da_incassare → incassato (oppure stornato). Il premio
+    incassato, al netto della provvigione, va rimesso alla compagnia: la data
+    di rimessa viene registrata dall'estratto conto.
+    """
+
+    __tablename__ = "titles"
+
+    id = db.Column(db.Integer, primary_key=True)
+    policy_id = db.Column(
+        db.Integer, db.ForeignKey("policies.id"), nullable=False, index=True
+    )
+    client_id = db.Column(
+        db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
+    )
+    tipo = db.Column(db.String(20), nullable=False, default="rata")
+    numero_rata = db.Column(db.Integer)
+    rate_totali = db.Column(db.Integer)
+    data_effetto = db.Column(db.Date, nullable=False, index=True)  # scadenza della rata
+    data_fine_copertura = db.Column(db.Date)
+    premio_lordo = db.Column(db.Float, nullable=False, default=0.0)
+    provvigione = db.Column(db.Float)
+    stato = db.Column(db.String(20), nullable=False, default="da_incassare", index=True)
+    data_incasso = db.Column(db.Date, index=True)
+    mezzo_pagamento = db.Column(db.String(20))
+    riferimento_pagamento = db.Column(db.String(120))  # CRO, n. assegno…
+    incassato_da = db.Column(db.String(60))
+    data_rimessa = db.Column(db.Date)
+    note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=now)
+
+    cliente = db.relationship("Client", viewonly=True)
+
+    @property
+    def tipo_label(self):
+        return TITLE_TYPE_LABELS.get(self.tipo, self.tipo)
+
+    @property
+    def stato_label(self):
+        return TITLE_STATUS_LABELS.get(self.stato, self.stato)
+
+    @property
+    def mezzo_label(self):
+        return PAYMENT_METHOD_LABELS.get(self.mezzo_pagamento, self.mezzo_pagamento or "—")
+
+    @property
+    def rata_label(self):
+        if self.numero_rata and self.rate_totali and self.rate_totali > 1:
+            return f"{self.numero_rata}/{self.rate_totali}"
+        return ""
+
+    @property
+    def netto(self):
+        """Premio da rimettere alla compagnia (lordo meno provvigione)."""
+        return (self.premio_lordo or 0.0) - (self.provvigione or 0.0)
+
+    @property
+    def arretrato(self):
+        return self.stato == "da_incassare" and self.data_effetto < date.today()
+
+    @property
+    def giorni_ritardo(self):
+        if not self.arretrato:
+            return 0
+        return (date.today() - self.data_effetto).days
+
+    @property
+    def data_sospensione(self):
+        """Giorno dal quale la copertura è sospesa se la rata resta impagata."""
+        if self.tipo == "perfezionamento":
+            return self.data_effetto
+        return self.data_effetto + timedelta(days=GIORNI_TOLLERANZA_PREMIO)
+
+    @property
+    def copertura_sospesa(self):
+        """Art. 1901 c.c.: primo premio non pagato → copertura non operante;
+        premi successivi → sospesa dopo 15 giorni dalla scadenza."""
+        if self.stato != "da_incassare":
+            return False
+        oggi = date.today()
+        if self.tipo == "perfezionamento":
+            return self.data_effetto <= oggi
+        return oggi > self.data_sospensione
+
+
+class Claim(db.Model):
+    """Sinistro denunciato da un cliente, con importi e stato di lavorazione."""
+
+    __tablename__ = "claims"
+
+    id = db.Column(db.Integer, primary_key=True)
+    numero = db.Column(db.String(30), unique=True, nullable=False)  # es. SIN-2026-0001
+    client_id = db.Column(
+        db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True
+    )
+    policy_id = db.Column(db.Integer, db.ForeignKey("policies.id"), index=True)
+    numero_compagnia = db.Column(db.String(60))
+    tipologia = db.Column(db.String(30), nullable=False, default="altro")
+    data_evento = db.Column(db.Date, nullable=False, index=True)
+    data_denuncia = db.Column(db.Date)
+    luogo = db.Column(db.String(200))
+    descrizione = db.Column(db.Text)
+    controparte = db.Column(db.String(200))
+    perito = db.Column(db.String(200))
+    liquidatore = db.Column(db.String(200))
+    importo_richiesto = db.Column(db.Float)  # stima del danno
+    importo_riservato = db.Column(db.Float)  # riserva della compagnia
+    importo_liquidato = db.Column(db.Float)
+    franchigia = db.Column(db.Float)
+    data_liquidazione = db.Column(db.Date)
+    stato = db.Column(db.String(20), nullable=False, default="aperto", index=True)
+    data_chiusura = db.Column(db.Date)
+    note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=now)
+    updated_at = db.Column(db.DateTime, default=now, onupdate=now)
+
+    eventi = db.relationship(
+        "ClaimNote",
+        backref="sinistro",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="ClaimNote.created_at.desc()",
+    )
+    documenti = db.relationship("Document", backref="sinistro", lazy=True)
+
+    @staticmethod
+    def genera_numero(anno: int | None = None) -> str:
+        """Prossimo numero progressivo dell'anno: SIN-AAAA-NNNN."""
+        anno = anno or date.today().year
+        prefisso = f"SIN-{anno}-"
+        ultimi = (
+            db.session.query(Claim.numero)
+            .filter(Claim.numero.like(prefisso + "%"))
+            .all()
+        )
+        massimo = 0
+        for (numero,) in ultimi:
+            try:
+                massimo = max(massimo, int(numero.rsplit("-", 1)[1]))
+            except (ValueError, IndexError):
+                continue
+        return f"{prefisso}{massimo + 1:04d}"
+
+    @property
+    def stato_label(self):
+        return CLAIM_STATUS_LABELS.get(self.stato, self.stato)
+
+    @property
+    def tipologia_label(self):
+        return CLAIM_TYPE_LABELS.get(self.tipologia, self.tipologia)
+
+    @property
+    def aperto(self):
+        return self.stato in CLAIM_OPEN_STATUSES
+
+    @property
+    def stato_badge(self):
+        return {
+            "aperto": "bg-warning text-dark",
+            "istruttoria": "bg-info text-dark",
+            "perizia": "bg-primary",
+            "liquidato": "bg-success",
+            "respinto": "bg-danger",
+            "chiuso": "bg-secondary",
+        }.get(self.stato, "bg-secondary")
+
+    @property
+    def giorni_apertura(self):
+        inizio = self.data_denuncia or (self.created_at.date() if self.created_at else date.today())
+        fine = self.data_chiusura or date.today()
+        return max(0, (fine - inizio).days)
+
+    @property
+    def giorni_alla_denuncia(self):
+        if not self.data_denuncia:
+            return None
+        return (self.data_denuncia - self.data_evento).days
+
+    @property
+    def denuncia_tardiva(self):
+        giorni = self.giorni_alla_denuncia
+        return giorni is not None and giorni > GIORNI_DENUNCIA_SINISTRO
+
+    @property
+    def costo(self):
+        """Costo del sinistro per il rapporto S/P: liquidato più riserva se aperto."""
+        costo = self.importo_liquidato or 0.0
+        if self.aperto:
+            costo += self.importo_riservato or 0.0
+        return costo
+
+
+class ClaimNote(db.Model):
+    """Voce della cronologia di un sinistro (nota o cambio di stato)."""
+
+    __tablename__ = "claim_notes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    claim_id = db.Column(
+        db.Integer, db.ForeignKey("claims.id"), nullable=False, index=True
+    )
+    tipo = db.Column(db.String(20), nullable=False, default="nota")  # nota | stato
+    testo = db.Column(db.Text, nullable=False)
+    username = db.Column(db.String(60))
+    created_at = db.Column(db.DateTime, default=now)
+
+
+class User(db.Model):
+    """Utente del gestionale."""
+
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(60), unique=True, nullable=False)
+    nome = db.Column(db.String(120))
+    email = db.Column(db.String(120))
+    password_hash = db.Column(db.String(255), nullable=False)
+    ruolo = db.Column(db.String(20), nullable=False, default="operatore")
+    attivo = db.Column(db.Boolean, default=True, nullable=False)
+    tentativi_falliti = db.Column(db.Integer, default=0, nullable=False)
+    bloccato_fino = db.Column(db.DateTime)
+    ultimo_accesso = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=now)
+
+    def set_password(self, password: str) -> None:
+        metodo = current_app.config.get("PASSWORD_HASH_METHOD", "scrypt")
+        try:
+            self.password_hash = generate_password_hash(password, method=metodo)
+        except (ValueError, AttributeError):
+            # Python compilato senza scrypt: ripiega su PBKDF2.
+            self.password_hash = generate_password_hash(password, method="pbkdf2:sha256")
+
+    def check_password(self, password: str) -> bool:
+        return check_password_hash(self.password_hash, password)
+
+    @property
+    def nome_visualizzato(self):
+        return self.nome or self.username
+
+    @property
+    def ruolo_label(self):
+        return USER_ROLE_LABELS.get(self.ruolo, self.ruolo)
+
+    @property
+    def is_admin(self):
+        return self.ruolo == "admin"
+
+    @property
+    def puo_modificare(self):
+        return self.ruolo in ("admin", "operatore")
+
+    @property
+    def bloccato(self):
+        return self.bloccato_fino is not None and self.bloccato_fino > now()
+
+
+class AuditLog(db.Model):
+    """Registro delle attività: chi ha fatto cosa e quando."""
+
+    __tablename__ = "audit_log"
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=now, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
+    username = db.Column(db.String(60))
+    azione = db.Column(db.String(30), nullable=False, index=True)
+    entita = db.Column(db.String(30), index=True)
+    entita_id = db.Column(db.Integer)
+    descrizione = db.Column(db.String(500))
+    ip = db.Column(db.String(45))

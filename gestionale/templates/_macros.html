@@ -1,0 +1,136 @@
+{# Macro riutilizzabili nei template. #}
+
+{% macro paginazione(p) -%}
+{% if p and p.total %}
+<div class="d-flex justify-content-between align-items-center px-3 py-2 border-top flex-wrap gap-2">
+  <span class="small ga-muted">{{ p.first }}–{{ p.last }} di {{ p.total }}</span>
+  {% if p.pages > 1 %}
+  <nav aria-label="Paginazione">
+    <ul class="pagination pagination-sm mb-0">
+      <li class="page-item {% if not p.has_prev %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_pagina(p.prev_num) if p.has_prev else '#' }}" aria-label="Precedente">&laquo;</a>
+      </li>
+      {% for n in p.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+        {% if n %}
+        <li class="page-item {% if n == p.page %}active{% endif %}"><a class="page-link" href="{{ url_pagina(n) }}">{{ n }}</a></li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+      {% endfor %}
+      <li class="page-item {% if not p.has_next %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_pagina(p.next_num) if p.has_next else '#' }}" aria-label="Successiva">&raquo;</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro stato_polizza(p) -%}
+<span class="badge {% if p.stato == 'attiva' %}bg-success{% elif p.stato == 'in_rinnovo' %}bg-info text-dark{% elif p.stato == 'scaduta' %}bg-danger{% else %}bg-secondary{% endif %}">{{ p.stato_label }}</span>
+{%- endmacro %}
+
+{% macro stato_titolo(t) -%}
+{% if t.stato == 'incassato' %}
+  <span class="badge bg-success"><i class="bi bi-check2"></i> Incassato</span>
+{% elif t.stato == 'stornato' %}
+  <span class="badge bg-secondary">Stornato</span>
+{% elif t.copertura_sospesa %}
+  <span class="badge bg-danger" title="Art. 1901 c.c.: copertura sospesa fino al pagamento"><i class="bi bi-shield-x"></i> Copertura sospesa</span>
+{% elif t.arretrato %}
+  <span class="badge bg-warning text-dark" title="Copertura sospesa dal {{ t.data_sospensione | data_it }} se non pagato"><i class="bi bi-hourglass-split"></i> Arretrato {{ t.giorni_ritardo }} gg</span>
+{% else %}
+  <span class="badge bg-info text-dark">Da incassare</span>
+{% endif %}
+{%- endmacro %}
+
+{% macro priorita(valore) -%}
+<span class="badge {% if valore == 'alta' %}bg-danger{% elif valore == 'media' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ valore }}</span>
+{%- endmacro %}
+
+{% macro azioni_titolo(t, next_url) -%}
+{% if puo_modificare %}
+  {% if t.stato == 'da_incassare' %}
+  <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalIncasso"
+          data-action="{{ url_for('titles.collect', title_id=t.id) }}"
+          data-fill-importo="{{ '%.2f' | format(t.premio_lordo or 0) | replace('.', ',') }}"
+          data-fill-descrizione="{{ t.polizza.numero_polizza }} · {{ t.cliente.ragione_sociale }} · rata del {{ t.data_effetto | data_it }}"
+          data-fill-next="{{ next_url }}" title="Registra incasso">
+    <i class="bi bi-cash"></i><span class="d-none d-xl-inline"> Incassa</span>
+  </button>
+  <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalStorno"
+          data-action="{{ url_for('titles.cancel', title_id=t.id) }}"
+          data-fill-descrizione="{{ t.polizza.numero_polizza }} · rata del {{ t.data_effetto | data_it }}"
+          data-fill-next="{{ next_url }}" title="Storna"><i class="bi bi-x-circle"></i></button>
+  {% elif t.stato == 'incassato' and not t.data_rimessa %}
+  <form class="d-inline" method="post" action="{{ url_for('titles.undo_collect', title_id=t.id) }}"
+        data-confirm="Annullare l'incasso di questo titolo?">
+    {{ csrf_field() }}
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <button class="btn btn-sm btn-outline-warning" title="Annulla incasso"><i class="bi bi-arrow-counterclockwise"></i></button>
+  </form>
+  {% endif %}
+{% endif %}
+{%- endmacro %}
+
+{% macro modali_titoli(payment_methods) -%}
+<div class="modal fade" id="modalIncasso" tabindex="-1" data-dynamic aria-labelledby="modalIncassoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" class="modal-content">
+      {{ csrf_field() }}
+      <input type="hidden" name="next" data-field="next">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="modalIncassoLabel"><i class="bi bi-cash-coin me-1"></i> Registra incasso</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-12 small ga-muted" data-field="descrizione"></div>
+        <div class="col-md-6">
+          <label class="form-label">Data incasso</label>
+          <input type="date" class="form-control" name="data_incasso" value="{{ oggi.isoformat() }}" max="{{ oggi.isoformat() }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Importo (€)</label>
+          <input class="form-control" name="importo" data-field="importo" inputmode="decimal">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Mezzo di pagamento</label>
+          <select class="form-select" name="mezzo_pagamento">
+            {% for v, l in payment_methods %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Riferimento</label>
+          <input class="form-control" name="riferimento" placeholder="CRO, n. assegno…">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
+        <button class="btn btn-success"><i class="bi bi-check-lg"></i> Conferma incasso</button>
+      </div>
+    </form>
+  </div>
+</div>
+<div class="modal fade" id="modalStorno" tabindex="-1" data-dynamic aria-labelledby="modalStornoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" class="modal-content">
+      {{ csrf_field() }}
+      <input type="hidden" name="next" data-field="next">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="modalStornoLabel">Storna titolo</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small ga-muted" data-field="descrizione"></p>
+        <label class="form-label">Motivo dello storno</label>
+        <input class="form-control" name="motivo" placeholder="es. polizza disdetta, sostituzione…">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
+        <button class="btn btn-danger">Storna</button>
+      </div>
+    </form>
+  </div>
+</div>
+{%- endmacro %}

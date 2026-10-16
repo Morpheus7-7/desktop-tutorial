@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Sinistro {{ claim.numero }} — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('claims.list_claims') }}">Sinistri</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=claim.client_id) }}">{{ claim.cliente.ragione_sociale }}</a></li>
+  <li class="breadcrumb-item active">{{ claim.numero }}</li>
+</ol></nav>
+
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">Sinistro {{ claim.numero }} <span class="badge {{ claim.stato_badge }} align-middle fs-6">{{ claim.stato_label }}</span></h1>
+    <div class="page-subtitle">
+      {{ claim.tipologia_label }} · evento del {{ claim.data_evento | data_it }}
+      {% if claim.numero_compagnia %} · n. compagnia {{ claim.numero_compagnia }}{% endif %}
+      · {{ 'aperto da' if claim.aperto else 'durata' }} {{ claim.giorni_apertura }} giorni
+    </div>
+  </div>
+  <div class="d-flex gap-2 no-print">
+    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+    {% if puo_modificare %}
+    <a class="btn btn-outline-primary" href="{{ url_for('claims.edit_claim', claim_id=claim.id) }}"><i class="bi bi-pencil"></i> Modifica</a>
+    <form method="post" action="{{ url_for('claims.delete_claim', claim_id=claim.id) }}" data-confirm="Eliminare definitivamente il sinistro {{ claim.numero }}?">
+      {{ csrf_field() }}
+      <button class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if claim.aperto and not claim.data_denuncia %}
+<div class="alert alert-danger"><i class="bi bi-send-exclamation me-1"></i>
+  Il sinistro non risulta ancora denunciato alla compagnia. La denuncia va fatta entro 3 giorni dall'evento (art. 1913 c.c.).</div>
+{% elif claim.denuncia_tardiva %}
+<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-1"></i>
+  Denuncia effettuata {{ claim.giorni_alla_denuncia }} giorni dopo l'evento (oltre il termine di 3 giorni dell'art. 1913 c.c.).</div>
+{% endif %}
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card mb-4">
+      <div class="card-header"><i class="bi bi-info-circle me-1"></i> Dettagli</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4">Cliente</dt><dd class="col-sm-8"><a href="{{ url_for('clients.detail', client_id=claim.client_id) }}">{{ claim.cliente.ragione_sociale }}</a></dd>
+          <dt class="col-sm-4">Polizza</dt><dd class="col-sm-8">{% if claim.polizza %}<a href="{{ url_for('policies.detail', policy_id=claim.policy_id) }}">{{ claim.polizza.numero_polizza }}</a> — {{ claim.polizza.compagnia }} · {{ claim.polizza.ramo_label }}{% else %}<span class="ga-muted">non indicata</span>{% endif %}</dd>
+          <dt class="col-sm-4">Data denuncia</dt><dd class="col-sm-8">{{ claim.data_denuncia | data_it }}</dd>
+          <dt class="col-sm-4">Luogo</dt><dd class="col-sm-8">{{ claim.luogo or '—' }}</dd>
+          <dt class="col-sm-4">Controparte</dt><dd class="col-sm-8">{{ claim.controparte or '—' }}</dd>
+          <dt class="col-sm-4">Perito</dt><dd class="col-sm-8">{{ claim.perito or '—' }}</dd>
+          <dt class="col-sm-4">Liquidatore</dt><dd class="col-sm-8">{{ claim.liquidatore or '—' }}</dd>
+          {% if claim.data_chiusura %}<dt class="col-sm-4">Chiuso il</dt><dd class="col-sm-8">{{ claim.data_chiusura | data_it }}</dd>{% endif %}
+        </dl>
+        {% if claim.descrizione %}
+        <div class="section-title mt-3">Descrizione dell'accaduto</div>
+        <p class="border rounded p-3 bg-light mb-0" style="white-space: pre-line;">{{ claim.descrizione }}</p>
+        {% endif %}
+        {% if claim.note %}<p class="small ga-muted mt-2 mb-0"><i class="bi bi-sticky me-1"></i>{{ claim.note }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="card" id="documenti">
+      <div class="card-header d-flex justify-content-between"><span><i class="bi bi-paperclip me-1"></i> Documenti del sinistro</span><span class="badge bg-secondary">{{ claim.documenti | length }}</span></div>
+      <ul class="list-group list-group-flush">
+        {% for d in claim.documenti %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span><i class="bi {{ d.icona }} me-1"></i>{{ d.original_name }} <span class="badge badge-soft">{{ d.categoria_label }}</span>
+            <span class="small ga-muted">{{ d.dimensione_leggibile if d.dimensione else '' }}</span></span>
+          <span class="text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}"><i class="bi bi-download"></i></a>
+            {% if puo_modificare %}
+            <form class="d-inline" method="post" action="{{ url_for('documents.delete', document_id=d.id) }}" data-confirm="Eliminare il documento {{ d.original_name }}?">
+              {{ csrf_field() }}<input type="hidden" name="da_sinistro" value="1">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+            {% endif %}
+          </span>
+        </li>
+        {% else %}
+        <li class="list-group-item ga-muted">Nessun documento: carica denuncia, foto, perizia, quietanza di liquidazione…</li>
+        {% endfor %}
+      </ul>
+      {% if puo_modificare %}
+      <div class="card-body border-top">
+        <form method="post" action="{{ url_for('documents.upload', client_id=claim.client_id) }}" enctype="multipart/form-data" class="row g-2">
+          {{ csrf_field() }}
+          <input type="hidden" name="claim_id" value="{{ claim.id }}">
+          <input type="hidden" name="policy_id" value="{{ claim.policy_id or '' }}">
+          <input type="hidden" name="categoria" value="sinistro">
+          <div class="col-12">
+            <div class="dropzone py-3" data-input="file-sinistro" data-list="lista-file-sinistro" tabindex="0" role="button">
+              <i class="bi bi-cloud-arrow-up d-block"></i>
+              <div class="small fw-semibold">Trascina qui i file o clicca per selezionarli</div>
+              <input type="file" class="d-none" name="file" id="file-sinistro" multiple required>
+            </div>
+            <div id="lista-file-sinistro" class="mt-1"></div>
+          </div>
+          <div class="col-md-9"><input class="form-control form-control-sm" name="note" placeholder="Note (facoltative)"></div>
+          <div class="col-md-3"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-upload"></i> Carica</button></div>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card mb-4">
+      <div class="card-header"><i class="bi bi-calculator me-1"></i> Importi</div>
+      <div class="card-body">
+        <dl class="row mb-0 tabular">
+          <dt class="col-7 fw-normal ga-muted">Danno stimato / richiesto</dt><dd class="col-5 num">{{ claim.importo_richiesto | euro }}</dd>
+          <dt class="col-7 fw-normal ga-muted">Riserva compagnia</dt><dd class="col-5 num">{{ claim.importo_riservato | euro }}</dd>
+          <dt class="col-7 fw-normal ga-muted">Franchigia / scoperto</dt><dd class="col-5 num">{{ claim.franchigia | euro }}</dd>
+          <dt class="col-7">Liquidato</dt><dd class="col-5 num fw-bold">{{ claim.importo_liquidato | euro }}</dd>
+          {% if claim.data_liquidazione %}<dt class="col-7 fw-normal ga-muted">Data liquidazione</dt><dd class="col-5 num">{{ claim.data_liquidazione | data_it }}</dd>{% endif %}
+        </dl>
+      </div>
+    </div>
+
+    {% if puo_modificare %}
+    <div class="card mb-4 no-print">
+      <div class="card-header"><i class="bi bi-arrow-repeat me-1"></i> Avanza lo stato</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('claims.change_status', claim_id=claim.id) }}" class="row g-2">
+          {{ csrf_field() }}
+          <div class="col-md-6">
+            <select class="form-select" name="stato" id="nuovo-stato">
+              {% for v, l in claim_statuses %}<option value="{{ v }}" {% if claim.stato == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <input class="form-control" name="importo_liquidato" placeholder="Importo liquidato (se liquidato)" inputmode="decimal">
+          </div>
+          <div class="col-12"><input class="form-control" name="commento" placeholder="Commento (es. esito perizia, motivo del rifiuto)"></div>
+          <div class="col-12"><button class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> Aggiorna stato</button></div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card" id="cronologia">
+      <div class="card-header"><i class="bi bi-clock-history me-1"></i> Cronologia</div>
+      <div class="card-body">
+        {% if puo_modificare %}
+        <form method="post" action="{{ url_for('claims.add_note', claim_id=claim.id) }}" class="mb-3 no-print">
+          {{ csrf_field() }}
+          <div class="input-group">
+            <input class="form-control" name="testo" placeholder="Aggiungi una nota (telefonata, sollecito, documenti ricevuti…)" required>
+            <button class="btn btn-outline-primary"><i class="bi bi-plus-lg"></i></button>
+          </div>
+        </form>
+        {% endif %}
+        <ul class="timeline">
+          {% for e in claim.eventi %}
+          <li class="ev-{{ e.tipo }}">
+            <div class="small ga-muted">{{ e.created_at | dataora_it }}{% if e.username %} · {{ e.username }}{% endif %}</div>
+            <div>{{ e.testo }}</div>
+          </li>
+          {% else %}
+          <li><span class="ga-muted">Nessuna voce.</span></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Foglio cassa — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title"><i class="bi bi-journal-check me-2"></i>Foglio cassa</h1>
+    <div class="page-subtitle">Incassi dal {{ dal | data_it }} al {{ al | data_it }}{% if compagnia %} · {{ compagnia }}{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2 no-print">
+    <a class="btn btn-outline-secondary" href="{{ url_for('titles.cash_sheet_csv', dal=dal.isoformat(), al=al.isoformat(), compagnia=compagnia) }}"><i class="bi bi-filetype-csv"></i> Esporta</a>
+    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+  </div>
+</div>
+{% include "titles/_nav.html" %}
+
+<form class="filter-bar row g-2 align-items-end" method="get">
+  <div class="col-6 col-md-3"><label class="form-label small">Dal</label><input type="date" class="form-control form-control-sm" name="dal" value="{{ dal.isoformat() }}"></div>
+  <div class="col-6 col-md-3"><label class="form-label small">Al</label><input type="date" class="form-control form-control-sm" name="al" value="{{ al.isoformat() }}"></div>
+  <div class="col-md-4"><label class="form-label small">Compagnia</label>
+    <select class="form-select form-select-sm" name="compagnia"><option value="">Tutte</option>
+      {% for c in compagnie %}<option {% if compagnia == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-funnel"></i> Aggiorna</button></div>
+</form>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4"><div class="card stat-card accent-success h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-cash-stack"></i></span>
+    <div class="stat-label">Totale incassato ({{ incassi | length }} titoli)</div><div class="stat-value small-value">{{ totale | euro }}</div>
+  </div></div></div>
+  <div class="col-md-4"><div class="card stat-card h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-wallet2"></i></span>
+    <div class="stat-label">Provvigioni maturate</div><div class="stat-value small-value">{{ provvigioni | euro }}</div>
+  </div></div></div>
+  <div class="col-md-4"><div class="card stat-card accent-warning h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-building"></i></span>
+    <div class="stat-label">Netto da rimettere alle compagnie</div><div class="stat-value small-value">{{ (totale - provvigioni) | euro }}</div>
+  </div></div></div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">Movimenti</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>Data</th><th>Cliente</th><th>Polizza</th><th>Mezzo</th><th class="num">Premio</th><th class="num">Provv.</th><th class="num">Netto</th></tr></thead>
+          <tbody>
+          {% for giorno, titoli in per_giorno.items() %}
+            {% for t in titoli %}
+            <tr>
+              <td class="text-nowrap small">{{ t.data_incasso | data_it }}</td>
+              <td class="small">{{ t.cliente.ragione_sociale }}</td>
+              <td class="small">{{ t.polizza.numero_polizza }}<div class="ga-muted">{{ t.polizza.compagnia }}</div></td>
+              <td class="small">{{ t.mezzo_label }}{% if t.riferimento_pagamento %}<div class="ga-muted">{{ t.riferimento_pagamento }}</div>{% endif %}</td>
+              <td class="num">{{ t.premio_lordo | euro }}</td>
+              <td class="num small">{{ t.provvigione | euro }}</td>
+              <td class="num small">{{ t.netto | euro }}</td>
+            </tr>
+            {% endfor %}
+            {% if per_giorno | length > 1 %}
+            <tr class="table-light"><td colspan="4" class="small text-end">Totale {{ giorno | data_it }}</td><td class="num small fw-semibold">{{ titoli | sum(attribute='premio_lordo') | euro }}</td><td colspan="2"></td></tr>
+            {% endif %}
+          {% else %}
+            <tr><td colspan="7" class="text-muted p-4">Nessun incasso nel periodo selezionato.</td></tr>
+          {% endfor %}
+          </tbody>
+          {% if incassi %}
+          <tfoot><tr class="table-totals"><td colspan="4">Totale periodo</td><td class="num">{{ totale | euro }}</td><td class="num">{{ provvigioni | euro }}</td><td class="num">{{ (totale - provvigioni) | euro }}</td></tr></tfoot>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">Riepilogo per mezzo di pagamento</div>
+      <ul class="list-group list-group-flush">
+        {% for v in per_mezzo %}
+        <li class="list-group-item d-flex justify-content-between"><span>{{ v.label }} <span class="ga-muted small">· {{ v.numero }}</span></span><span class="tabular fw-semibold">{{ v.importo | euro }}</span></li>
+        {% else %}
+        <li class="list-group-item ga-muted">—</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

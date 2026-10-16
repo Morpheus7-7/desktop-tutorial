@@ -572,7 +572,7 @@ def analyze_risks(
             uncovered.append(entry)
 
     return {
-        "generata_il": datetime.utcnow().isoformat(timespec="seconds"),
+        "generata_il": datetime.now().isoformat(timespec="seconds"),
         "rischi": detected,
         "coperture_presenti": covered,
         "coperture_scoperte": uncovered,

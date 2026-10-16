@@ -3,12 +3,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <div>
-    <h1 class="h3 mb-0"><i class="bi bi-funnel me-2"></i>Pipeline commerciale</h1>
-    <div class="small text-muted">{{ aperte }} opportunità aperte</div>
+    <h1 class="page-title"><i class="bi bi-funnel me-2"></i>Pipeline commerciale</h1>
+    <div class="page-subtitle">{{ aperte }} opportunità aperte</div>
   </div>
+  {% if puo_modificare %}
   <a class="btn btn-primary" href="{{ url_for('opportunities.new_opportunity') }}">
     <i class="bi bi-plus-lg"></i> Nuova opportunità
   </a>
+  {% endif %}
 </div>
 
 <div class="d-flex gap-3 overflow-auto pb-3">
@@ -20,7 +22,7 @@
         <span class="fw-semibold">{{ col.label }}</span>
         <span class="badge bg-secondary">{{ col.opps | length }}</span>
       </div>
-      <div class="card-body p-2" style="background:#f8f9fc;">
+      <div class="card-body p-2" style="background:#f6f8fc;">
         {% if col.valore %}<div class="small text-muted mb-2 px-1">Valore: {{ col.valore | euro }}</div>{% endif %}
         {% for o in col.opps %}
         <div class="card mb-2">
@@ -36,8 +38,10 @@
             {% if o.premio_stimato %}<div class="small">Premio: <strong>{{ o.premio_stimato | euro }}</strong>{% if o.provvigione_stimata %} · prov. {{ o.provvigione_stimata | euro }}{% endif %}</div>{% endif %}
             {% if o.origine == 'analisi_rischi' %}<span class="badge bg-light text-dark border mt-1"><i class="bi bi-magic"></i> da analisi</span>{% endif %}
 
+            {% if puo_modificare %}
             <div class="d-flex gap-1 mt-2">
               <form method="post" action="{{ url_for('opportunities.change_stage', opportunity_id=o.id) }}" class="flex-fill">
+                {{ csrf_field() }}
                 <input type="hidden" name="next" value="{{ url_for('opportunities.board') }}">
                 <select class="form-select form-select-sm" name="fase" onchange="this.form.submit()" title="Sposta di fase">
                   {% for f, lab in stages %}<option value="{{ f }}" {% if o.fase == f %}selected{% endif %}>{{ lab }}</option>{% endfor %}
@@ -45,11 +49,13 @@
               </form>
               <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('opportunities.edit_opportunity', opportunity_id=o.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>
               <form method="post" action="{{ url_for('opportunities.delete_opportunity', opportunity_id=o.id) }}"
-                    onsubmit="return confirm('Eliminare l\'opportunità?');">
+                    data-confirm="Eliminare l'opportunità?">
+                {{ csrf_field() }}
                 <input type="hidden" name="next" value="{{ url_for('opportunities.board') }}">
                 <button class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i></button>
               </form>
             </div>
+            {% endif %}
           </div>
         </div>
         {% else %}

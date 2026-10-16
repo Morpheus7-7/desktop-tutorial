@@ -4,37 +4,12 @@ L'invio SMTP reale è sostituito da un monkeypatch: non viene contattato alcun
 server, ma verifichiamo che il messaggio venga costruito e che le notifiche
 siano marcate come inviate.
 """
-import os
-import tempfile
 from datetime import datetime
 
 import pytest
 
-from gestionale import create_app
 from gestionale import mailer
 from gestionale.models import Notification, Settings, db
-
-
-@pytest.fixture
-def app():
-    db_fd, db_path = tempfile.mkstemp(suffix=".db")
-    upload_dir = tempfile.mkdtemp()
-    app = create_app(
-        {
-            "TESTING": True,
-            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}",
-            "UPLOAD_FOLDER": upload_dir,
-            "SECRET_KEY": "test",
-        }
-    )
-    yield app
-    os.close(db_fd)
-    os.unlink(db_path)
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
 
 
 @pytest.fixture(autouse=True)

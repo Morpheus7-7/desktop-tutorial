@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Polizza {{ policy.numero_polizza }} — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('policies.list_policies') }}">Polizze</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=policy.client_id) }}">{{ policy.cliente.ragione_sociale }}</a></li>
+  <li class="breadcrumb-item active">{{ policy.numero_polizza }}</li>
+</ol></nav>
+
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">Polizza {{ policy.numero_polizza }} {{ m.stato_polizza(policy) }}</h1>
+    <div class="page-subtitle">{{ policy.compagnia }} · {{ policy.ramo_label }} ·
+      <a href="{{ url_for('clients.detail', client_id=policy.client_id) }}">{{ policy.cliente.ragione_sociale }}</a></div>
+  </div>
+  {% if puo_modificare %}
+  <div class="d-flex gap-2 flex-wrap no-print">
+    {% if policy.data_scadenza %}
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalRinnovo"><i class="bi bi-arrow-repeat"></i> Rinnova</button>
+    {% endif %}
+    <a class="btn btn-outline-primary" href="{{ url_for('policies.edit_policy', policy_id=policy.id) }}"><i class="bi bi-pencil"></i> Modifica</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('claims.new_claim', policy_id=policy.id) }}"><i class="bi bi-exclamation-octagon"></i> Apri sinistro</a>
+    <form method="post" action="{{ url_for('policies.delete_policy', policy_id=policy.id) }}" data-confirm="Eliminare la polizza {{ policy.numero_polizza }} e i suoi titoli non incassati?">
+      {{ csrf_field() }}
+      <button class="btn btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i></button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+{% if policy.copertura_sospesa and policy.attiva %}
+<div class="alert alert-danger"><i class="bi bi-shield-x me-1"></i>
+  <strong>Copertura sospesa per mancato pagamento</strong> (art. 1901 c.c.): incassare i titoli arretrati per riattivarla.</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3"><div class="card stat-card h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-cash-coin"></i></span>
+    <div class="stat-label">Premio annuo</div><div class="stat-value small-value">{{ policy.premio_annuo | euro }}</div>
+    <div class="small ga-muted">{{ policy.frazionamento_label }}{% if policy.provvigione_annua %} · provv. {{ policy.provvigione_annua | euro }}{% endif %}</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat-card accent-info h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-calendar-event"></i></span>
+    <div class="stat-label">Scadenza</div><div class="stat-value small-value">{{ policy.data_scadenza | data_it }}</div>
+    <div class="small ga-muted">{% if policy.giorni_alla_scadenza is not none %}{% if policy.giorni_alla_scadenza < 0 %}scaduta da {{ -policy.giorni_alla_scadenza }} gg{% else %}tra {{ policy.giorni_alla_scadenza }} gg{% endif %}{% endif %}{% if policy.tacito_rinnovo %} · tacito rinnovo{% endif %}</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat-card accent-success h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-check2-circle"></i></span>
+    <div class="stat-label">Incassato (totale)</div><div class="stat-value small-value">{{ situazione.incassato | euro }}</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat-card {% if situazione.arretrato %}accent-danger stat-alert{% else %}accent-warning{% endif %} h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-hourglass-split"></i></span>
+    <div class="stat-label">Da incassare</div><div class="stat-value small-value">{{ situazione.da_incassare | euro }}</div>
+    {% if situazione.arretrato %}<div class="small text-danger">di cui arretrato {{ situazione.arretrato | euro }}</div>{% endif %}
+  </div></div></div>
+</div>
+
+<ul class="nav nav-tabs" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-titoli">Titoli <span class="badge bg-secondary">{{ policy.titoli | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-dati">Dati contratto</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sinistri">Sinistri <span class="badge bg-secondary">{{ policy.sinistri | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-documenti">Documenti <span class="badge bg-secondary">{{ policy.documenti | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-storico">Storico</button></li>
+</ul>
+<div class="tab-content bg-white border border-top-0 rounded-bottom p-3 p-md-4">
+  <div class="tab-pane fade show active" id="tab-titoli">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <div class="small ga-muted">Annualità in corso: {{ annualita[0] | data_it }} – {{ annualita[1] | data_it }}</div>
+      {% if puo_modificare %}
+      <div class="d-flex gap-2">
+        {% if not titoli_correnti and policy.premio_annuo %}
+        <form method="post" action="{{ url_for('policies.generate_titles', policy_id=policy.id) }}">
+          {{ csrf_field() }}
+          <button class="btn btn-sm btn-primary"><i class="bi bi-magic"></i> Genera titoli dell'annualità ({{ policy.rate_annue }} {{ 'rata' if policy.rate_annue == 1 else 'rate' }})</button>
+        </form>
+        {% endif %}
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#nuovoTitolo"><i class="bi bi-plus-lg"></i> Titolo manuale</button>
+      </div>
+      {% endif %}
+    </div>
+    {% if puo_modificare %}
+    <div class="collapse mb-3" id="nuovoTitolo">
+      <form method="post" action="{{ url_for('titles.new_title', policy_id=policy.id) }}" class="row g-2 border rounded p-3 bg-light">
+        {{ csrf_field() }}
+        <div class="col-md-3"><label class="form-label small">Tipo</label>
+          <select class="form-select form-select-sm" name="tipo">{% for v, l in title_types %}<option value="{{ v }}" {% if v == 'appendice' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+        <div class="col-md-2"><label class="form-label small">Effetto *</label><input type="date" class="form-control form-control-sm" name="data_effetto" required></div>
+        <div class="col-md-2"><label class="form-label small">Copertura fino al</label><input type="date" class="form-control form-control-sm" name="data_fine_copertura"></div>
+        <div class="col-md-2"><label class="form-label small">Premio lordo € *</label><input class="form-control form-control-sm" name="premio_lordo" required inputmode="decimal"></div>
+        <div class="col-md-3"><label class="form-label small">Provvigione € <span class="ga-muted">(vuoto = {{ policy.provvigione_perc or 0 }}%)</span></label><input class="form-control form-control-sm" name="provvigione" inputmode="decimal"></div>
+        <div class="col-md-10"><input class="form-control form-control-sm" name="note" placeholder="Note (es. regolazione premio consuntivo 2025)"></div>
+        <div class="col-md-2"><button class="btn btn-sm btn-primary w-100">Aggiungi</button></div>
+      </form>
+    </div>
+    {% endif %}
+    {% if policy.titoli %}
+    <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Effetto</th><th>Copertura fino al</th><th>Tipo</th><th class="num">Premio</th><th class="num">Provv.</th><th>Stato</th><th>Incasso</th><th></th></tr></thead>
+      <tbody>
+      {% set qui = url_for('policies.detail', policy_id=policy.id) ~ '#titoli' %}
+      {% for t in policy.titoli | reverse %}
+        <tr class="{% if t.copertura_sospesa %}urgenza-scaduta{% elif t.arretrato %}urgenza-critica{% endif %}">
+          <td class="text-nowrap">{{ t.data_effetto | data_it }}</td>
+          <td class="text-nowrap small">{{ t.data_fine_copertura | data_it }}</td>
+          <td class="small">{{ t.tipo_label }}{% if t.rata_label %} <span class="badge badge-soft">{{ t.rata_label }}</span>{% endif %}{% if t.note %}<div class="ga-muted">{{ t.note }}</div>{% endif %}</td>
+          <td class="num">{{ t.premio_lordo | euro }}</td>
+          <td class="num small text-success">{{ t.provvigione | euro }}</td>
+          <td>{{ m.stato_titolo(t) }}{% if t.data_rimessa %}<div class="small ga-muted">rimesso il {{ t.data_rimessa | data_it }}</div>{% endif %}</td>
+          <td class="small">{% if t.data_incasso %}{{ t.data_incasso | data_it }} · {{ t.mezzo_label }}{% if t.incassato_da %}<div class="ga-muted">da {{ t.incassato_da }}</div>{% endif %}{% else %}—{% endif %}</td>
+          <td class="text-end text-nowrap">
+            {{ m.azioni_titolo(t, qui) }}
+            {% if puo_modificare and t.stato != 'incassato' %}
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('titles.edit', title_id=t.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>
+            <form class="d-inline" method="post" action="{{ url_for('titles.delete', title_id=t.id) }}" data-confirm="Eliminare il titolo del {{ t.data_effetto | data_it }}?">
+              {{ csrf_field() }}<button class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i></button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p class="ga-muted mb-0">Nessun titolo registrato.{% if policy.premio_annuo %} Usa «Genera titoli» per creare le rate dell'annualità in base al frazionamento.{% else %} Indica il premio annuo per poter generare i titoli.{% endif %}</p>
+    {% endif %}
+  </div>
+
+  <div class="tab-pane fade" id="tab-dati">
+    <div class="row g-4">
+      <div class="col-md-6">
+        <dl class="row mb-0">
+          <dt class="col-sm-5">Compagnia</dt><dd class="col-sm-7">{{ policy.compagnia }}</dd>
+          <dt class="col-sm-5">Numero</dt><dd class="col-sm-7">{{ policy.numero_polizza }}</dd>
+          <dt class="col-sm-5">Ramo</dt><dd class="col-sm-7">{{ policy.ramo_label }}</dd>
+          <dt class="col-sm-5">Massimale</dt><dd class="col-sm-7">{{ policy.massimale | euro }}</dd>
+          <dt class="col-sm-5">Stato</dt><dd class="col-sm-7">{{ policy.stato_label }}</dd>
+        </dl>
+      </div>
+      <div class="col-md-6">
+        <dl class="row mb-0">
+          <dt class="col-sm-5">Decorrenza</dt><dd class="col-sm-7">{{ policy.data_decorrenza | data_it }}</dd>
+          <dt class="col-sm-5">Scadenza</dt><dd class="col-sm-7">{{ policy.data_scadenza | data_it }}</dd>
+          <dt class="col-sm-5">Frazionamento</dt><dd class="col-sm-7">{{ policy.frazionamento_label }}</dd>
+          <dt class="col-sm-5">Provvigione</dt><dd class="col-sm-7">{{ (policy.provvigione_perc | perc) if policy.provvigione_perc is not none else '—' }}{% if policy.provvigione_annua %} · {{ policy.provvigione_annua | euro }}/anno{% endif %}</dd>
+          <dt class="col-sm-5">Tacito rinnovo</dt><dd class="col-sm-7">{{ 'Sì' if policy.tacito_rinnovo else 'No' }}</dd>
+        </dl>
+      </div>
+      {% if policy.note %}<div class="col-12"><div class="section-title">Note</div><p class="mb-0">{{ policy.note }}</p></div>{% endif %}
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="tab-sinistri">
+    {% if policy.sinistri %}
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Numero</th><th>Evento</th><th>Tipologia</th><th class="num">Riserva</th><th class="num">Liquidato</th><th>Stato</th></tr></thead>
+      <tbody>
+      {% for s in policy.sinistri %}
+        <tr>
+          <td><a class="fw-semibold" href="{{ url_for('claims.detail', claim_id=s.id) }}">{{ s.numero }}</a></td>
+          <td>{{ s.data_evento | data_it }}</td><td class="small">{{ s.tipologia_label }}</td>
+          <td class="num">{{ s.importo_riservato | euro }}</td><td class="num">{{ s.importo_liquidato | euro }}</td>
+          <td><span class="badge {{ s.stato_badge }}">{{ s.stato_label }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="ga-muted mb-0">Nessun sinistro su questa polizza.</p>{% endif %}
+  </div>
+
+  <div class="tab-pane fade" id="tab-documenti">
+    {% if policy.documenti %}
+    <ul class="list-group mb-3">
+      {% for d in policy.documenti %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <span><i class="bi {{ d.icona }} me-1"></i>{{ d.original_name }} <span class="badge badge-soft">{{ d.categoria_label }}</span></span>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}"><i class="bi bi-download"></i></a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="ga-muted">Nessun documento collegato.</p>{% endif %}
+    {% if puo_modificare %}
+    <form method="post" action="{{ url_for('documents.upload', client_id=policy.client_id) }}" enctype="multipart/form-data" class="row g-2">
+      {{ csrf_field() }}
+      <input type="hidden" name="policy_id" value="{{ policy.id }}">
+      <input type="hidden" name="next" value="{{ url_for('policies.detail', policy_id=policy.id) }}#documenti">
+      <div class="col-md-5"><input type="file" class="form-control form-control-sm" name="file" multiple required></div>
+      <div class="col-md-4"><select class="form-select form-select-sm" name="categoria">{% for v, l in document_categories %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+      <div class="col-md-3"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-upload"></i> Carica</button></div>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="tab-pane fade" id="tab-storico">
+    <ul class="timeline">
+      {% for v in storico %}
+      <li class="{% if v.azione == 'rinnovo' %}ev-stato{% endif %}">
+        <div class="small ga-muted">{{ v.created_at | dataora_it }}{% if v.username %} · {{ v.username }}{% endif %}</div>
+        <div>{{ v.descrizione }}</div>
+      </li>
+      {% else %}
+      <li><span class="ga-muted">Nessuna modifica registrata.</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+{% if puo_modificare and policy.data_scadenza %}
+<div class="modal fade" id="modalRinnovo" tabindex="-1" aria-labelledby="modalRinnovoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" action="{{ url_for('policies.renew', policy_id=policy.id) }}" class="modal-content">
+      {{ csrf_field() }}
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="modalRinnovoLabel"><i class="bi bi-arrow-repeat me-1"></i> Rinnova polizza {{ policy.numero_polizza }}</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-12 small ga-muted">Scadenza attuale: <strong>{{ policy.data_scadenza | data_it }}</strong></div>
+        <div class="col-md-6">
+          <label class="form-label">Nuova scadenza</label>
+          <input type="date" class="form-control" name="nuova_scadenza" value="{{ proposta_scadenza.isoformat() }}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Premio annuo (€)</label>
+          <input class="form-control" name="nuovo_premio" inputmode="decimal" value="{{ ('%.2f' | format(policy.premio_annuo)) | replace('.', ',') if policy.premio_annuo is not none else '' }}">
+        </div>
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="genera_titoli" id="rinnovo-titoli" checked>
+            <label class="form-check-label" for="rinnovo-titoli">Genera i titoli della nuova annualità ({{ policy.frazionamento_label | lower }})</label>
+          </div>
+          <div class="form-text">I follow-up di rinnovo ancora aperti verranno chiusi automaticamente.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
+        <button class="btn btn-success"><i class="bi bi-check-lg"></i> Conferma rinnovo</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{{ m.modali_titoli(payment_methods) }}
+{% endblock %}

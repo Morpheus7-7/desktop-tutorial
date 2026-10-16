@@ -1,8 +1,9 @@
-"""Scheduler in background per l'invio automatico delle notifiche email.
+"""Scheduler in background: notifiche email e backup automatico.
 
 Un singolo thread demone controlla periodicamente le scadenze: genera le
 notifiche mancanti e, se le email sono attive, invia il digest delle notifiche
-non ancora spedite. La cadenza è configurabile dalla pagina «Impostazioni»
+non ancora spedite. Esegue inoltre il backup automatico giornaliero di
+database e documenti. La cadenza è configurabile dalla pagina «Impostazioni»
 (``Settings.intervallo_minuti``).
 
 Lo scheduler NON parte in fase di test: viene avviato esplicitamente dagli
@@ -21,7 +22,8 @@ _MIN_INTERVALLO_S = 60  # limite di sicurezza: non più spesso di una volta al m
 
 
 def _tick(app: Flask) -> None:
-    """Un ciclo di controllo: genera notifiche e invia il digest se attivo."""
+    """Un ciclo di controllo: notifiche, digest email e backup giornaliero."""
+    from .backup import backup_automatico
     from .mailer import send_pending_notifications
     from .notifications import auto_create_renewal_followups, generate_notifications
     from .models import Settings
@@ -36,6 +38,12 @@ def _tick(app: Flask) -> None:
                 app.logger.info("Scheduler: inviate %d notifiche via email.", inviate)
         except Exception:  # noqa: BLE001 — non far morire il thread per un errore transitorio
             app.logger.exception("Scheduler: errore durante il controllo periodico.")
+        try:
+            percorso = backup_automatico()
+            if percorso:
+                app.logger.info("Scheduler: backup automatico salvato in %s.", percorso)
+        except Exception:  # noqa: BLE001
+            app.logger.exception("Scheduler: backup automatico non riuscito.")
 
 
 def _intervallo_secondi(app: Flask) -> int:

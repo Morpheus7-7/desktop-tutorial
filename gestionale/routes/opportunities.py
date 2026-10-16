@@ -1,7 +1,5 @@
 """Pipeline commerciale: opportunità di vendita (stile CRM assicurativo)."""
-from datetime import datetime
-
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 from ..models import (
     OPPORTUNITY_OPEN_STAGES,
@@ -10,25 +8,21 @@ from ..models import (
     Client,
     Opportunity,
     db,
+    now,
 )
+from ..security import audit, safe_next
+from ..utils import parse_float, parse_int
 
 bp = Blueprint("opportunities", __name__, url_prefix="/opportunita")
 
 _CHIUSE = {"vinta", "persa"}
 
 
-def _float_or_none(value):
-    try:
-        return float(value.replace(",", ".")) if value not in (None, "") else None
-    except (ValueError, AttributeError):
-        return None
-
-
 def _apply_form(opp: Opportunity, form) -> None:
     opp.titolo = form.get("titolo", "").strip()
     opp.ramo = form.get("ramo") or None
-    opp.premio_stimato = _float_or_none(form.get("premio_stimato"))
-    opp.provvigione_perc = _float_or_none(form.get("provvigione_perc"))
+    opp.premio_stimato = parse_float(form.get("premio_stimato"))
+    opp.provvigione_perc = parse_float(form.get("provvigione_perc"))
     opp.priorita = form.get("priorita", "media")
     opp.note = form.get("note", "").strip() or None
     nuova_fase = form.get("fase")
@@ -41,7 +35,7 @@ def _set_fase(opp: Opportunity, fase: str) -> None:
     if fase not in valide:
         return
     opp.fase = fase
-    opp.chiusa_at = datetime.utcnow() if fase in _CHIUSE else None
+    opp.chiusa_at = now() if fase in _CHIUSE else None
 
 
 @bp.route("/")
@@ -74,8 +68,10 @@ def board():
 @bp.route("/nuova/<int:client_id>", methods=["GET", "POST"])
 def new_opportunity(client_id=None):
     if request.method == "POST":
-        cid = client_id or request.form.get("client_id")
-        client = db.get_or_404(Client, int(cid))
+        cid = client_id or parse_int(request.form.get("client_id"))
+        if not cid:
+            abort(400, description="Seleziona il cliente dell'opportunità.")
+        client = db.get_or_404(Client, cid)
         opp = Opportunity(client_id=client.id, origine=request.form.get("origine", "manuale"))
         _apply_form(opp, request.form)
         if not opp.titolo:
@@ -84,6 +80,8 @@ def new_opportunity(client_id=None):
             if not opp.fase:
                 opp.fase = "lead"
             db.session.add(opp)
+            db.session.flush()
+            audit("crea", "opportunita", opp.id, f"Nuova opportunità «{opp.titolo}» per «{client.ragione_sociale}»")
             db.session.commit()
             flash(f"Opportunità «{opp.titolo}» creata.", "success")
             if client_id:
@@ -116,7 +114,7 @@ def from_gap(client_id):
     db.session.add(opp)
     db.session.commit()
     flash(f"Opportunità «{titolo}» aggiunta alla pipeline.", "success")
-    dest = request.form.get("next")
+    dest = safe_next(request.form.get("next"))
     return redirect(dest or (url_for("clients.detail", client_id=client.id) + "#opportunita"))
 
 
@@ -125,7 +123,7 @@ def change_stage(opportunity_id):
     opp = db.get_or_404(Opportunity, opportunity_id)
     _set_fase(opp, request.form.get("fase", ""))
     db.session.commit()
-    return redirect(request.form.get("next") or url_for("opportunities.board"))
+    return redirect(safe_next(request.form.get("next")) or url_for("opportunities.board"))
 
 
 @bp.route("/<int:opportunity_id>/modifica", methods=["GET", "POST"])
@@ -149,9 +147,9 @@ def edit_opportunity(opportunity_id):
 @bp.route("/<int:opportunity_id>/elimina", methods=["POST"])
 def delete_opportunity(opportunity_id):
     opp = db.get_or_404(Opportunity, opportunity_id)
-    client_id = opp.client_id
+    audit("elimina", "opportunita", opp.id, f"Eliminata opportunità «{opp.titolo}»")
     db.session.delete(opp)
     db.session.commit()
     flash("Opportunità eliminata.", "success")
-    dest = request.form.get("next")
+    dest = safe_next(request.form.get("next"))
     return redirect(dest or url_for("opportunities.board"))

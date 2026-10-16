@@ -1,16 +1,33 @@
 """Gestionale Assicurativo — applicazione Flask.
 
 Gestionale per intermediari assicurativi: anagrafiche clienti
-(professionisti e aziende), polizze, documenti, analisi automatica dei
-rischi, follow-up, scadenzario e notifiche.
+(professionisti, aziende e dipendenti), polizze, titoli e incassi, sinistri,
+documenti, analisi automatica dei rischi, pipeline commerciale, follow-up,
+scadenzario e notifiche. Accesso con utenti e ruoli, registro attività e
+backup.
 """
 import os
-from datetime import date
+import secrets
+import time
+from datetime import date, timedelta
 
-from flask import Flask
-from sqlalchemy import inspect, text
+from flask import Flask, g, render_template, request, url_for
+from sqlalchemy import event, inspect, text
+from sqlalchemy.engine import Engine
 
 from .models import db
+from .utils import formatta_euro
+
+__version__ = "2.0.0"
+
+
+@event.listens_for(Engine, "connect")
+def _sqlite_pragmas(dbapi_connection, connection_record):  # pragma: no cover - dipende dal driver
+    """Attesa sui lock: lo scheduler e le richieste web condividono il file SQLite."""
+    if dbapi_connection.__class__.__module__.startswith("sqlite3"):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA busy_timeout = 10000")
+        cursor.close()
 
 
 def _ensure_schema() -> None:
@@ -32,16 +49,34 @@ def _ensure_schema() -> None:
         },
         "clients": {
             "datore_lavoro": "ALTER TABLE clients ADD COLUMN datore_lavoro VARCHAR(200)",
+            "data_nascita": "ALTER TABLE clients ADD COLUMN data_nascita DATE",
+            "data_consenso_privacy": "ALTER TABLE clients ADD COLUMN data_consenso_privacy DATE",
+            "consenso_marketing": "ALTER TABLE clients ADD COLUMN consenso_marketing BOOLEAN NOT NULL DEFAULT 0",
+            "data_adeguatezza": "ALTER TABLE clients ADD COLUMN data_adeguatezza DATE",
+            "documento_tipo": "ALTER TABLE clients ADD COLUMN documento_tipo VARCHAR(30)",
+            "documento_numero": "ALTER TABLE clients ADD COLUMN documento_numero VARCHAR(40)",
+            "documento_scadenza": "ALTER TABLE clients ADD COLUMN documento_scadenza DATE",
         },
         "policies": {
             "provvigione_perc": "ALTER TABLE policies ADD COLUMN provvigione_perc FLOAT",
         },
         "documents": {
             "dimensione": "ALTER TABLE documents ADD COLUMN dimensione INTEGER",
+            "claim_id": "ALTER TABLE documents ADD COLUMN claim_id INTEGER",
         },
         "followups": {
             "policy_id": "ALTER TABLE followups ADD COLUMN policy_id INTEGER",
             "auto_generato": "ALTER TABLE followups ADD COLUMN auto_generato BOOLEAN NOT NULL DEFAULT 0",
+        },
+        "settings": {
+            "studio_nome": "ALTER TABLE settings ADD COLUMN studio_nome VARCHAR(200)",
+            "studio_rui": "ALTER TABLE settings ADD COLUMN studio_rui VARCHAR(40)",
+            "studio_piva": "ALTER TABLE settings ADD COLUMN studio_piva VARCHAR(16)",
+            "studio_indirizzo": "ALTER TABLE settings ADD COLUMN studio_indirizzo VARCHAR(250)",
+            "studio_contatti": "ALTER TABLE settings ADD COLUMN studio_contatti VARCHAR(250)",
+            "backup_automatico": "ALTER TABLE settings ADD COLUMN backup_automatico BOOLEAN NOT NULL DEFAULT 1",
+            "backup_conservati": "ALTER TABLE settings ADD COLUMN backup_conservati INTEGER DEFAULT 14",
+            "ultimo_backup_at": "ALTER TABLE settings ADD COLUMN ultimo_backup_at DATETIME",
         },
     }
 
@@ -58,35 +93,92 @@ def _ensure_schema() -> None:
         db.session.commit()
 
 
+def init_db() -> None:
+    """Crea le tabelle mancanti, applica le micro-migrazioni e la riga delle impostazioni."""
+    from .models import Settings
+
+    db.create_all()
+    _ensure_schema()
+    # Creata subito: così Settings.get() non deve mai fare commit durante una richiesta.
+    Settings.get()
+
+
+def _secret_key(app: Flask) -> str:
+    """Chiave di sessione: da ambiente, altrimenti generata una volta e salvata.
+
+    Una chiave fissa nel codice renderebbe falsificabili i cookie di sessione
+    di chiunque usi l'eseguibile: la generiamo casualmente al primo avvio.
+    """
+    percorso = os.environ.get("SECRET_KEY_FILE") or os.path.join(app.instance_path, "secret_key")
+    try:
+        with open(percorso, encoding="utf-8") as fh:
+            chiave = fh.read().strip()
+            if chiave:
+                return chiave
+    except OSError:
+        pass
+    chiave = secrets.token_hex(32)
+    try:
+        os.makedirs(os.path.dirname(percorso) or ".", exist_ok=True)
+        with open(percorso, "w", encoding="utf-8") as fh:
+            fh.write(chiave)
+        try:
+            os.chmod(percorso, 0o600)
+        except OSError:  # pragma: no cover - es. filesystem senza permessi POSIX
+            pass
+    except OSError:  # pragma: no cover - cartella non scrivibile: chiave valida fino al riavvio
+        app.logger.warning("Impossibile salvare la chiave di sessione in %s", percorso)
+    return chiave
+
+
 def create_app(test_config: dict | None = None) -> Flask:
     app = Flask(__name__, instance_relative_config=True)
 
     os.makedirs(app.instance_path, exist_ok=True)
-    default_upload_folder = os.path.join(app.instance_path, "uploads")
 
     app.config.from_mapping(
-        SECRET_KEY=os.environ.get("SECRET_KEY", "dev-cambiami-in-produzione"),
+        SECRET_KEY=os.environ.get("SECRET_KEY"),
         SQLALCHEMY_DATABASE_URI=os.environ.get(
             "DATABASE_URL",
             "sqlite:///" + os.path.join(app.instance_path, "gestionale.db"),
         ),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        UPLOAD_FOLDER=os.environ.get("UPLOAD_FOLDER", default_upload_folder),
-        MAX_CONTENT_LENGTH=20 * 1024 * 1024,  # 20 MB per file
+        UPLOAD_FOLDER=os.environ.get("UPLOAD_FOLDER", os.path.join(app.instance_path, "uploads")),
+        BACKUP_FOLDER=os.environ.get("BACKUP_FOLDER", os.path.join(app.instance_path, "backups")),
+        MAX_CONTENT_LENGTH=20 * 1024 * 1024,  # 20 MB per richiesta
+        MAX_RESTORE_SIZE=512 * 1024 * 1024,  # ripristino backup: fino a 512 MB
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "").lower() in ("1", "true", "yes"),
+        PERMANENT_SESSION_LIFETIME=timedelta(hours=10),
+        CSRF_ENABLED=True,
+        PASSWORD_HASH_METHOD="scrypt",
+        # Rigenerazione notifiche/follow-up automatici: al massimo ogni N secondi.
+        NOTIFICHE_REFRESH_SECONDI=60,
+        ELEMENTI_PER_PAGINA=25,
     )
     if test_config:
         app.config.update(test_config)
+    if not app.config.get("SECRET_KEY"):
+        app.config["SECRET_KEY"] = _secret_key(app)
 
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
     db.init_app(app)
     with app.app_context():
-        db.create_all()
-        _ensure_schema()
+        init_db()
 
+    # La sicurezza va registrata per prima: i suoi before_request girano
+    # prima di quelli dei blueprint e della generazione notifiche.
+    from .security import init_security
+
+    init_security(app)
+
+    from .cli import register_cli
     from .routes import register_blueprints
 
     register_blueprints(app)
+    register_cli(app)
 
     # ------------------------------------------------------------------
     # Filtri Jinja e variabili globali dei template
@@ -97,24 +189,85 @@ def create_app(test_config: dict | None = None) -> Flask:
             return "—"
         return value.strftime("%d/%m/%Y")
 
-    @app.template_filter("euro")
-    def euro(value):
+    @app.template_filter("dataora_it")
+    def dataora_it(value):
         if value is None:
             return "—"
-        return ("€ {:,.2f}".format(value)).replace(",", "X").replace(".", ",").replace("X", ".")
+        return value.strftime("%d/%m/%Y %H:%M")
+
+    app.add_template_filter(formatta_euro, "euro")
+
+    @app.template_filter("perc")
+    def perc(value, decimali=1):
+        if value is None:
+            return "—"
+        return f"{value:.{decimali}f}%".replace(".", ",")
+
+    def url_pagina(numero: int) -> str:
+        """URL della pagina corrente con un altro numero di pagina (paginazione)."""
+        argomenti = dict(request.view_args or {})
+        argomenti.update(request.args.to_dict())
+        argomenti["page"] = numero
+        return url_for(request.endpoint, **argomenti)
+
+    from .models import PAYMENT_METHODS
+
+    app.jinja_env.globals["url_pagina"] = url_pagina
+    app.jinja_env.globals["versione"] = __version__
+    app.jinja_env.globals["payment_methods"] = PAYMENT_METHODS
 
     @app.context_processor
     def inject_globals():
-        from .models import Notification
+        from .models import Notification, Settings
 
-        unread = Notification.query.filter_by(letta=False).count()
-        return {"notifiche_non_lette": unread, "oggi": date.today()}
+        dati = {"oggi": date.today(), "notifiche_non_lette": 0, "studio": None}
+        if g.get("user") is not None:
+            dati["notifiche_non_lette"] = Notification.query.filter_by(letta=False).count()
+            dati["studio"] = Settings.get()
+        return dati
+
+    # ------------------------------------------------------------------
+    # Notifiche e follow-up automatici (al massimo ogni N secondi)
+    # ------------------------------------------------------------------
+    stato_refresh = {"ultimo": 0.0}
 
     @app.before_request
     def refresh_notifications():
+        if request.endpoint in (None, "static") or g.get("user") is None:
+            return
+        intervallo = app.config.get("NOTIFICHE_REFRESH_SECONDI", 60)
+        adesso = time.monotonic()
+        if intervallo and adesso - stato_refresh["ultimo"] < intervallo:
+            return
+        stato_refresh["ultimo"] = adesso
+
         from .notifications import auto_create_renewal_followups, generate_notifications
 
         auto_create_renewal_followups()
         generate_notifications()
+
+    # ------------------------------------------------------------------
+    # Pagine di errore
+    # ------------------------------------------------------------------
+    messaggi_errore = {
+        400: ("Richiesta non valida", "La richiesta non può essere elaborata."),
+        403: ("Accesso negato", "Non hai i permessi per accedere a questa pagina."),
+        404: ("Pagina non trovata", "La pagina o l'elemento richiesto non esiste (o è stato eliminato)."),
+        413: ("File troppo grande", "Il file supera la dimensione massima consentita."),
+        500: ("Errore interno", "Si è verificato un errore imprevisto. Riprova; se il problema persiste contatta l'assistenza."),
+    }
+
+    def _pagina_errore(errore):
+        codice = getattr(errore, "code", 500) or 500
+        titolo, messaggio = messaggi_errore.get(codice, messaggi_errore[500])
+        descrizione = getattr(errore, "description", None)
+        if codice in (400, 403) and descrizione and not descrizione.startswith("The "):
+            messaggio = descrizione
+        if codice == 500:
+            db.session.rollback()
+        return render_template("errors/error.html", codice=codice, titolo=titolo, messaggio=messaggio), codice
+
+    for codice in messaggi_errore:
+        app.register_error_handler(codice, _pagina_errore)
 
     return app

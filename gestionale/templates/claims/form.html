@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% set modifica = claim.id is not none %}
+{% block title %}{{ 'Modifica sinistro' if modifica else 'Nuovo sinistro' }} — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('claims.list_claims') }}">Sinistri</a></li>
+  {% if client %}<li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.ragione_sociale }}</a></li>{% endif %}
+  <li class="breadcrumb-item active">{{ claim.numero if modifica else 'Nuovo sinistro' }}</li>
+</ol></nav>
+<h1 class="page-title mb-3"><i class="bi bi-exclamation-octagon me-2"></i>{{ 'Modifica sinistro ' ~ claim.numero if modifica else 'Apertura sinistro' }}</h1>
+
+<form method="post" class="card" action="{{ url_for('claims.edit_claim', claim_id=claim.id) if modifica else url_for('claims.new_claim') }}">
+  {{ csrf_field() }}
+  <div class="card-body">
+    <div class="section-title">Cliente e polizza</div>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <label class="form-label">Cliente *</label>
+        {% if client %}
+          <input class="form-control" value="{{ client.ragione_sociale }}" disabled>
+          <input type="hidden" name="client_id" value="{{ client.id }}">
+        {% else %}
+          <select class="form-select" name="client_id" id="sel-cliente" data-filter-target="#sel-polizza" required>
+            <option value="">Seleziona il cliente…</option>
+            {% for c in clienti %}<option value="{{ c.id }}">{{ c.ragione_sociale }}</option>{% endfor %}
+          </select>
+        {% endif %}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Polizza coinvolta</label>
+        <select class="form-select" name="policy_id" id="sel-polizza">
+          <option value="">— nessuna / da individuare —</option>
+          {% for p in polizze %}
+          <option value="{{ p.id }}" data-parent="{{ p.client_id }}" {% if claim.policy_id == p.id %}selected{% endif %}>
+            {{ p.numero_polizza }} — {{ p.compagnia }} · {{ p.ramo_label }}{% if not client %} ({{ p.cliente.ragione_sociale }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="section-title">Evento</div>
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <label class="form-label">Tipologia</label>
+        <select class="form-select" name="tipologia">
+          {% for v, l in claim_types %}<option value="{{ v }}" {% if claim.tipologia == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Data evento *</label>
+        <input type="date" class="form-control" name="data_evento" required max="{{ oggi.isoformat() }}"
+               value="{{ claim.data_evento.isoformat() if claim.data_evento else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Data denuncia alla compagnia</label>
+        <input type="date" class="form-control" name="data_denuncia"
+               value="{{ claim.data_denuncia.isoformat() if claim.data_denuncia else '' }}">
+        <div class="form-text">Entro 3 giorni dall'evento (art. 1913 c.c.).</div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">N. sinistro compagnia</label>
+        <input class="form-control" name="numero_compagnia" value="{{ claim.numero_compagnia or '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Luogo</label>
+        <input class="form-control" name="luogo" value="{{ claim.luogo or '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Controparte / danneggiato</label>
+        <input class="form-control" name="controparte" value="{{ claim.controparte or '' }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Descrizione dell'accaduto</label>
+        <textarea class="form-control" name="descrizione" rows="4">{{ claim.descrizione or '' }}</textarea>
+      </div>
+    </div>
+
+    <div class="section-title">Gestione e importi</div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Perito</label>
+        <input class="form-control" name="perito" value="{{ claim.perito or '' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Liquidatore / ispettorato</label>
+        <input class="form-control" name="liquidatore" value="{{ claim.liquidatore or '' }}">
+      </div>
+      {% for campo, etichetta in [('importo_richiesto', 'Danno stimato / richiesto (€)'), ('importo_riservato', 'Riserva compagnia (€)'), ('franchigia', 'Franchigia / scoperto (€)'), ('importo_liquidato', 'Importo liquidato (€)')] %}
+      <div class="col-md-3">
+        <label class="form-label">{{ etichetta }}</label>
+        <input class="form-control" name="{{ campo }}" inputmode="decimal"
+               value="{{ ('%.2f' | format(claim[campo])) | replace('.', ',') if claim[campo] is not none else '' }}">
+      </div>
+      {% endfor %}
+      <div class="col-md-3">
+        <label class="form-label">Data liquidazione</label>
+        <input type="date" class="form-control" name="data_liquidazione"
+               value="{{ claim.data_liquidazione.isoformat() if claim.data_liquidazione else '' }}">
+      </div>
+      <div class="col-md-9">
+        <label class="form-label">Note interne</label>
+        <input class="form-control" name="note" value="{{ claim.note or '' }}">
+      </div>
+    </div>
+  </div>
+  <div class="card-footer d-flex gap-2">
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> {{ 'Salva' if modifica else 'Apri sinistro' }}</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('claims.detail', claim_id=claim.id) if modifica else (url_for('clients.detail', client_id=client.id) ~ '#sinistri' if client else url_for('claims.list_claims')) }}">Annulla</a>
+  </div>
+</form>
+{% endblock %}

@@ -7,8 +7,13 @@ può lanciare anche direttamente con:
 
     python run_desktop.py
 
-Il database e i file caricati vengono salvati accanto all'eseguibile, nella
-cartella ``dati_gestionale``, così i dati restano tra un avvio e l'altro.
+Il database, i file caricati, i backup automatici e la chiave di sessione
+vengono salvati accanto all'eseguibile, nella cartella ``dati_gestionale``,
+così i dati restano tra un avvio e l'altro.
+
+Per recuperare l'accesso se si dimentica la password dell'amministratore:
+
+    GestionaleAssicurativo.exe --reimposta-password NOMEUTENTE
 """
 from __future__ import annotations
 
@@ -46,11 +51,20 @@ def main() -> None:
         "DATABASE_URL", "sqlite:///" + os.path.join(data_dir, "gestionale.db")
     )
     os.environ.setdefault("UPLOAD_FOLDER", os.path.join(data_dir, "uploads"))
+    os.environ.setdefault("BACKUP_FOLDER", os.path.join(data_dir, "backup"))
+    # Chiave di sessione generata al primo avvio e conservata con i dati.
+    os.environ.setdefault("SECRET_KEY_FILE", os.path.join(data_dir, "secret_key"))
 
     from gestionale import create_app
     from gestionale.scheduler import start_scheduler
 
     app = create_app()
+
+    if len(sys.argv) >= 3 and sys.argv[1] == "--reimposta-password":
+        from gestionale.cli import chiedi_e_reimposta
+
+        with app.app_context():
+            sys.exit(chiedi_e_reimposta(sys.argv[2]))
 
     port = _find_free_port(int(os.environ.get("PORT", "5000")))
     url = f"http://127.0.0.1:{port}"

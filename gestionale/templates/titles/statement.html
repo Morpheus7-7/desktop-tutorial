@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Estratto conto compagnie — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title"><i class="bi bi-building me-2"></i>Estratto conto compagnie</h1>
+    <div class="page-subtitle">Incassi dal {{ dal | data_it }} al {{ al | data_it }}: premi, provvigioni trattenute e netto da rimettere</div>
+  </div>
+  <button class="btn btn-outline-secondary no-print" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+</div>
+{% include "titles/_nav.html" %}
+
+<form class="filter-bar row g-2 align-items-end" method="get">
+  <div class="col-6 col-md-4"><label class="form-label small">Incassi dal</label><input type="date" class="form-control form-control-sm" name="dal" value="{{ dal.isoformat() }}"></div>
+  <div class="col-6 col-md-4"><label class="form-label small">al</label><input type="date" class="form-control form-control-sm" name="al" value="{{ al.isoformat() }}"></div>
+  <div class="col-md-4"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-funnel"></i> Aggiorna</button></div>
+</form>
+
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Compagnia</th><th class="num">Titoli</th><th class="num">Premi incassati</th><th class="num">Provvigioni</th><th class="num">Netto</th><th class="num">Già rimesso</th><th class="num">Da rimettere</th><th></th></tr></thead>
+      <tbody>
+      {% for r in righe %}
+        <tr>
+          <td class="fw-semibold"><a href="{{ url_for('titles.statement', dal=dal.isoformat(), al=al.isoformat(), compagnia=r.compagnia) }}">{{ r.compagnia }}</a></td>
+          <td class="num">{{ r.numero }}</td>
+          <td class="num">{{ r.premi | euro }}</td>
+          <td class="num text-success">{{ r.provvigioni | euro }}</td>
+          <td class="num">{{ r.netto | euro }}</td>
+          <td class="num ga-muted">{{ r.rimesso | euro }}</td>
+          <td class="num fw-semibold {% if r.da_rimettere > 0.005 %}text-danger{% endif %}">{{ r.da_rimettere | euro }}</td>
+          <td class="text-end">
+            {% if r.titoli_da_rimettere and puo_modificare %}
+            <form method="post" action="{{ url_for('titles.register_remittance') }}" class="d-flex gap-1 justify-content-end no-print"
+                  data-confirm="Registrare la rimessa a {{ r.compagnia }} di {{ r.da_rimettere | euro }} ({{ r.titoli_da_rimettere }} titoli)?">
+              {{ csrf_field() }}
+              <input type="hidden" name="dal" value="{{ dal.isoformat() }}">
+              <input type="hidden" name="al" value="{{ al.isoformat() }}">
+              <input type="hidden" name="compagnia" value="{{ r.compagnia }}">
+              <input type="date" class="form-control form-control-sm" name="data_rimessa" value="{{ oggi.isoformat() }}" style="max-width: 9.5rem;" aria-label="Data rimessa">
+              <button class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-send-check"></i> Rimessa</button>
+            </form>
+            {% elif r.numero %}<span class="badge bg-success">rimesso</span>{% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="text-muted p-4">Nessun incasso nel periodo selezionato.</td></tr>
+      {% endfor %}
+      </tbody>
+      {% if righe %}
+      <tfoot><tr class="table-totals"><td>Totale</td><td class="num">{{ totali.numero }}</td><td class="num">{{ totali.premi | euro }}</td><td class="num">{{ totali.provvigioni | euro }}</td><td class="num">{{ totali.netto | euro }}</td><td class="num">{{ totali.rimesso | euro }}</td><td class="num">{{ totali.da_rimettere | euro }}</td><td></td></tr></tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% if dettaglio %}
+<div class="card">
+  <div class="card-header">Dettaglio titoli — {{ dettaglio }}</div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead><tr><th>Incasso</th><th>Cliente</th><th>Polizza</th><th>Effetto</th><th class="num">Premio</th><th class="num">Provvigione</th><th class="num">Netto</th><th>Rimessa</th></tr></thead>
+      <tbody>
+      {% for t in titoli_dettaglio %}
+        <tr>
+          <td class="small">{{ t.data_incasso | data_it }}</td>
+          <td class="small">{{ t.cliente.ragione_sociale }}</td>
+          <td class="small">{{ t.polizza.numero_polizza }}</td>
+          <td class="small">{{ t.data_effetto | data_it }}</td>
+          <td class="num small">{{ t.premio_lordo | euro }}</td>
+          <td class="num small">{{ t.provvigione | euro }}</td>
+          <td class="num small">{{ t.netto | euro }}</td>
+          <td class="small">{{ t.data_rimessa | data_it if t.data_rimessa else '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

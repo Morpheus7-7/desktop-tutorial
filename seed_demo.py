@@ -1,14 +1,28 @@
 """Carica dati di esempio nel gestionale: `python seed_demo.py`.
 
-Crea clienti (aziende e professionisti), polizze con scadenze varie,
-follow-up e un'analisi rischi, per provare subito tutte le funzioni.
+Crea clienti (aziende, professionisti e un dipendente), polizze con scadenze
+varie, titoli da incassare e incassati, sinistri, follow-up, opportunità e
+analisi rischi, per provare subito tutte le funzioni.
+
+Non crea utenti: al primo accesso il gestionale chiede di creare
+l'amministratore.
 """
 import json
 from datetime import date, timedelta
 
 from gestionale import create_app
-from gestionale.models import Client, FollowUp, Opportunity, Policy, RiskAnalysis, db
+from gestionale.models import (
+    Claim,
+    ClaimNote,
+    Client,
+    FollowUp,
+    Opportunity,
+    Policy,
+    RiskAnalysis,
+    db,
+)
 from gestionale.risk_engine import analyze_client
+from gestionale.titoli import genera_titoli
 
 app = create_app()
 
@@ -23,7 +37,7 @@ with app.app_context():
         tipo="azienda",
         ragione_sociale="Falegnameria Rossi S.r.l.",
         referente="Mario Rossi",
-        partita_iva="01234567890",
+        partita_iva="01234567897",
         codice_ateco="16.23",
         settore="Lavorazione del legno",
         indirizzo="Via delle Industrie 12",
@@ -34,6 +48,8 @@ with app.app_context():
         telefono="0422 123456",
         numero_dipendenti=8,
         fatturato_annuo=1_450_000,
+        data_consenso_privacy=oggi - timedelta(days=300),
+        data_adeguatezza=oggi - timedelta(days=300),
         descrizione_attivita=(
             "Falegnameria con capannone di 900 mq, magazzino legname e deposito "
             "vernici e solventi. Otto dipendenti tra operai e montatori. Produzione "
@@ -45,8 +61,8 @@ with app.app_context():
     studio = Client(
         tipo="professionista",
         ragione_sociale="Ing. Laura Bianchi",
-        codice_fiscale="BNCLRA80A41F205X",
-        partita_iva="09876543210",
+        codice_fiscale="BNCLRA80A41F205G",
+        partita_iva="09876543217",
         professione="Ingegnere civile",
         settore="Progettazione strutturale",
         citta="Milano",
@@ -55,6 +71,12 @@ with app.app_context():
         telefono="02 8765432",
         numero_dipendenti=1,
         fatturato_annuo=180_000,
+        data_nascita=date(1980, 1, 1),
+        data_consenso_privacy=oggi - timedelta(days=400),
+        data_adeguatezza=oggi - timedelta(days=400),
+        documento_tipo="carta_identita",
+        documento_numero="CA12345AB",
+        documento_scadenza=oggi + timedelta(days=20),
         descrizione_attivita=(
             "Studio di ingegneria civile: progettazione strutturale, direzione "
             "lavori e collaudi in cantiere. Consulenza tecnica d'ufficio per "
@@ -66,7 +88,7 @@ with app.app_context():
         tipo="azienda",
         ragione_sociale="Trattoria Da Peppe di Esposito Giuseppe & C. S.a.s.",
         referente="Giuseppe Esposito",
-        partita_iva="04455667788",
+        partita_iva="04455667784",
         codice_ateco="56.10",
         settore="Ristorazione",
         citta="Napoli",
@@ -85,7 +107,7 @@ with app.app_context():
     dipendente = Client(
         tipo="dipendente",
         ragione_sociale="Marco Verdi",
-        codice_fiscale="VRDMRC85M12F205Z",
+        codice_fiscale="VRDMRC85M12F205X",
         professione="Capo officina",
         datore_lavoro="Meccanica Padana S.r.l.",
         indirizzo="Via Emilia 45",
@@ -93,6 +115,13 @@ with app.app_context():
         provincia="MO",
         email="marco.verdi@email.it",
         telefono="059 223344",
+        data_nascita=date(1985, 8, 12),
+        data_consenso_privacy=oggi - timedelta(days=100),
+        consenso_marketing=True,
+        data_adeguatezza=oggi - timedelta(days=100),
+        documento_tipo="patente",
+        documento_numero="MO1234567X",
+        documento_scadenza=oggi + timedelta(days=900),
         descrizione_attivita=(
             "Lavoratore dipendente con famiglia (moglie e due figli minori) e mutuo "
             "sulla prima casa. Pratica sci e moto nel tempo libero. Interessato a "
@@ -106,12 +135,14 @@ with app.app_context():
         Policy(
             client_id=falegnameria.id, compagnia="Generali", numero_polizza="GEN-2024-1181",
             ramo="incendio", premio_annuo=3_800, massimale=2_000_000, provvigione_perc=18,
+            frazionamento="semestrale",
             data_decorrenza=oggi - timedelta(days=340), data_scadenza=oggi + timedelta(days=25),
             tacito_rinnovo=False, stato="attiva",
         ),
         Policy(
             client_id=falegnameria.id, compagnia="Allianz", numero_polizza="ALZ-88422",
             ramo="rct_rco", premio_annuo=2_450, massimale=3_000_000, provvigione_perc=20,
+            frazionamento="trimestrale",
             data_decorrenza=oggi - timedelta(days=200), data_scadenza=oggi + timedelta(days=165),
             tacito_rinnovo=True, stato="attiva",
         ),
@@ -130,11 +161,48 @@ with app.app_context():
         Policy(
             client_id=dipendente.id, compagnia="Poste Vita", numero_polizza="PV-INF-3390",
             ramo="infortuni", premio_annuo=420, massimale=200_000, provvigione_perc=25,
+            frazionamento="mensile",
             data_decorrenza=oggi - timedelta(days=100), data_scadenza=oggi + timedelta(days=265),
             tacito_rinnovo=True, stato="attiva",
         ),
     ]
     db.session.add_all(polizze)
+    db.session.flush()
+
+    # Titoli dell'annualità in corso: incassati quelli già scaduti, tranne
+    # uno lasciato arretrato per mostrare l'avviso di copertura sospesa.
+    for polizza in polizze:
+        for titolo in genera_titoli(polizza):
+            if titolo.data_effetto <= oggi - timedelta(days=5):
+                titolo.stato = "incassato"
+                titolo.data_incasso = titolo.data_effetto + timedelta(days=3)
+                titolo.mezzo_pagamento = "bonifico"
+    arretrato = next(t for t in polizze[1].titoli if t.stato == "incassato")
+    arretrato.stato, arretrato.data_incasso, arretrato.mezzo_pagamento = "da_incassare", None, None
+
+    sinistri = [
+        Claim(
+            numero=f"SIN-{oggi.year}-0001", client_id=falegnameria.id, policy_id=polizze[1].id,
+            tipologia="danni_terzi", data_evento=oggi - timedelta(days=40),
+            data_denuncia=oggi - timedelta(days=38), luogo="Cantiere scuola media, Treviso",
+            descrizione="Durante il montaggio di un armadio a muro un pannello è caduto danneggiando il pavimento in parquet.",
+            controparte="Comune di Treviso", perito="Studio Peritale Nordest",
+            importo_richiesto=6_500, importo_riservato=5_000, stato="perizia",
+        ),
+        Claim(
+            numero=f"SIN-{oggi.year}-0002", client_id=ristorante.id,
+            tipologia="acqua", data_evento=oggi - timedelta(days=4),
+            luogo="Cantina della trattoria", descrizione="Rottura del tubo della cella frigorifera con allagamento della cantina.",
+            importo_richiesto=3_200, stato="aperto",
+        ),
+    ]
+    db.session.add_all(sinistri)
+    db.session.flush()
+    sinistri[0].eventi.extend([
+        ClaimNote(tipo="stato", testo="Sinistro aperto.", username="demo"),
+        ClaimNote(tipo="stato", testo="Stato: Aperto → In perizia. Sopralluogo fissato.", username="demo"),
+    ])
+    sinistri[1].eventi.append(ClaimNote(tipo="stato", testo="Sinistro aperto.", username="demo"))
 
     followups = [
         FollowUp(
@@ -189,4 +257,8 @@ with app.app_context():
         )
 
     db.session.commit()
-    print("Dati demo caricati: 4 clienti, 5 polizze, 3 follow-up, 3 opportunità, 4 analisi rischi.")
+    print(
+        "Dati demo caricati: 4 clienti, 5 polizze con i relativi titoli, 2 sinistri, "
+        "3 follow-up, 3 opportunità, 4 analisi rischi.\n"
+        "Avvia il gestionale: al primo accesso ti verrà chiesto di creare l'amministratore."
+    )

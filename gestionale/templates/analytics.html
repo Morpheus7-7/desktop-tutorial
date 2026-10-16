@@ -1,121 +1,197 @@
 {% extends "base.html" %}
 {% block title %}Statistiche — Gestionale Assicurativo{% endblock %}
+{% macro colonne(serie, campo, massimo, etichetta) -%}
+<div class="colchart" role="img" aria-label="{{ etichetta }}">
+  {% for x in serie %}
+  <div class="col-slot" tabindex="0">
+    <span class="col-tip">{{ x.label }} · {{ x[campo] | euro }}</span>
+    <div class="col-bar" style="height: {{ ((100 * x[campo] / massimo) | round(1)) if massimo else 0 }}%;"></div>
+  </div>
+  {% endfor %}
+</div>
+<div class="colchart-labels mt-1">{% for x in serie %}<span>{{ x.label }}</span>{% endfor %}</div>
+<details class="mt-2 small">
+  <summary class="ga-muted">Mostra i dati in tabella</summary>
+  <table class="table table-sm mt-2 mb-0">
+    <thead><tr><th>Mese</th><th class="num">Importo</th></tr></thead>
+    <tbody>{% for x in serie %}<tr><td>{{ x.label }}</td><td class="num">{{ x[campo] | euro }}</td></tr>{% endfor %}</tbody>
+  </table>
+</details>
+{%- endmacro %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-  <h1 class="h3 mb-0"><i class="bi bi-bar-chart-line me-2"></i>Statistiche di portafoglio</h1>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title"><i class="bi bi-bar-chart-line me-2"></i>Statistiche di portafoglio</h1>
+    <div class="page-subtitle">Situazione al {{ oggi | data_it }}</div>
+  </div>
   <button class="btn btn-outline-secondary no-print" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
 </div>
 
 <!-- KPI principali -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">
-    <div class="card stat-card accent-primary h-100"><div class="card-body">
-      <i class="bi bi-file-earmark-text stat-icon"></i>
-      <div class="text-muted small">Polizze attive</div>
-      <div class="display-6">{{ totale_polizze }}</div>
-    </div></div>
-  </div>
-  <div class="col-6 col-lg-3">
-    <div class="card stat-card accent-info h-100"><div class="card-body">
-      <i class="bi bi-cash-coin stat-icon"></i>
-      <div class="text-muted small">Premi annui</div>
-      <div class="h4 mt-2 mb-0">{{ premi_totali | euro }}</div>
+    <div class="card stat-card h-100"><div class="card-body">
+      <span class="stat-icon"><i class="bi bi-cash-coin"></i></span>
+      <div class="stat-label">Premi annui in portafoglio</div>
+      <div class="stat-value small-value">{{ premi_totali | euro }}</div>
+      <div class="small ga-muted">{{ totale_polizze }} polizze attive</div>
     </div></div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="card stat-card accent-success h-100"><div class="card-body">
-      <i class="bi bi-wallet2 stat-icon"></i>
-      <div class="text-muted small">Provvigioni stimate</div>
-      <div class="h4 mt-2 mb-0">{{ provvigioni_totali | euro }}</div>
+      <span class="stat-icon"><i class="bi bi-wallet2"></i></span>
+      <div class="stat-label">Provvigioni annue stimate</div>
+      <div class="stat-value small-value">{{ provvigioni_totali | euro }}</div>
+      <div class="small ga-muted">{{ ((100 * provvigioni_totali / premi_totali) | perc) if premi_totali else '—' }} medio sui premi</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card {% if rapporto_sp is not none and rapporto_sp > 70 %}accent-danger{% else %}accent-info{% endif %} h-100"><div class="card-body">
+      <span class="stat-icon"><i class="bi bi-activity"></i></span>
+      <div class="stat-label">Rapporto sinistri / premi</div>
+      <div class="stat-value small-value">{{ rapporto_sp | perc if rapporto_sp is not none else '—' }}</div>
+      <div class="small ga-muted">{{ numero_sinistri }} sinistri · costo {{ costo_sinistri | euro }}</div>
     </div></div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="card stat-card accent-warning h-100"><div class="card-body">
-      <i class="bi bi-funnel stat-icon"></i>
-      <div class="text-muted small">Valore pipeline aperta</div>
-      <div class="h4 mt-2 mb-0">{{ pipeline | sum(attribute='valore') | euro }}</div>
+      <span class="stat-icon"><i class="bi bi-funnel"></i></span>
+      <div class="stat-label">Valore pipeline aperta</div>
+      <div class="stat-value small-value">{{ pipeline | rejectattr('fase', 'in', ['vinta', 'persa']) | sum(attribute='valore') | euro }}</div>
+      <div class="small ga-muted">conversione {{ tasso_conversione | perc if tasso_conversione is not none else 'n.d.' }}</div>
     </div></div>
   </div>
 </div>
 
 <div class="row g-4">
   <!-- Portafoglio per ramo -->
-  <div class="col-lg-7">
+  <div class="col-xl-7">
     <div class="card h-100">
-      <div class="card-header"><i class="bi bi-pie-chart me-1"></i> Premi per ramo</div>
-      <div class="card-body">
+      <div class="card-header">Premi per ramo e rapporto sinistri/premi</div>
+      <div class="table-responsive">
         {% if rami %}
-        {% for r in rami %}
-        <div class="mb-3">
-          <div class="d-flex justify-content-between small">
-            <span>{{ r.nome }} <span class="text-muted">· {{ r.numero }} pol.</span></span>
-            <span class="fw-semibold">{{ r.premi | euro }}</span>
-          </div>
-          <div class="progress mt-1" style="height: 10px;">
-            <div class="progress-bar" role="progressbar"
-                 style="width: {{ (100 * r.premi / premi_max) if premi_max else 0 }}%; background: var(--ga-primary-2);"></div>
-          </div>
-          {% if r.provvigioni %}<div class="small text-success">Provvigioni: {{ r.provvigioni | euro }}</div>{% endif %}
-        </div>
-        {% endfor %}
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>Ramo</th><th class="num">Polizze</th><th style="min-width: 160px;">Premi</th><th class="num">Provvigioni</th><th class="num">S/P</th></tr></thead>
+          <tbody>
+          {% for r in rami %}
+            <tr>
+              <td class="small">{{ r.nome }}</td>
+              <td class="num small">{{ r.numero }}</td>
+              <td>
+                <div class="hbar" title="{{ r.nome }}: {{ r.premi | euro }}">
+                  <div class="hbar-track"><div class="hbar-fill" style="width: {{ ((100 * r.premi / premi_max) | round(1)) if premi_max else 0 }}%;"></div></div>
+                  <span class="small tabular text-nowrap">{{ r.premi | euro }}</span>
+                </div>
+              </td>
+              <td class="num small">{{ r.provvigioni | euro }}</td>
+              <td class="num small {% if r.rapporto_sp is not none and r.rapporto_sp > 70 %}text-danger fw-semibold{% endif %}">{{ r.rapporto_sp | perc if r.rapporto_sp is not none else '—' }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
         {% else %}
-        <p class="text-muted mb-0">Nessuna polizza attiva da analizzare.</p>
+        <p class="ga-muted p-3 mb-0">Nessuna polizza attiva da analizzare.</p>
         {% endif %}
       </div>
     </div>
   </div>
 
-  <!-- Clienti per tipo + Pipeline -->
-  <div class="col-lg-5">
-    <div class="card mb-4">
-      <div class="card-header"><i class="bi bi-people me-1"></i> Clienti per tipo</div>
+  <!-- Compagnie -->
+  <div class="col-xl-5">
+    <div class="card h-100">
+      <div class="card-header">Premi per compagnia</div>
       <div class="card-body">
-        {% set tot_clienti = clienti_per_tipo | sum(attribute='n') %}
-        {% for c in clienti_per_tipo %}
+        {% for c in compagnie %}
         <div class="mb-2">
-          <div class="d-flex justify-content-between small"><span>{{ c.tipo }}</span><span class="fw-semibold">{{ c.n }}</span></div>
-          <div class="progress mt-1" style="height: 8px;">
-            <div class="progress-bar bg-secondary" style="width: {{ (100 * c.n / tot_clienti) if tot_clienti else 0 }}%;"></div>
-          </div>
+          <div class="d-flex justify-content-between small"><span>{{ c.nome }} <span class="ga-muted">· {{ c.numero }} pol.</span></span><span class="tabular fw-semibold">{{ c.premi | euro }}</span></div>
+          <div class="hbar mt-1"><div class="hbar-track"><div class="hbar-fill" style="width: {{ ((100 * c.premi / compagnie_max) | round(1)) if compagnie_max else 0 }}%;"></div></div></div>
         </div>
-        {% endfor %}
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-funnel me-1"></i> Pipeline commerciale</span>
-        <a class="small" href="{{ url_for('opportunities.board') }}">Apri pipeline</a>
-      </div>
-      <div class="card-body">
-        {% for f in pipeline %}
-        <div class="mb-2">
-          <div class="d-flex justify-content-between small">
-            <span>{{ f.label }}</span>
-            <span><span class="fw-semibold">{{ f.numero }}</span>{% if f.valore %} · {{ f.valore | euro }}{% endif %}</span>
-          </div>
-          <div class="progress mt-1" style="height: 8px;">
-            <div class="progress-bar {% if f.fase == 'vinta' %}bg-success{% elif f.fase == 'persa' %}bg-danger{% else %}bg-info{% endif %}"
-                 style="width: {{ (100 * f.numero / pipeline_max) if pipeline_max else 0 }}%;"></div>
-          </div>
-        </div>
+        {% else %}
+        <p class="ga-muted mb-0">Nessun dato.</p>
         {% endfor %}
       </div>
     </div>
   </div>
 
-  <!-- Premi in scadenza per mese -->
+  <!-- Incassi e scadenze -->
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">Incassi degli ultimi 12 mesi</div>
+      <div class="card-body">{{ colonne(incassi, 'importo', incassi_max, 'Incassi mensili degli ultimi 12 mesi') }}</div>
+    </div>
+  </div>
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">Premi in scadenza nei prossimi 12 mesi</div>
+      <div class="card-body">{{ colonne(mesi, 'premi', mesi_max, 'Premi in scadenza per mese nei prossimi 12 mesi') }}</div>
+    </div>
+  </div>
+
+  <!-- Clienti -->
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">Primi 10 clienti per premi</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>#</th><th>Cliente</th><th>Tipo</th><th class="num">Premi</th><th class="num">Quota</th></tr></thead>
+          <tbody>
+          {% for cliente, premi in top_clienti %}
+            <tr>
+              <td class="small ga-muted">{{ loop.index }}</td>
+              <td><a href="{{ url_for('clients.detail', client_id=cliente.id) }}">{{ cliente.ragione_sociale }}</a></td>
+              <td><span class="badge {{ cliente.tipo_badge }}">{{ cliente.tipo_label }}</span></td>
+              <td class="num">{{ premi | euro }}</td>
+              <td class="num small">{{ ((100 * premi / premi_totali) | perc) if premi_totali else '—' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="ga-muted p-3">Nessun dato.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body border-top small">
+        {% set tot_clienti = clienti_per_tipo | sum(attribute='n') %}
+        {% for c in clienti_per_tipo %}<span class="me-3">{{ c.tipo }}: <strong>{{ c.n }}</strong>{% if tot_clienti %} <span class="ga-muted">({{ ((100 * c.n / tot_clienti) | round | int) }}%)</span>{% endif %}</span>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Sinistri -->
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between"><span>Sinistri per tipologia</span><a class="small" href="{{ url_for('claims.list_claims', filtro='tutti') }}">Tutti i sinistri</a></div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Tipologia</th><th class="num">Numero</th><th class="num">Costo</th></tr></thead>
+          <tbody>
+          {% for t in sinistri_tipologie %}
+            <tr><td class="small">{{ t.nome }}</td><td class="num small">{{ t.n }}</td><td class="num small">{{ t.costo | euro }}</td></tr>
+          {% else %}
+            <tr><td colspan="3" class="ga-muted p-3">Nessun sinistro registrato.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body border-top small">
+        {% for s in sinistri_per_stato if s.n %}<span class="me-3">{{ s.stato }}: <strong>{{ s.n }}</strong></span>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Pipeline -->
   <div class="col-12">
     <div class="card">
-      <div class="card-header"><i class="bi bi-calendar3 me-1"></i> Premi in scadenza nei prossimi 12 mesi</div>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Pipeline commerciale</span>
+        <a class="small" href="{{ url_for('opportunities.board') }}">Apri pipeline</a>
+      </div>
       <div class="card-body">
-        <div class="d-flex align-items-end gap-2" style="height: 180px;">
-          {% for m in mesi %}
-          <div class="text-center flex-fill d-flex flex-column justify-content-end" style="min-width: 0;">
-            <div class="small text-muted mb-1" style="font-size:.7rem;">{{ (m.premi/1000)|round(1) if m.premi else '' }}{{ 'k' if m.premi else '' }}</div>
-            <div class="mx-auto rounded-top" title="{{ m.premi | euro }}"
-                 style="width: 60%; background: var(--ga-primary-2); height: {{ (100 * m.premi / mesi_max)|round(1) if mesi_max else 0 }}%; min-height: 2px;"></div>
-            <div class="small text-muted mt-1" style="font-size:.7rem;">{{ m.label }}</div>
+        <div class="row g-3">
+          {% for f in pipeline %}
+          <div class="col-6 col-md-4 col-xl-2">
+            <div class="small ga-muted">{{ f.label }}</div>
+            <div class="fw-semibold tabular">{{ f.numero }} <span class="small ga-muted fw-normal">· {{ f.valore | euro }}</span></div>
+            <div class="hbar mt-1"><div class="hbar-track"><div class="hbar-fill" style="width: {{ ((100 * f.numero / pipeline_max) | round(1)) if pipeline_max else 0 }}%;"></div></div></div>
           </div>
           {% endfor %}
         </div>
@@ -124,8 +200,9 @@
   </div>
 </div>
 
-<p class="text-muted small mt-3">
+<p class="ga-muted small mt-3">
   <i class="bi bi-info-circle me-1"></i>
-  Le provvigioni sono stimate dalla percentuale impostata su ciascuna polizza; il valore della pipeline usa il premio stimato delle opportunità aperte.
+  Provvigioni stimate dalla percentuale di ciascuna polizza. Il rapporto S/P confronta il costo dei sinistri
+  (liquidato più riserva dei sinistri aperti) con i premi annui delle polizze attive.
 </p>
 {% endblock %}

@@ -242,7 +242,7 @@ def send_pending_notifications(settings: Settings | None = None) -> int:
     subject, text_body, html_body = build_digest(pending)
     _send(cfg, _build_message(cfg, subject, text_body, html_body))
 
-    ora = datetime.utcnow()
+    ora = datetime.now()
     for x in pending:
         x.inviata_email = True
         x.inviata_email_at = ora

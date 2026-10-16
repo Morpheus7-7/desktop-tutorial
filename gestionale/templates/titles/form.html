@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Modifica titolo — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=titolo.client_id) }}">{{ titolo.cliente.ragione_sociale }}</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('policies.detail', policy_id=titolo.policy_id) }}">Polizza {{ titolo.polizza.numero_polizza }}</a></li>
+  <li class="breadcrumb-item active">Titolo del {{ titolo.data_effetto | data_it }}</li>
+</ol></nav>
+<div class="row"><div class="col-lg-8">
+<form method="post" class="card">
+  {{ csrf_field() }}
+  <div class="card-header">Modifica titolo — {{ titolo.stato_label }}</div>
+  <div class="card-body row g-3">
+    <div class="col-md-4">
+      <label class="form-label">Tipo</label>
+      <select class="form-select" name="tipo">
+        {% for v, l in title_types %}<option value="{{ v }}" {% if titolo.tipo == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Data effetto (scadenza rata) *</label>
+      <input type="date" class="form-control" name="data_effetto" required value="{{ titolo.data_effetto.isoformat() }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Copertura fino al</label>
+      <input type="date" class="form-control" name="data_fine_copertura" value="{{ titolo.data_fine_copertura.isoformat() if titolo.data_fine_copertura else '' }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Premio lordo (€) *</label>
+      <input class="form-control" name="premio_lordo" required inputmode="decimal" value="{{ ('%.2f' | format(titolo.premio_lordo)) | replace('.', ',') }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Provvigione (€)</label>
+      <input class="form-control" name="provvigione" inputmode="decimal" value="{{ ('%.2f' | format(titolo.provvigione)) | replace('.', ',') if titolo.provvigione is not none else '' }}">
+    </div>
+    <div class="col-12">
+      <label class="form-label">Note</label>
+      <textarea class="form-control" name="note" rows="2">{{ titolo.note or '' }}</textarea>
+    </div>
+  </div>
+  <div class="card-footer d-flex gap-2">
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Salva</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('policies.detail', policy_id=titolo.policy_id) }}#titoli">Annulla</a>
+  </div>
+</form>
+</div></div>
+{% endblock %}

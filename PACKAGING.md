@@ -7,9 +7,11 @@ installare Python né conoscere la riga di comando. Basta fare doppio clic.
 - Su **Windows** si ottiene `GestionaleAssicurativo.exe`
 - Su **macOS/Linux** si ottiene un binario `GestionaleAssicurativo`
 
-L'eseguibile salva i dati (database SQLite e documenti caricati) nella cartella
-`dati_gestionale/` creata **accanto all'eseguibile stesso**, così i dati
-restano tra un avvio e l'altro e sono facili da spostare o salvare.
+L'eseguibile salva i dati (database SQLite, documenti caricati, backup
+automatici e chiave di sessione) nella cartella `dati_gestionale/` creata
+**accanto all'eseguibile stesso**, così i dati restano tra un avvio e l'altro e
+sono facili da spostare o salvare. Al primo avvio il gestionale chiede di creare
+l'account amministratore.
 
 ---
 
@@ -88,7 +90,8 @@ python run_desktop.py
   statici, dichiara i blueprint importati dinamicamente ed esclude il pacchetto
   `cryptography` (non necessario: l'invio email usa `ssl`/`smtplib` della
   libreria standard).
-- **Dati persistenti:** cartella `dati_gestionale/` accanto all'eseguibile.
+- **Dati persistenti:** cartella `dati_gestionale/` accanto all'eseguibile
+  (`gestionale.db`, `uploads/`, `backup/` e `secret_key`).
 
 ## Risoluzione problemi
 
@@ -97,6 +100,12 @@ python run_desktop.py
   Esegui comunque», oppure firma l'eseguibile con un certificato tuo.
 - **La porta 5000 è occupata**: il launcher passa automaticamente a una porta
   libera; l'indirizzo esatto è stampato nella console all'avvio.
-- **Voglio configurare le email**: apri l'app, vai su **Impostazioni** (icona
-  ingranaggio) e inserisci i parametri SMTP. Vedi il README per l'elenco delle
-  variabili d'ambiente equivalenti.
+- **Voglio configurare le email**: accedi come amministratore, vai su
+  **Impostazioni → Notifiche via email** e inserisci i parametri SMTP. Vedi il
+  README per l'elenco delle variabili d'ambiente equivalenti.
+- **Ho dimenticato la password**: un altro amministratore può reimpostarla
+  dalla pagina **Utenti**. Se l'unico amministratore ha perso l'accesso, apri
+  un prompt dei comandi nella cartella dell'eseguibile e lancia
+  `GestionaleAssicurativo.exe --reimposta-password NOMEUTENTE` (in sviluppo:
+  `flask --app app reimposta-password NOMEUTENTE`): verrà chiesta la nuova
+  password e l'utente sarà anche sbloccato e riattivato.

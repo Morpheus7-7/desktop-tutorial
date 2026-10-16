@@ -4,16 +4,19 @@
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=policy.client_id) }}">{{ policy.cliente.ragione_sociale }}</a></li>
-    <li class="breadcrumb-item active">Polizza {{ policy.numero_polizza }}</li>
+    <li class="breadcrumb-item"><a href="{{ url_for('policies.detail', policy_id=policy.id) }}">Polizza {{ policy.numero_polizza }}</a></li>
+    <li class="breadcrumb-item active">Modifica</li>
   </ol>
 </nav>
-<h1 class="h3 mb-4"><i class="bi bi-pencil me-2"></i>Modifica polizza {{ policy.numero_polizza }}</h1>
+<h1 class="page-title mb-3"><i class="bi bi-pencil me-2"></i>Modifica polizza {{ policy.numero_polizza }}</h1>
 
 <form method="post" class="card">
+  {{ csrf_field() }}
   <div class="card-body row g-3">
     <div class="col-md-4">
       <label class="form-label">Compagnia *</label>
-      <input class="form-control" name="compagnia" required value="{{ policy.compagnia }}">
+      <input class="form-control" name="compagnia" required value="{{ policy.compagnia }}" list="elenco-compagnie" autocomplete="off">
+      <datalist id="elenco-compagnie">{% for c in compagnie %}<option value="{{ c }}">{% endfor %}</datalist>
     </div>
     <div class="col-md-4">
       <label class="form-label">Numero polizza *</label>
@@ -79,7 +82,7 @@
   </div>
   <div class="card-footer d-flex gap-2">
     <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Salva</button>
-    <a class="btn btn-outline-secondary" href="{{ url_for('clients.detail', client_id=policy.client_id) }}#polizze">Annulla</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('policies.detail', policy_id=policy.id) }}">Annulla</a>
   </div>
 </form>
 {% endblock %}
