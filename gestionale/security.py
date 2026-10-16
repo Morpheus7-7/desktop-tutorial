@@ -105,22 +105,26 @@ def audit(
     descrizione: str = "",
     user: User | None = None,
     commit: bool = False,
+    sistema: bool = False,
 ) -> None:
     """Aggiunge una voce al registro attività.
 
     Di norma la voce viene salvata insieme all'operazione che descrive (stessa
     transazione): chi chiama fa poi ``db.session.commit()``.
     """
-    utente = user if user is not None else (g.get("user") if has_request_context() else None)
+    if sistema:
+        utente = None
+    else:
+        utente = user if user is not None else (g.get("user") if has_request_context() else None)
     db.session.add(
         AuditLog(
             user_id=utente.id if utente else None,
-            username=utente.username if utente else None,
+            username=utente.username if utente else ("sistema" if sistema else None),
             azione=azione,
             entita=entita,
             entita_id=entita_id,
             descrizione=(descrizione or "")[:500],
-            ip=request.remote_addr if has_request_context() else None,
+            ip=request.remote_addr if has_request_context() and not sistema else None,
         )
     )
     if commit:

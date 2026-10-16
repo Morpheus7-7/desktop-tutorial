@@ -1,4 +1,4 @@
-"""Scheduler in background: notifiche email e backup automatico.
+"""Scheduler in background: automatismi sulle date, notifiche email e backup.
 
 Un singolo thread demone controlla periodicamente le scadenze: genera le
 notifiche mancanti e, se le email sono attive, invia il digest delle notifiche
@@ -22,28 +22,35 @@ _MIN_INTERVALLO_S = 60  # limite di sicurezza: non più spesso di una volta al m
 
 
 def _tick(app: Flask) -> None:
-    """Un ciclo di controllo: notifiche, digest email e backup giornaliero."""
+    """Un ciclo di controllo: automatismi, notifiche, digest email e backup giornaliero."""
     from .backup import backup_automatico
     from .mailer import send_pending_notifications
-    from .notifications import auto_create_renewal_followups, generate_notifications
-    from .models import Settings
+    from .models import Settings, db
+    from .notifications import LOCK, aggiorna_tutto
 
     with app.app_context():
+        with LOCK:
+            try:
+                aggiorna_tutto()
+            except Exception:  # noqa: BLE001 — non far morire il thread per un errore transitorio
+                db.session.rollback()
+                app.logger.exception("Scheduler: errore durante l'aggiornamento di scadenze e notifiche.")
         try:
-            auto_create_renewal_followups()
-            generate_notifications()
-            settings = Settings.get()
-            inviate = send_pending_notifications(settings)
+            inviate = send_pending_notifications(Settings.get())
             if inviate:
                 app.logger.info("Scheduler: inviate %d notifiche via email.", inviate)
-        except Exception:  # noqa: BLE001 — non far morire il thread per un errore transitorio
-            app.logger.exception("Scheduler: errore durante il controllo periodico.")
+        except Exception:  # noqa: BLE001
+            db.session.rollback()
+            app.logger.exception("Scheduler: invio delle notifiche via email non riuscito.")
         try:
             percorso = backup_automatico()
             if percorso:
                 app.logger.info("Scheduler: backup automatico salvato in %s.", percorso)
         except Exception:  # noqa: BLE001
+            db.session.rollback()
             app.logger.exception("Scheduler: backup automatico non riuscito.")
+        finally:
+            db.session.remove()
 
 
 def _intervallo_secondi(app: Flask) -> int:

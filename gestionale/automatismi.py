@@ -1,0 +1,189 @@
+"""Automatismi legati alle date, eseguiti dallo scheduler e all'accesso.
+
+- **Rinnovo tacito**: le polizze a tacito rinnovo senza disdetta, arrivate a
+  scadenza, vengono prorogate di un'annualità e (se la polizza gestisce i
+  titoli) ricevono la quietanza della nuova annualità.
+- **Quietanze all'anniversario**: per le polizze che gestiscono i titoli nel
+  gestionale (poliennali comprese), la quietanza di ogni nuova annualità viene
+  emessa con un anticipo configurabile.
+- **Scadenza automatica**: le polizze senza tacito rinnovo, non rinnovate entro
+  i giorni di tolleranza dopo la scadenza, passano a «scaduta» (o «disdetta» se
+  la disdetta era stata registrata); le rate future vengono stornate.
+
+Ogni operazione finisce nel registro attività come utente «sistema» e genera
+una notifica informativa. Ogni automatismo si disattiva dalle Impostazioni.
+"""
+from __future__ import annotations
+
+from datetime import date, timedelta
+
+from .models import FollowUp, Policy, Settings, db, now
+from .titoli import TitoliGiaPresenti, add_months, genera_titoli, periodi_polizza, titoli_periodo
+
+# Il rinnovo tacito automatico agisce solo su scadenze recenti: una polizza
+# dimenticata da anni va verificata a mano, non rinnovata in blocco.
+FINESTRA_RINNOVO_TACITO_GIORNI = 60
+STATI_ATTIVI = ("attiva", "in_rinnovo")
+
+
+def _audit_sistema(azione: str, policy: Policy, descrizione: str) -> None:
+    from .security import audit
+
+    audit(azione, "polizza", policy.id, descrizione, sistema=True)
+
+
+def _notifica(dedup_key: str, messaggio: str, policy: Policy, livello: str = "info") -> None:
+    from .notifications import aggiungi_notifica
+
+    aggiungi_notifica("automatismo", livello, messaggio, f"/polizze/{policy.id}", dedup_key)
+
+
+def _gestisce_titoli(policy: Policy) -> bool:
+    """Le automazioni sui titoli valgono solo per le polizze che li gestiscono già."""
+    return bool(policy.premio_annuo and policy.premio_annuo > 0 and policy.titoli)
+
+
+def storna_titoli_futuri(policy: Policy, dal: date, motivo: str) -> int:
+    """Storna le rate non incassate con effetto da ``dal`` in poi; restituisce quante."""
+    from .notifications import elimina_notifiche
+
+    stornati = 0
+    for titolo in policy.titoli:
+        if titolo.stato == "da_incassare" and titolo.data_effetto >= dal:
+            titolo.stato = "stornato"
+            titolo.note = ((titolo.note + "\n") if titolo.note else "") + f"Storno: {motivo}"
+            elimina_notifiche(f"titolo:{titolo.id}:")
+            stornati += 1
+    return stornati
+
+
+def rinnova_taciti(oggi: date, settings: Settings) -> int:
+    if not settings.rinnovo_tacito_automatico:
+        return 0
+    polizze = Policy.query.filter(
+        Policy.stato.in_(STATI_ATTIVI),
+        Policy.tacito_rinnovo.is_(True),
+        Policy.data_disdetta.is_(None),
+        Policy.data_scadenza.isnot(None),
+        Policy.data_scadenza <= oggi,
+        Policy.data_scadenza >= oggi - timedelta(days=FINESTRA_RINNOVO_TACITO_GIORNI),
+    ).all()
+    rinnovate = 0
+    for policy in polizze:
+        vecchia = policy.data_scadenza
+        try:
+            nuova = add_months(vecchia, 12)
+        except (ValueError, OverflowError):
+            continue
+        titoli_msg = ""
+        if _gestisce_titoli(policy):
+            try:
+                titoli = genera_titoli(policy, inizio=vecchia, fine=nuova, tipo_primo="quietanza")
+                titoli_msg = f", emesse {len(titoli)} rate"
+            except (TitoliGiaPresenti, ValueError):
+                pass
+        policy.data_scadenza = nuova
+        policy.stato = "attiva"
+        for fu in FollowUp.query.filter_by(policy_id=policy.id, tipo="rinnovo", stato="aperto").all():
+            fu.stato = "completato"
+            fu.completed_at = now()
+        _audit_sistema(
+            "rinnovo", policy,
+            f"Rinnovo tacito automatico della polizza {policy.numero_polizza}: "
+            f"scadenza {vecchia:%d/%m/%Y} → {nuova:%d/%m/%Y}{titoli_msg}",
+        )
+        _notifica(
+            f"automatismo:tacito:{policy.id}:{vecchia.isoformat()}",
+            f"Polizza {policy.numero_polizza} di {policy.cliente.ragione_sociale} rinnovata tacitamente "
+            f"fino al {nuova:%d/%m/%Y}{titoli_msg}.",
+            policy,
+        )
+        rinnovate += 1
+    return rinnovate
+
+
+def emetti_quietanze(oggi: date, settings: Settings) -> int:
+    if not settings.emissione_quietanze_automatica:
+        return 0
+    anticipo = max(0, min(settings.anticipo_quietanze_giorni or 0, 365))
+    orizzonte = oggi + timedelta(days=anticipo)
+    polizze = Policy.query.filter(
+        Policy.stato.in_(STATI_ATTIVI),
+        Policy.premio_annuo > 0,
+    ).all()
+    emesse = 0
+    for policy in polizze:
+        if not policy.titoli or policy.data_disdetta:
+            continue
+        for inizio, fine in periodi_polizza(policy, fino_a=orizzonte):
+            if fine <= oggi or inizio > orizzonte:
+                continue
+            if titoli_periodo(policy, inizio, fine):
+                continue
+            try:
+                titoli = genera_titoli(policy, inizio=inizio, fine=fine)
+            except (TitoliGiaPresenti, ValueError):
+                continue
+            _audit_sistema(
+                "crea", policy,
+                f"Emesse automaticamente {len(titoli)} rate della polizza {policy.numero_polizza} "
+                f"per l'annualità {inizio:%d/%m/%Y} – {fine:%d/%m/%Y}",
+            )
+            _notifica(
+                f"automatismo:quietanze:{policy.id}:{inizio.isoformat()}",
+                f"Emesse le rate dell'annualità {inizio:%d/%m/%Y} – {fine:%d/%m/%Y} della polizza "
+                f"{policy.numero_polizza} di {policy.cliente.ragione_sociale}.",
+                policy,
+            )
+            emesse += 1
+    return emesse
+
+
+def scadi_polizze(oggi: date, settings: Settings) -> int:
+    if not settings.scadenza_automatica:
+        return 0
+    tolleranza = max(0, min(settings.tolleranza_scadenza_giorni or 0, 365))
+    polizze = Policy.query.filter(
+        Policy.stato.in_(STATI_ATTIVI),
+        Policy.data_scadenza.isnot(None),
+        Policy.data_scadenza < oggi,
+    ).all()
+    chiuse = 0
+    for policy in polizze:
+        disdetta = policy.data_disdetta is not None
+        if policy.tacito_rinnovo and not disdetta:
+            continue  # si rinnova per legge: la gestisce il rinnovo tacito
+        limite = policy.data_scadenza + timedelta(days=0 if disdetta else tolleranza)
+        if oggi <= limite:
+            continue
+        policy.stato = "disdetta" if disdetta else "scaduta"
+        stornati = storna_titoli_futuri(policy, policy.data_scadenza, f"polizza {policy.stato}")
+        dettaglio = f", stornate {stornati} rate successive" if stornati else ""
+        _audit_sistema(
+            "modifica", policy,
+            f"Polizza {policy.numero_polizza} passata automaticamente a «{policy.stato_label}» "
+            f"(scadenza {policy.data_scadenza:%d/%m/%Y}){dettaglio}",
+        )
+        _notifica(
+            f"automatismo:chiusura:{policy.id}:{policy.data_scadenza.isoformat()}",
+            f"Polizza {policy.numero_polizza} di {policy.cliente.ragione_sociale} non rinnovata: "
+            f"impostata come «{policy.stato_label}» (scaduta il {policy.data_scadenza:%d/%m/%Y}){dettaglio}.",
+            policy,
+        )
+        chiuse += 1
+    return chiuse
+
+
+def esegui_automatismi(oggi: date | None = None) -> dict:
+    """Esegue tutti gli automatismi e salva. Restituisce i conteggi."""
+    oggi = oggi or date.today()
+    settings = Settings.get()
+    esito = {
+        "rinnovi_taciti": rinnova_taciti(oggi, settings),
+        "quietanze": emetti_quietanze(oggi, settings),
+        "scadute": scadi_polizze(oggi, settings),
+    }
+    if any(esito.values()):
+        db.session.commit()
+    return esito
+

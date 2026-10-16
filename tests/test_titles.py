@@ -156,15 +156,29 @@ def test_incasso_annullamento_e_storno(client, app):
         assert t.stato == "stornato" and "disdetta" in t.note
 
 
-def test_incasso_parziale_ricalcola_provvigione(client, app):
+def test_incasso_parziale_rifiutato(client, app):
     _, pid = _cliente_e_polizza(app)
     client.post(f"/polizze/{pid}/genera-titoli")
     with app.app_context():
         tid = db.session.get(Policy, pid).titoli[0].id
-    client.post(f"/titoli/{tid}/incassa", data={"importo": "600,00", "mezzo_pagamento": "pos"})
+    resp = client.post(f"/titoli/{tid}/incassa", data={"importo": "600,00", "mezzo_pagamento": "pos"},
+                       follow_redirects=True)
+    assert "incassi parziali non sono ammessi" in resp.get_data(as_text=True)
     with app.app_context():
         t = db.session.get(Title, tid)
-        assert t.premio_lordo == 600.0 and t.provvigione == 120.0
+        assert t.stato == "da_incassare" and t.premio_lordo == 1200.0 and t.provvigione == 240.0
+    # Senza mezzo di pagamento l'incasso non si registra.
+    client.post(f"/titoli/{tid}/incassa", data={})
+    with app.app_context():
+        assert db.session.get(Title, tid).stato == "da_incassare"
+    # Data di incasso futura: rifiutata.
+    client.post(f"/titoli/{tid}/incassa", data={
+        "mezzo_pagamento": "pos", "data_incasso": (OGGI + timedelta(days=1)).isoformat()})
+    with app.app_context():
+        assert db.session.get(Title, tid).stato == "da_incassare"
+    client.post(f"/titoli/{tid}/incassa", data={"importo": "1.200,00", "mezzo_pagamento": "pos"})
+    with app.app_context():
+        assert db.session.get(Title, tid).stato == "incassato"
 
 
 def test_polizza_e_cliente_con_incassi_non_eliminabili(client, app):
@@ -226,11 +240,12 @@ def test_notifiche_titoli_e_chiusura_dopo_incasso(client, app):
         tid = t.id
     client.get("/")
     with app.app_context():
-        n = Notification.query.filter_by(dedup_key=f"titolo:{tid}:sospesa").one()
+        chiave = f"titolo:{tid}:{(OGGI - timedelta(days=20)).isoformat()}:sospesa"
+        n = Notification.query.filter_by(dedup_key=chiave).one()
         assert n.livello == "danger" and not n.letta
     client.post(f"/titoli/{tid}/incassa", data={"mezzo_pagamento": "bonifico"})
     with app.app_context():
-        assert Notification.query.filter_by(dedup_key=f"titolo:{tid}:sospesa").one().letta
+        assert Notification.query.filter_by(dedup_key=chiave).one().letta
 
 
 def test_foglio_cassa_ed_estratto_conto(client, app):
@@ -253,7 +268,13 @@ def test_foglio_cassa_ed_estratto_conto(client, app):
     pagina = client.get("/titoli/estratto-conto", query_string=periodo).get_data(as_text=True)
     assert "Generali" in pagina and "€ 960,00" in pagina  # netto = 1200 - 20%
 
-    client.post("/titoli/estratto-conto/rimessa", data={**periodo, "compagnia": "Generali"})
+    # Senza la conferma dei titoli (ids) non si rimette nulla.
+    client.post("/titoli/estratto-conto/rimessa", data={**periodo, "compagnia": "Generali",
+                                                         "data_rimessa": OGGI.isoformat()})
+    with app.app_context():
+        assert all(db.session.get(Title, i).data_rimessa is None for i in ids)
+    client.post("/titoli/estratto-conto/rimessa", data={
+        **periodo, "compagnia": "Generali", "ids": ids, "data_rimessa": OGGI.isoformat()})
     with app.app_context():
         assert all(db.session.get(Title, i).data_rimessa == OGGI for i in ids)
     # Dopo la rimessa l'incasso non si può più annullare.

@@ -2,6 +2,7 @@
 from datetime import date
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
+from sqlalchemy.exc import IntegrityError
 
 from ..export import csv_response
 from ..models import (
@@ -16,9 +17,9 @@ from ..models import (
     db,
     now,
 )
-from ..notifications import segna_lette
+from ..notifications import elimina_notifiche, segna_lette
 from ..security import audit
-from ..utils import clean, formatta_euro, paginate, parse_date, parse_float, parse_int
+from ..utils import clean, formatta_euro, leggi_data, leggi_importo, paginate, parse_int
 
 bp = Blueprint("claims", __name__, url_prefix="/sinistri")
 
@@ -61,7 +62,10 @@ def list_claims():
         "aperti": aperti.count(),
         "riservato": aperti.with_entities(db.func.coalesce(db.func.sum(Claim.importo_riservato), 0.0)).scalar(),
         "liquidato_anno": db.session.query(db.func.coalesce(db.func.sum(Claim.importo_liquidato), 0.0))
-        .filter(Claim.data_liquidazione >= date(date.today().year, 1, 1))
+        .filter(
+            Claim.data_liquidazione >= date(date.today().year, 1, 1),
+            Claim.data_liquidazione <= date.today(),
+        )
         .scalar(),
         "da_denunciare": aperti.filter(Claim.data_denuncia.is_(None)).count(),
     }
@@ -99,39 +103,50 @@ def export_claims():
 
 
 def _populate(claim: Claim, form) -> list[str]:
-    """Copia i campi del form nel sinistro; restituisce gli errori di validazione."""
-    errori = []
+    """Copia i campi del form nel sinistro; restituisce gli errori di validazione.
+
+    Tutte le date del sinistro sono fatti già avvenuti: nessuna può essere
+    futura (una denuncia «futura» spegnerebbe il promemoria dell'art. 1913).
+    """
+    errori: list[str] = []
+    oggi = date.today()
     claim.tipologia = form.get("tipologia") if form.get("tipologia") in dict(CLAIM_TYPES) else "altro"
     claim.numero_compagnia = clean(form, "numero_compagnia")
-    claim.data_evento = parse_date(form.get("data_evento"))
-    claim.data_denuncia = parse_date(form.get("data_denuncia"))
+    claim.data_evento = leggi_data(
+        form, "data_evento", "Data dell'evento", errori, obbligatoria=True, massimo=oggi,
+        msg_massimo="La data dell'evento non può essere futura.",
+    )
+    claim.data_denuncia = leggi_data(
+        form, "data_denuncia", "Data di denuncia", errori, massimo=oggi,
+        msg_massimo="La data di denuncia non può essere futura.",
+    )
     claim.luogo = clean(form, "luogo")
     claim.descrizione = clean(form, "descrizione")
     claim.controparte = clean(form, "controparte")
     claim.perito = clean(form, "perito")
     claim.liquidatore = clean(form, "liquidatore")
-    claim.importo_richiesto = parse_float(form.get("importo_richiesto"))
-    claim.importo_riservato = parse_float(form.get("importo_riservato"))
-    claim.importo_liquidato = parse_float(form.get("importo_liquidato"))
-    claim.franchigia = parse_float(form.get("franchigia"))
-    claim.data_liquidazione = parse_date(form.get("data_liquidazione"))
+    for campo, etichetta in (
+        ("importo_richiesto", "Importo richiesto"),
+        ("importo_riservato", "Riserva"),
+        ("importo_liquidato", "Importo liquidato"),
+        ("franchigia", "Franchigia"),
+    ):
+        setattr(claim, campo, leggi_importo(form, campo, etichetta, errori, minimo=0))
+    claim.data_liquidazione = leggi_data(
+        form, "data_liquidazione", "Data di liquidazione", errori, massimo=oggi,
+        msg_massimo="La data di liquidazione non può essere futura.",
+    )
     claim.note = clean(form, "note")
 
-    if not claim.data_evento:
-        errori.append("La data dell'evento è obbligatoria.")
-    elif claim.data_evento > date.today():
-        errori.append("La data dell'evento non può essere futura.")
     if claim.data_evento and claim.data_denuncia and claim.data_denuncia < claim.data_evento:
         errori.append("La data di denuncia non può precedere quella dell'evento.")
-    for campo, etichetta in (
-        ("importo_richiesto", "L'importo richiesto"),
-        ("importo_riservato", "La riserva"),
-        ("importo_liquidato", "L'importo liquidato"),
-        ("franchigia", "La franchigia"),
-    ):
-        valore = getattr(claim, campo)
-        if valore is not None and valore < 0:
-            errori.append(f"{etichetta} non può essere negativo.")
+    if claim.data_evento and claim.data_liquidazione and claim.data_liquidazione < claim.data_evento:
+        errori.append("La data di liquidazione non può precedere quella dell'evento.")
+    if claim.stato == "liquidato":
+        if not claim.importo_liquidato or claim.importo_liquidato <= 0:
+            errori.append("Un sinistro liquidato richiede l'importo liquidato.")
+        if claim.data_liquidazione is None:
+            claim.data_liquidazione = claim.data_chiusura or oggi
     return errori
 
 
@@ -142,27 +157,34 @@ def _policy_for(client: Client, raw) -> Policy | None:
     return next((p for p in client.polizze if p.id == pid), None)
 
 
-def _form_context(claim, client=None):
+def _form_context(claim, client=None, valori=None):
     clienti = None if client else Client.query.order_by(Client.ragione_sociale).all()
     polizze = (
         client.polizze if client
         else Policy.query.join(Client).order_by(Client.ragione_sociale, Policy.numero_polizza).all()
     )
     return dict(
-        claim=claim, client=client, clienti=clienti, polizze=polizze,
+        claim=claim, client=client, clienti=clienti, polizze=polizze, valori=valori,
         claim_types=CLAIM_TYPES, claim_statuses=CLAIM_STATUSES,
     )
+
+
+def _avvisa_copertura(claim: Claim) -> None:
+    for avviso in claim.avvisi_copertura:
+        flash(f"Verifica la copertura: {avviso}", "warning")
 
 
 @bp.route("/nuovo", methods=["GET", "POST"])
 def new_claim():
     client = None
-    cid = parse_int(request.values.get("client_id"))
+    cid = parse_int(request.values.get("client_id"), minimo=1)
     if cid:
         client = db.get_or_404(Client, cid)
-    claim = Claim(stato="aperto", data_denuncia=date.today())
+    # Nessuna data di denuncia predefinita: finché non viene indicata il
+    # sinistro risulta «da denunciare» e scatta il promemoria dell'art. 1913.
+    claim = Claim(stato="aperto")
     if request.method == "GET":
-        policy = db.session.get(Policy, parse_int(request.args.get("policy_id")) or 0)
+        policy = db.session.get(Policy, parse_int(request.args.get("policy_id"), minimo=1) or 0)
         if policy is not None:
             client = policy.cliente
             claim.policy_id = policy.id
@@ -170,19 +192,27 @@ def new_claim():
 
     if client is None:
         flash("Seleziona il cliente del sinistro.", "danger")
-        return render_template("claims/form.html", **_form_context(claim, None)), 400
-    errori = _populate(claim, request.form)
+        return render_template("claims/form.html", **_form_context(claim, None, request.form)), 400
+    with db.session.no_autoflush:
+        errori = _populate(claim, request.form)
     policy = _policy_for(client, request.form.get("policy_id"))
     claim.policy_id = policy.id if policy else None
     if errori:
         for e in errori:
             flash(e, "danger")
-        return render_template("claims/form.html", **_form_context(claim, client)), 400
+        return render_template("claims/form.html", **_form_context(claim, client, request.form)), 400
 
     claim.client_id = client.id
-    claim.numero = Claim.genera_numero(date.today().year)
-    db.session.add(claim)
-    db.session.flush()
+    for tentativo in range(3):
+        claim.numero = Claim.genera_numero(date.today().year)
+        db.session.add(claim)
+        try:
+            db.session.flush()
+            break
+        except IntegrityError:  # numero assegnato nel frattempo da un'altra apertura
+            db.session.rollback()  # il sinistro torna transient e si riprova
+            if tentativo == 2:
+                raise
     claim.eventi.append(ClaimNote(tipo="stato", testo="Sinistro aperto.", username=g.user.username))
     audit("crea", "sinistro", claim.id,
           f"Aperto sinistro {claim.numero} per {client.ragione_sociale}"
@@ -191,6 +221,9 @@ def new_claim():
     flash(f"Sinistro {claim.numero} aperto.", "success")
     if claim.denuncia_tardiva:
         flash("Attenzione: denuncia oltre i 3 giorni dall'evento (art. 1913 c.c.).", "warning")
+    elif claim.data_denuncia is None:
+        flash("Ricorda di denunciare il sinistro alla compagnia entro 3 giorni dall'evento (art. 1913 c.c.).", "info")
+    _avvisa_copertura(claim)
     return redirect(url_for("claims.detail", claim_id=claim.id))
 
 
@@ -209,18 +242,29 @@ def detail(claim_id):
 def edit_claim(claim_id):
     claim = db.get_or_404(Claim, claim_id)
     if request.method == "POST":
-        errori = _populate(claim, request.form)
-        policy = _policy_for(claim.cliente, request.form.get("policy_id"))
-        claim.policy_id = policy.id if policy else None
+        vecchio_evento = claim.data_evento
+        vecchia_polizza = claim.policy_id
+        with db.session.no_autoflush:
+            errori = _populate(claim, request.form)
+            policy = _policy_for(claim.cliente, request.form.get("policy_id"))
+            claim.policy_id = policy.id if policy else None
         if errori:
+            cliente = claim.cliente
+            db.session.rollback()  # nessuna modifica parziale
             for e in errori:
                 flash(e, "danger")
-            return render_template("claims/form.html", **_form_context(claim, claim.cliente)), 400
+            claim = db.session.get(Claim, claim_id)
+            return render_template("claims/form.html", **_form_context(claim, cliente, request.form)), 400
+        if claim.data_evento != vecchio_evento:
+            # Il termine dell'art. 1913 dipende dalla data dell'evento: si ricalcola.
+            elimina_notifiche(f"sinistro:{claim.id}:")
         if claim.data_denuncia:
-            segna_lette(f"sinistro:{claim.id}:denuncia")
+            segna_lette(f"sinistro:{claim.id}:{claim.data_evento.isoformat()}:denuncia")
         audit("modifica", "sinistro", claim.id, f"Modificato sinistro {claim.numero}")
         db.session.commit()
         flash("Sinistro aggiornato.", "success")
+        if claim.data_evento != vecchio_evento or claim.policy_id != vecchia_polizza:
+            _avvisa_copertura(claim)
         return redirect(url_for("claims.detail", claim_id=claim.id))
     return render_template("claims/form.html", **_form_context(claim, claim.cliente))
 
@@ -232,19 +276,25 @@ def change_status(claim_id):
     if nuovo not in dict(CLAIM_STATUSES):
         abort(400)
     commento = (request.form.get("commento") or "").strip()
-    if nuovo == "liquidato":
-        importo = parse_float(request.form.get("importo_liquidato"))
-        if importo is not None:
-            claim.importo_liquidato = importo
-        if not claim.importo_liquidato:
-            flash("Per chiudere come liquidato indica l'importo liquidato.", "danger")
-            return redirect(url_for("claims.detail", claim_id=claim.id))
-        claim.data_liquidazione = claim.data_liquidazione or date.today()
     if nuovo == claim.stato:
         flash("Il sinistro è già in questo stato.", "info")
         return redirect(url_for("claims.detail", claim_id=claim.id))
+    if nuovo == "liquidato":
+        errori: list[str] = []
+        importo = leggi_importo(request.form, "importo_liquidato", "Importo liquidato", errori, minimo=0)
+        if errori:
+            for e in errori:
+                flash(e, "danger")
+            return redirect(url_for("claims.detail", claim_id=claim.id))
+        if importo is not None:
+            claim.importo_liquidato = importo
+        if not claim.importo_liquidato or claim.importo_liquidato <= 0:
+            flash("Per chiudere come liquidato indica l'importo liquidato.", "danger")
+            return redirect(url_for("claims.detail", claim_id=claim.id))
+        claim.data_liquidazione = claim.data_liquidazione or date.today()
 
     vecchio = claim.stato_label
+    era_aperto = claim.aperto
     claim.stato = nuovo
     claim.data_chiusura = None if nuovo in CLAIM_OPEN_STATUSES else (claim.data_chiusura or date.today())
     testo = f"Stato: {vecchio} → {claim.stato_label}."
@@ -255,6 +305,9 @@ def change_status(claim_id):
     claim.eventi.append(ClaimNote(tipo="stato", testo=testo, username=g.user.username))
     if not claim.aperto:
         segna_lette(f"sinistro:{claim.id}:")
+    elif not era_aperto:
+        # Riaperto: le notifiche ripartono da zero (es. denuncia ancora mancante).
+        elimina_notifiche(f"sinistro:{claim.id}:")
     audit("modifica", "sinistro", claim.id, f"Sinistro {claim.numero}: {testo}")
     db.session.commit()
     flash(f"Sinistro {claim.numero}: {claim.stato_label}.", "success")
@@ -282,6 +335,7 @@ def delete_claim(claim_id):
     for doc in claim.documenti:
         doc.claim_id = None
     audit("elimina", "sinistro", claim.id, f"Eliminato sinistro {claim.numero} ({claim.cliente.ragione_sociale})")
+    elimina_notifiche(f"sinistro:{claim.id}:")
     db.session.delete(claim)
     db.session.commit()
     flash("Sinistro eliminato.", "success")

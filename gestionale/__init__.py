@@ -7,6 +7,7 @@ scadenzario e notifiche. Accesso con utenti e ruoli, registro attività e
 backup.
 """
 import os
+import re
 import secrets
 import time
 from datetime import date, timedelta
@@ -59,6 +60,11 @@ def _ensure_schema() -> None:
         },
         "policies": {
             "provvigione_perc": "ALTER TABLE policies ADD COLUMN provvigione_perc FLOAT",
+            "preavviso_disdetta_giorni": "ALTER TABLE policies ADD COLUMN preavviso_disdetta_giorni INTEGER",
+            "data_disdetta": "ALTER TABLE policies ADD COLUMN data_disdetta DATE",
+        },
+        "users": {
+            "sessione_versione": "ALTER TABLE users ADD COLUMN sessione_versione INTEGER NOT NULL DEFAULT 0",
         },
         "documents": {
             "dimensione": "ALTER TABLE documents ADD COLUMN dimensione INTEGER",
@@ -77,6 +83,11 @@ def _ensure_schema() -> None:
             "backup_automatico": "ALTER TABLE settings ADD COLUMN backup_automatico BOOLEAN NOT NULL DEFAULT 1",
             "backup_conservati": "ALTER TABLE settings ADD COLUMN backup_conservati INTEGER DEFAULT 14",
             "ultimo_backup_at": "ALTER TABLE settings ADD COLUMN ultimo_backup_at DATETIME",
+            "rinnovo_tacito_automatico": "ALTER TABLE settings ADD COLUMN rinnovo_tacito_automatico BOOLEAN NOT NULL DEFAULT 1",
+            "emissione_quietanze_automatica": "ALTER TABLE settings ADD COLUMN emissione_quietanze_automatica BOOLEAN NOT NULL DEFAULT 1",
+            "anticipo_quietanze_giorni": "ALTER TABLE settings ADD COLUMN anticipo_quietanze_giorni INTEGER DEFAULT 30",
+            "scadenza_automatica": "ALTER TABLE settings ADD COLUMN scadenza_automatica BOOLEAN NOT NULL DEFAULT 1",
+            "tolleranza_scadenza_giorni": "ALTER TABLE settings ADD COLUMN tolleranza_scadenza_giorni INTEGER DEFAULT 30",
         },
     }
 
@@ -89,6 +100,62 @@ def _ensure_schema() -> None:
             if colonna not in esistenti:
                 db.session.execute(text(ddl))
                 cambiato = True
+    if cambiato:
+        db.session.commit()
+
+    # Indici delle colonne aggiunte con ALTER TABLE e vincolo anti-duplicati
+    # sulle rate (doppio clic su «Genera titoli» o «Rinnova»).
+    indici = [
+        "CREATE INDEX IF NOT EXISTS ix_documents_claim_id ON documents (claim_id)",
+        "CREATE INDEX IF NOT EXISTS ix_followups_policy_id ON followups (policy_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_titles_rata ON titles (policy_id, data_effetto, numero_rata) "
+        "WHERE stato != 'stornato' AND numero_rata IS NOT NULL AND tipo != 'appendice'",
+    ]
+    if db.engine.dialect.name == "sqlite":
+        for ddl in indici:
+            try:
+                db.session.execute(text(ddl))
+                db.session.commit()
+            except Exception:  # noqa: BLE001 - es. duplicati già presenti: il vincolo resta solo applicativo
+                db.session.rollback()
+
+    _migra_chiavi_notifiche()
+
+
+_CHIAVE_POLIZZA_VECCHIA = re.compile(r"^polizza:(\d+):(\d+|scaduta)$")
+_CHIAVE_FOLLOWUP_VECCHIA = re.compile(r"^followup:(\d+):(ritardo|oggi|prossimo)$")
+
+
+def _migra_chiavi_notifiche() -> None:
+    """Converte le chiavi delle notifiche delle versioni precedenti nel formato con la data.
+
+    Evita che, dopo l'aggiornamento, gli avvisi già ricevuti (anche via email)
+    vengano generati e inviati una seconda volta.
+    """
+    from .models import FollowUp, Notification, Policy
+
+    vecchie = Notification.query.filter(
+        db.or_(Notification.dedup_key.like("polizza:%"), Notification.dedup_key.like("followup:%"))
+    ).all()
+    esistenti = {n.dedup_key for n in vecchie}
+    cambiato = False
+    for n in vecchie:
+        nuova = None
+        m = _CHIAVE_POLIZZA_VECCHIA.match(n.dedup_key)
+        if m:
+            policy = db.session.get(Policy, int(m.group(1)))
+            if policy and policy.data_scadenza:
+                nuova = f"polizza:{policy.id}:{policy.data_scadenza.isoformat()}:{m.group(2)}"
+        m = _CHIAVE_FOLLOWUP_VECCHIA.match(n.dedup_key)
+        if m:
+            fu = db.session.get(FollowUp, int(m.group(1)))
+            if fu:
+                nuova = f"followup:{fu.id}:{fu.data_scadenza.isoformat()}:{m.group(2)}"
+        if nuova and nuova not in esistenti:
+            esistenti.discard(n.dedup_key)
+            n.dedup_key = nuova
+            esistenti.add(nuova)
+            cambiato = True
     if cambiato:
         db.session.commit()
 
@@ -239,12 +306,20 @@ def create_app(test_config: dict | None = None) -> Flask:
         adesso = time.monotonic()
         if intervallo and adesso - stato_refresh["ultimo"] < intervallo:
             return
-        stato_refresh["ultimo"] = adesso
 
-        from .notifications import auto_create_renewal_followups, generate_notifications
+        from .notifications import LOCK, aggiorna_tutto
 
-        auto_create_renewal_followups()
-        generate_notifications()
+        # Se lo scheduler (o un'altra richiesta) sta già aggiornando, non aspettiamo.
+        if not LOCK.acquire(blocking=False):
+            return
+        try:
+            stato_refresh["ultimo"] = adesso
+            aggiorna_tutto()
+        except Exception:  # noqa: BLE001 - le notifiche non devono mai bloccare l'utente
+            db.session.rollback()
+            app.logger.exception("Aggiornamento automatico di notifiche e scadenze non riuscito.")
+        finally:
+            LOCK.release()
 
     # ------------------------------------------------------------------
     # Pagine di errore
@@ -253,6 +328,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         400: ("Richiesta non valida", "La richiesta non può essere elaborata."),
         403: ("Accesso negato", "Non hai i permessi per accedere a questa pagina."),
         404: ("Pagina non trovata", "La pagina o l'elemento richiesto non esiste (o è stato eliminato)."),
+        405: ("Operazione non consentita", "Usa i pulsanti della pagina per eseguire questa operazione."),
         413: ("File troppo grande", "Il file supera la dimensione massima consentita."),
         500: ("Errore interno", "Si è verificato un errore imprevisto. Riprova; se il problema persiste contatta l'assistenza."),
     }

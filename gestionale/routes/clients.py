@@ -1,6 +1,7 @@
 """Anagrafica clienti (aziende, professionisti, dipendenti) e analisi rischi."""
 import json
 import os
+from datetime import date, timedelta
 
 from flask import (
     Blueprint,
@@ -12,6 +13,7 @@ from flask import (
     request,
     url_for,
 )
+from werkzeug.security import safe_join
 
 from ..export import csv_response
 from ..models import (
@@ -29,9 +31,10 @@ from ..models import (
     RiskAnalysis,
     db,
 )
+from ..notifications import elimina_notifiche
 from ..risk_engine import analyze_client
 from ..security import audit
-from ..utils import clean, paginate, parse_date, parse_float, parse_int
+from ..utils import DATA_MIN, clean, leggi_data, leggi_importo, paginate, parse_int
 from ..validators import (
     data_nascita_da_cf,
     valida_cap,
@@ -44,7 +47,10 @@ from ..validators import (
 bp = Blueprint("clients", __name__, url_prefix="/clienti")
 
 
-def _populate_from_form(client: Client, form) -> None:
+def _populate_from_form(client: Client, form) -> list[str]:
+    """Copia i campi del form nel cliente e restituisce gli errori su date e importi."""
+    errori: list[str] = []
+    oggi = date.today()
     tipo = form.get("tipo")
     client.tipo = tipo if tipo in dict(CLIENT_TYPES) else "azienda"
     client.ragione_sociale = (form.get("ragione_sociale") or "").strip()
@@ -62,25 +68,44 @@ def _populate_from_form(client: Client, form) -> None:
     client.email = clean(form, "email")
     client.pec = clean(form, "pec")
     client.telefono = clean(form, "telefono")
-    client.numero_dipendenti = parse_int(form.get("numero_dipendenti"))
-    client.fatturato_annuo = parse_float(form.get("fatturato_annuo"))
+    dipendenti = (form.get("numero_dipendenti") or "").strip()
+    client.numero_dipendenti = parse_int(dipendenti, minimo=0, massimo=1_000_000)
+    if dipendenti and client.numero_dipendenti is None:
+        errori.append("Numero dipendenti: indica un numero intero non negativo.")
+    client.fatturato_annuo = leggi_importo(form, "fatturato_annuo", "Fatturato annuo", errori, minimo=0)
     client.descrizione_attivita = clean(form, "descrizione_attivita")
     client.note = clean(form, "note")
-    # Compliance
-    client.data_nascita = parse_date(form.get("data_nascita"))
-    client.data_consenso_privacy = parse_date(form.get("data_consenso_privacy"))
+    # Compliance: date nel passato (nascita, consenso, questionario) e una
+    # scadenza del documento entro un orizzonte plausibile.
+    futura = "non può essere una data futura."
+    client.data_nascita = leggi_data(
+        form, "data_nascita", "Data di nascita", errori, minimo=DATA_MIN, massimo=oggi,
+        msg_massimo=f"Data di nascita: {futura}",
+    )
+    client.data_consenso_privacy = leggi_data(
+        form, "data_consenso_privacy", "Consenso privacy", errori, massimo=oggi,
+        msg_massimo=f"Consenso privacy: {futura}",
+    )
     client.consenso_marketing = bool(form.get("consenso_marketing"))
-    client.data_adeguatezza = parse_date(form.get("data_adeguatezza"))
+    client.data_adeguatezza = leggi_data(
+        form, "data_adeguatezza", "Questionario di adeguatezza", errori, massimo=oggi,
+        msg_massimo=f"Questionario di adeguatezza: {futura}",
+    )
     documento_tipo = form.get("documento_tipo")
     client.documento_tipo = documento_tipo if documento_tipo in dict(ID_DOCUMENT_TYPES) else None
     client.documento_numero = clean(form, "documento_numero", upper=True)
-    client.documento_scadenza = parse_date(form.get("documento_scadenza"))
+    client.documento_scadenza = leggi_data(
+        form, "documento_scadenza", "Scadenza documento", errori,
+        massimo=oggi + timedelta(days=365 * 20),
+        msg_massimo="Scadenza documento: oltre 20 anni da oggi, controlla la data.",
+    )
     if client.persona_fisica and not client.data_nascita:
         client.data_nascita = data_nascita_da_cf(client.codice_fiscale)
+    return errori
 
 
-def _valida(client: Client) -> list[str]:
-    errori = []
+def _valida(client: Client, errori: list[str] | None = None) -> list[str]:
+    errori = list(errori or [])
     if not client.ragione_sociale:
         errori.append("La ragione sociale / il nominativo è obbligatorio.")
     for errore in (
@@ -93,8 +118,6 @@ def _valida(client: Client) -> list[str]:
     ):
         if errore:
             errori.append(errore)
-    if client.numero_dipendenti is not None and client.numero_dipendenti < 0:
-        errori.append("Il numero di dipendenti non può essere negativo.")
     return errori
 
 
@@ -189,8 +212,7 @@ def export_clients():
 def new_client():
     client = Client(tipo=request.args.get("tipo") if request.args.get("tipo") in dict(CLIENT_TYPES) else "azienda")
     if request.method == "POST":
-        _populate_from_form(client, request.form)
-        errori = _valida(client)
+        errori = _valida(client, _populate_from_form(client, request.form))
         if errori:
             for e in errori:
                 flash(e, "danger")
@@ -209,12 +231,17 @@ def new_client():
 
 @bp.route("/<int:client_id>")
 def detail(client_id):
-    client = db.get_or_404(Client, client_id)
+    return render_detail(db.get_or_404(Client, client_id))
+
+
+def render_detail(client: Client, form_polizza=None):
+    """Scheda cliente; ``form_polizza`` ripresenta i dati di una polizza non salvata."""
     from .policies import compagnie_note
 
     return render_template(
         "clients/detail.html",
         client=client,
+        form_polizza=form_polizza,
         compagnie=compagnie_note(),
         policy_branches=POLICY_BRANCHES,
         policy_statuses=POLICY_STATUSES,
@@ -232,12 +259,13 @@ def detail(client_id):
 def edit_client(client_id):
     client = db.get_or_404(Client, client_id)
     if request.method == "POST":
-        _populate_from_form(client, request.form)
-        errori = _valida(client)
+        with db.session.no_autoflush:
+            errori = _valida(client, _populate_from_form(client, request.form))
+            if errori:
+                for e in errori:
+                    flash(e, "danger")
+                risposta = _form(client, nuovo=False)
         if errori:
-            for e in errori:
-                flash(e, "danger")
-            risposta = _form(client, nuovo=False)
             db.session.rollback()
             return risposta, 400
         _avvisa_duplicati(client)
@@ -260,16 +288,24 @@ def delete_client(client_id):
         )
         return redirect(url_for("clients.detail", client_id=client.id))
     cartella = current_app.config["UPLOAD_FOLDER"]
-    file_da_rimuovere = [os.path.join(cartella, d.filename) for d in client.documenti]
+    file_da_rimuovere = [p for p in (safe_join(cartella, d.filename) for d in client.documenti) if p]
+    prefissi = [f"cliente:{client.id}:"]
+    for p in client.polizze:
+        prefissi += [f"polizza:{p.id}:", f"disdetta:{p.id}:", f"decorrenza:{p.id}:"]
+        prefissi += [f"titolo:{t.id}:" for t in p.titoli]
+    prefissi += [f"sinistro:{s.id}:" for s in client.sinistri]
+    prefissi += [f"followup:{f.id}:" for f in client.followups]
+    elimina_notifiche(*prefissi)
     audit("elimina", "cliente", client.id,
           f"Eliminato il cliente «{nome}» con {len(client.polizze)} polizze e {len(client.documenti)} documenti")
     db.session.delete(client)
     db.session.commit()
     for percorso in file_da_rimuovere:
         try:
-            os.remove(percorso)
+            if os.path.isfile(percorso):
+                os.remove(percorso)
         except OSError:
-            pass
+            current_app.logger.warning("File %s non rimosso", percorso)
     flash(f"Cliente «{nome}» eliminato con tutti i dati collegati.", "success")
     return redirect(url_for("clients.list_clients"))
 

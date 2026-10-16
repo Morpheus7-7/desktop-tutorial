@@ -91,7 +91,8 @@ def test_notifica_sinistro_da_denunciare(client, app):
     client.get("/")
     with app.app_context():
         s = Claim.query.one()
-        n = Notification.query.filter_by(dedup_key=f"sinistro:{s.id}:denuncia").one()
+        chiave = f"sinistro:{s.id}:{s.data_evento.isoformat()}:denuncia:scaduta"
+        n = Notification.query.filter_by(dedup_key=chiave).one()
         assert n.livello == "danger" and "1913" in n.messaggio
         sid = s.id
     # Registrando la denuncia la notifica viene chiusa.
@@ -100,7 +101,7 @@ def test_notifica_sinistro_da_denunciare(client, app):
         "data_evento": (OGGI - timedelta(days=5)).isoformat(), "data_denuncia": OGGI.isoformat(),
     })
     with app.app_context():
-        assert Notification.query.filter_by(dedup_key=f"sinistro:{sid}:denuncia").one().letta
+        assert Notification.query.filter_by(dedup_key=chiave).one().letta
         assert db.session.get(Claim, sid).denuncia_tardiva
 
 

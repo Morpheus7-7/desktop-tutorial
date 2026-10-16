@@ -82,11 +82,14 @@ def data_nascita_da_cf(cf: str | None) -> date | None:
     if giorno > 40:
         giorno -= 40
     oggi = date.today()
-    anno = 2000 + anno2 if 2000 + anno2 <= oggi.year else 1900 + anno2
-    try:
-        return date(anno, mese, giorno)
-    except ValueError:
-        return None
+    for secolo in (2000, 1900):
+        try:
+            candidata = date(secolo + anno2, mese, giorno)
+        except ValueError:
+            return None
+        if candidata <= oggi:
+            return candidata
+    return None
 
 
 def valida_cap(cap: str | None) -> str | None:

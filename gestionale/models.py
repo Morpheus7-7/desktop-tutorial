@@ -6,6 +6,8 @@ from flask import current_app
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from .utils import add_months_sicuro
+
 db = SQLAlchemy()
 
 
@@ -116,6 +118,22 @@ OPPORTUNITY_STAGES = [
 OPPORTUNITY_STAGE_LABELS = dict(OPPORTUNITY_STAGES)
 OPPORTUNITY_OPEN_STAGES = {"lead", "contatto", "preventivo", "trattativa"}
 
+# Stato «effettivo» di una polizza, calcolato dalle date (oltre allo stato manuale).
+POLICY_EFFECTIVE_STATES = {
+    "non_in_vigore": ("Non ancora in vigore", "bg-info text-dark"),
+    "in_vigore": ("In vigore", "bg-success"),
+    "disdetta_inviata": ("Disdetta inviata", "bg-warning text-dark"),
+    "da_rinnovare": ("Scaduta da rinnovare", "bg-danger"),
+    "tacito_da_registrare": ("Rinnovo tacito da registrare", "bg-warning text-dark"),
+    "sospesa": ("Copertura sospesa", "bg-danger"),
+}
+# Preavviso di disdetta predefinito per le polizze a tacito rinnovo (giorni).
+PREAVVISO_DISDETTA_DEFAULT = 30
+# Rami per cui il tacito rinnovo non è ammesso (RC auto: L. 221/2012).
+RAMI_SENZA_TACITO_RINNOVO = {"auto"}
+# Durata massima di una polizza accettata nei form.
+DURATA_MASSIMA_ANNI = 10
+
 # Numero di rate annue per ciascun frazionamento del premio.
 RATE_PER_FRAZIONAMENTO = {
     "annuale": 1,
@@ -151,6 +169,9 @@ PAYMENT_METHOD_LABELS = dict(PAYMENT_METHODS)
 # Art. 1901 c.c., comma 2: per i premi successivi al primo la copertura resta
 # sospesa dalle ore 24 del quindicesimo giorno dopo la scadenza non pagata.
 GIORNI_TOLLERANZA_PREMIO = 15
+# Art. 1901 c.c., comma 3: il contratto si risolve di diritto se l'assicuratore
+# non agisce per la riscossione entro sei mesi dalla scadenza della rata.
+MESI_RISOLUZIONE_PREMIO = 6
 
 # Sinistri.
 CLAIM_TYPES = [
@@ -281,7 +302,7 @@ class Client(db.Model):
 
     @property
     def eta(self):
-        if not self.data_nascita:
+        if not self.data_nascita or self.data_nascita > date.today():
             return None
         oggi = date.today()
         return oggi.year - self.data_nascita.year - (
@@ -290,12 +311,20 @@ class Client(db.Model):
 
     # --- Compliance -----------------------------------------------------
     @property
+    def adeguatezza_scadenza(self):
+        """Data entro cui aggiornare il questionario di adeguatezza (12 mesi)."""
+        return add_months_sicuro(self.data_adeguatezza, 12)
+
+    @property
     def adeguatezza_stato(self):
-        """mancante | da_aggiornare (oltre 12 mesi) | ok."""
+        """mancante | da_aggiornare (oltre 12 mesi) | in_scadenza (entro 30 gg) | ok."""
         if not self.data_adeguatezza:
             return "mancante"
-        if (date.today() - self.data_adeguatezza).days > 365:
+        scadenza = self.adeguatezza_scadenza
+        if scadenza is None or scadenza < date.today():
             return "da_aggiornare"
+        if (scadenza - date.today()).days <= 30:
+            return "in_scadenza"
         return "ok"
 
     @property
@@ -340,12 +369,22 @@ class Client(db.Model):
         return sum(s.costo for s in self.sinistri)
 
     @property
+    def costo_sinistri_12_mesi(self):
+        limite = date.today() - timedelta(days=365)
+        return sum(s.costo for s in self.sinistri if s.data_evento and s.data_evento > limite)
+
+    @property
     def rapporto_sp(self):
-        """Rapporto sinistri/premi (loss ratio) in percentuale, se calcolabile."""
+        """Rapporto sinistri/premi degli ultimi 12 mesi, in percentuale.
+
+        Sinistri accaduti negli ultimi 12 mesi rispetto ai premi annui delle
+        polizze in vigore: un periodo omogeneo, che non cresce con l'anzianità
+        del cliente.
+        """
         premi = self.premi_attivi
         if not premi:
             return None
-        return 100.0 * self.costo_sinistri / premi
+        return 100.0 * self.costo_sinistri_12_mesi / premi
 
     @property
     def titoli_da_incassare(self):
@@ -357,7 +396,8 @@ class Client(db.Model):
 
     @property
     def polizze_attive(self):
-        return [p for p in self.polizze if p.stato in ("attiva", "in_rinnovo")]
+        """Polizze attive e già in vigore (escluse quelle con decorrenza futura)."""
+        return [p for p in self.polizze if p.attiva and not p.non_ancora_in_vigore]
 
     @property
     def ultima_analisi(self):
@@ -384,6 +424,10 @@ class Policy(db.Model):
     data_decorrenza = db.Column(db.Date)
     data_scadenza = db.Column(db.Date, index=True)
     tacito_rinnovo = db.Column(db.Boolean, default=False)
+    # Tacito rinnovo: preavviso di disdetta (giorni prima della scadenza) e
+    # disdetta eventualmente già inviata (blocca il rinnovo automatico).
+    preavviso_disdetta_giorni = db.Column(db.Integer)
+    data_disdetta = db.Column(db.Date)
     stato = db.Column(db.String(20), nullable=False, default="attiva")
     note = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=now)
@@ -416,9 +460,87 @@ class Policy(db.Model):
     def attiva(self):
         return self.stato in ("attiva", "in_rinnovo")
 
+    # --- Date future e stato effettivo ----------------------------------
+    @property
+    def non_ancora_in_vigore(self):
+        return self.data_decorrenza is not None and self.data_decorrenza > date.today()
+
+    @property
+    def giorni_alla_decorrenza(self):
+        if not self.data_decorrenza:
+            return None
+        return (self.data_decorrenza - date.today()).days
+
+    @property
+    def preavviso_disdetta(self):
+        """Giorni di preavviso per la disdetta (solo con tacito rinnovo)."""
+        if not self.tacito_rinnovo:
+            return None
+        if self.preavviso_disdetta_giorni is None:
+            return PREAVVISO_DISDETTA_DEFAULT
+        return self.preavviso_disdetta_giorni
+
+    @property
+    def termine_disdetta(self):
+        """Ultimo giorno utile per inviare la disdetta ed evitare il rinnovo tacito."""
+        if not self.tacito_rinnovo or not self.data_scadenza:
+            return None
+        try:
+            return self.data_scadenza - timedelta(days=self.preavviso_disdetta or 0)
+        except OverflowError:
+            return None
+
+    @property
+    def giorni_al_termine_disdetta(self):
+        termine = self.termine_disdetta
+        return None if termine is None else (termine - date.today()).days
+
+    @property
+    def disdetta_inviata(self):
+        return self.data_disdetta is not None
+
+    @property
+    def disdetta_tardiva(self):
+        termine = self.termine_disdetta
+        return bool(self.data_disdetta and termine and self.data_disdetta > termine)
+
+    @property
+    def stato_effettivo(self):
+        """Stato calcolato dalle date, per le polizze attive (None per gli altri stati).
+
+        non_in_vigore | disdetta_inviata | da_rinnovare | tacito_da_registrare |
+        sospesa | in_vigore
+        """
+        if not self.attiva:
+            return None
+        oggi = date.today()
+        if self.non_ancora_in_vigore:
+            return "non_in_vigore"
+        if self.data_scadenza and self.data_scadenza < oggi:
+            if self.tacito_rinnovo and not self.disdetta_inviata:
+                return "tacito_da_registrare"
+            return "da_rinnovare"
+        if self.copertura_sospesa:
+            return "sospesa"
+        if self.disdetta_inviata:
+            return "disdetta_inviata"
+        return "in_vigore"
+
+    @property
+    def stato_effettivo_label(self):
+        return POLICY_EFFECTIVE_STATES.get(self.stato_effettivo, ("", ""))[0]
+
+    @property
+    def stato_effettivo_badge(self):
+        return POLICY_EFFECTIVE_STATES.get(self.stato_effettivo, ("", "bg-secondary"))[1]
+
     @property
     def titoli_arretrati(self):
         return [t for t in self.titoli if t.arretrato]
+
+    @property
+    def titoli_da_incassare(self):
+        return [t for t in self.titoli if t.stato == "da_incassare"]
 
     @property
     def titoli_incassati(self):
@@ -646,6 +768,12 @@ class Settings(db.Model):
     # Backup automatico giornaliero del database e dei documenti.
     backup_automatico = db.Column(db.Boolean, default=True, nullable=False)
     backup_conservati = db.Column(db.Integer, default=14)
+    # Automatismi sulle date (eseguiti dallo scheduler e all'accesso).
+    rinnovo_tacito_automatico = db.Column(db.Boolean, default=True, nullable=False)
+    emissione_quietanze_automatica = db.Column(db.Boolean, default=True, nullable=False)
+    anticipo_quietanze_giorni = db.Column(db.Integer, default=30)
+    scadenza_automatica = db.Column(db.Boolean, default=True, nullable=False)
+    tolleranza_scadenza_giorni = db.Column(db.Integer, default=30)
     ultimo_backup_at = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime, default=now, onupdate=now)
 
@@ -731,8 +859,17 @@ class Title(db.Model):
         return (self.premio_lordo or 0.0) - (self.provvigione or 0.0)
 
     @property
+    def da_rimborsare(self):
+        """Titolo negativo (es. appendice di rimborso) ancora da pagare al cliente."""
+        return self.stato == "da_incassare" and (self.premio_lordo or 0) < 0
+
+    @property
     def arretrato(self):
-        return self.stato == "da_incassare" and self.data_effetto < date.today()
+        return (
+            self.stato == "da_incassare"
+            and (self.premio_lordo or 0) > 0
+            and self.data_effetto < date.today()
+        )
 
     @property
     def giorni_ritardo(self):
@@ -745,18 +882,40 @@ class Title(db.Model):
         """Giorno dal quale la copertura è sospesa se la rata resta impagata."""
         if self.tipo == "perfezionamento":
             return self.data_effetto
-        return self.data_effetto + timedelta(days=GIORNI_TOLLERANZA_PREMIO)
+        try:
+            return self.data_effetto + timedelta(days=GIORNI_TOLLERANZA_PREMIO)
+        except OverflowError:
+            return date.max
+
+    @property
+    def data_risoluzione(self):
+        """Art. 1901 c. 3: risoluzione di diritto se la rata resta impagata 6 mesi."""
+        return add_months_sicuro(self.data_effetto, MESI_RISOLUZIONE_PREMIO)
 
     @property
     def copertura_sospesa(self):
         """Art. 1901 c.c.: primo premio non pagato → copertura non operante;
         premi successivi → sospesa dopo 15 giorni dalla scadenza."""
-        if self.stato != "da_incassare":
+        if self.stato != "da_incassare" or (self.premio_lordo or 0) <= 0:
             return False
         oggi = date.today()
         if self.tipo == "perfezionamento":
             return self.data_effetto <= oggi
         return oggi > self.data_sospensione
+
+    @property
+    def modificabile(self):
+        return self.stato == "da_incassare"
+
+    def sospende_alla_data(self, giorno: date) -> bool:
+        """True se, alla data indicata, questa rata impagata sospendeva la copertura."""
+        if self.stato == "stornato" or (self.premio_lordo or 0) <= 0:
+            return False
+        if giorno < self.data_sospensione:
+            return False
+        if self.tipo != "perfezionamento" and giorno == self.data_sospensione:
+            return False  # sospensione dalle ore 24 del 15° giorno
+        return self.data_incasso is None or self.data_incasso > giorno
 
 
 class Claim(db.Model):
@@ -801,21 +960,46 @@ class Claim(db.Model):
 
     @staticmethod
     def genera_numero(anno: int | None = None) -> str:
-        """Prossimo numero progressivo dell'anno: SIN-AAAA-NNNN."""
+        """Prossimo numero progressivo dell'anno: SIN-AAAA-NNNN.
+
+        Usa un contatore persistente: i numeri dei sinistri eliminati non vengono
+        riassegnati (sono già stati comunicati a cliente e compagnia).
+        """
         anno = anno or date.today().year
         prefisso = f"SIN-{anno}-"
-        ultimi = (
-            db.session.query(Claim.numero)
-            .filter(Claim.numero.like(prefisso + "%"))
-            .all()
-        )
         massimo = 0
-        for (numero,) in ultimi:
+        for (numero,) in db.session.query(Claim.numero).filter(Claim.numero.like(prefisso + "%")):
             try:
                 massimo = max(massimo, int(numero.rsplit("-", 1)[1]))
             except (ValueError, IndexError):
                 continue
-        return f"{prefisso}{massimo + 1:04d}"
+        return f"{prefisso}{Contatore.prossimo(f'sinistri-{anno}', almeno=massimo + 1):04d}"
+
+    @property
+    def avvisi_copertura(self):
+        """Controlli di operatività della copertura alla data dell'evento."""
+        avvisi = []
+        polizza = self.polizza
+        if polizza is None or self.data_evento is None:
+            return avvisi
+        if polizza.data_decorrenza and self.data_evento < polizza.data_decorrenza:
+            avvisi.append(
+                f"L'evento ({self.data_evento:%d/%m/%Y}) è precedente alla decorrenza della polizza "
+                f"({polizza.data_decorrenza:%d/%m/%Y})."
+            )
+        if polizza.data_scadenza and self.data_evento >= polizza.data_scadenza:
+            avvisi.append(
+                f"L'evento ({self.data_evento:%d/%m/%Y}) è successivo alla scadenza della polizza "
+                f"({polizza.data_scadenza:%d/%m/%Y})."
+            )
+        sospensive = [t for t in polizza.titoli if t.sospende_alla_data(self.data_evento)]
+        if sospensive:
+            t = sospensive[0]
+            avvisi.append(
+                f"Alla data dell'evento la copertura risultava sospesa per mancato pagamento "
+                f"della rata del {t.data_effetto:%d/%m/%Y} (art. 1901 c.c.)."
+            )
+        return avvisi
 
     @property
     def stato_label(self):
@@ -894,6 +1078,9 @@ class User(db.Model):
     ruolo = db.Column(db.String(20), nullable=False, default="operatore")
     attivo = db.Column(db.Boolean, default=True, nullable=False)
     tentativi_falliti = db.Column(db.Integer, default=0, nullable=False)
+    # Incrementata a logout, cambio password, reset e disattivazione: invalida
+    # i cookie di sessione già emessi.
+    sessione_versione = db.Column(db.Integer, default=0, nullable=False)
     bloccato_fino = db.Column(db.DateTime)
     ultimo_accesso = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=now)
@@ -928,6 +1115,30 @@ class User(db.Model):
     @property
     def bloccato(self):
         return self.bloccato_fino is not None and self.bloccato_fino > now()
+
+
+class Contatore(db.Model):
+    """Contatori progressivi persistenti (es. numerazione dei sinistri per anno)."""
+
+    __tablename__ = "contatori"
+
+    chiave = db.Column(db.String(60), primary_key=True)
+    valore = db.Column(db.Integer, nullable=False, default=0)
+
+    @staticmethod
+    def prossimo(chiave: str, almeno: int = 1) -> int:
+        """Incrementa e restituisce il contatore (mai inferiore ad ``almeno``).
+
+        L'aggiornamento avviene nella transazione corrente: in caso di conflitto
+        la chiamante ripete l'operazione.
+        """
+        riga = db.session.get(Contatore, chiave)
+        if riga is None:
+            riga = Contatore(chiave=chiave, valore=0)
+            db.session.add(riga)
+        riga.valore = max(riga.valore or 0, almeno - 1) + 1
+        db.session.flush()
+        return riga.valore
 
 
 class AuditLog(db.Model):
