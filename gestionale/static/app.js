@@ -78,6 +78,8 @@
           'campo-azienda': tipo === 'azienda',
           'campo-piva': tipo !== 'dipendente',
           'campo-professionista': tipo === 'professionista',
+          // Professione per i professionisti, mansione per i dipendenti.
+          'campo-professione': tipo === 'professionista' || tipo === 'dipendente',
           'campo-dipendente': tipo === 'dipendente',
           'campo-impresa': tipo === 'azienda' || tipo === 'professionista',
           'campo-persona': tipo !== 'azienda'
@@ -88,6 +90,8 @@
             el.querySelectorAll('input, select, textarea').forEach(function (campo) { campo.disabled = !regole[cls]; });
           });
         });
+        const etichettaProfessione = document.getElementById('label-professione');
+        if (etichettaProfessione) etichettaProfessione.textContent = tipo === 'dipendente' ? 'Mansione' : 'Professione';
         if (etichettaNome) {
           etichettaNome.textContent = tipo === 'azienda'
             ? 'Ragione sociale *'

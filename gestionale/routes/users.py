@@ -11,6 +11,7 @@ from ..security import (
     password_problem,
     require_admin,
     username_problem,
+    trova_utente,
 )
 
 bp = Blueprint("users", __name__, url_prefix="/utenti")
@@ -46,9 +47,7 @@ def new_user():
         user.ruolo = ruolo if ruolo in dict(USER_ROLES) else "operatore"
         password = request.form.get("password") or ""
         errore = username_problem(user.username)
-        if errore is None and User.query.filter(
-            db.func.lower(User.username) == user.username.lower()
-        ).first():
+        if errore is None and trova_utente(user.username) is not None:
             errore = f"Il nome utente «{user.username}» è già in uso."
         if errore is None:
             errore = password_problem(password, request.form.get("conferma") or "")

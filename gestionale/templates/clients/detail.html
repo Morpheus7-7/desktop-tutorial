@@ -31,7 +31,7 @@
     <form method="post" action="{{ url_for('clients.delete_client', client_id=client.id) }}"
           data-confirm="Eliminare il cliente e tutti i dati collegati (polizze, titoli, sinistri, documenti, follow-up)?">
       {{ csrf_field() }}
-      <button class="btn btn-outline-danger" title="Elimina cliente"><i class="bi bi-trash"></i></button>
+      <button class="btn btn-outline-danger" title="Elimina cliente" aria-label="Elimina cliente"><i class="bi bi-trash" aria-hidden="true"></i></button>
     </form>
   </div>
   {% endif %}
@@ -135,7 +135,8 @@
             <li class="list-group-item d-flex justify-content-between">
               <span>Questionario di adeguatezza</span>
               {% if client.adeguatezza_stato == 'ok' %}<span class="text-success"><i class="bi bi-check-circle"></i> {{ client.data_adeguatezza | data_it }}</span>
-              {% elif client.adeguatezza_stato == 'da_aggiornare' %}<span class="text-warning"><i class="bi bi-exclamation-circle"></i> {{ client.data_adeguatezza | data_it }} (da aggiornare)</span>
+              {% elif client.adeguatezza_stato == 'in_scadenza' %}<span class="text-warning"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> {{ client.data_adeguatezza | data_it }} (scade il {{ client.adeguatezza_scadenza | data_it }})</span>
+              {% elif client.adeguatezza_stato == 'da_aggiornare' %}<span class="text-warning"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> {{ client.data_adeguatezza | data_it }} (da aggiornare)</span>
               {% else %}<span class="text-danger"><i class="bi bi-x-circle"></i> mancante</span>{% endif %}
             </li>
             <li class="list-group-item d-flex justify-content-between">
@@ -281,12 +282,12 @@
           <td class="small text-nowrap">{{ d.dimensione_leggibile if d.dimensione else '—' }}</td>
           <td class="small">{{ d.uploaded_at | dataora_it }}</td>
           <td class="text-end text-nowrap">
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}" title="Scarica"><i class="bi bi-download"></i></a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}" title="Scarica" aria-label="Scarica {{ d.original_name }}"><i class="bi bi-download" aria-hidden="true"></i></a>
             {% if puo_modificare %}
             <form class="d-inline" method="post" action="{{ url_for('documents.delete', document_id=d.id) }}"
                   data-confirm="Eliminare il documento {{ d.original_name }}?">
               {{ csrf_field() }}
-              <button class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-sm btn-outline-danger" title="Elimina" aria-label="Elimina"><i class="bi bi-trash" aria-hidden="true"></i></button>
             </form>
             {% endif %}
           </td>
@@ -379,12 +380,12 @@
           <td class="small">{% if o.origine == 'analisi_rischi' %}<span class="badge bg-light text-dark border"><i class="bi bi-magic"></i> analisi</span>{% else %}{{ o.origine or '—' }}{% endif %}</td>
           <td class="text-end text-nowrap">
             {% if puo_modificare %}
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('opportunities.edit_opportunity', opportunity_id=o.id) }}"><i class="bi bi-pencil"></i></a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('opportunities.edit_opportunity', opportunity_id=o.id) }}" title="Modifica" aria-label="Modifica l'opportunità {{ o.titolo }}"><i class="bi bi-pencil" aria-hidden="true"></i></a>
             <form class="d-inline" method="post" action="{{ url_for('opportunities.delete_opportunity', opportunity_id=o.id) }}"
                   data-confirm="Eliminare l'opportunità?">
               {{ csrf_field() }}
               <input type="hidden" name="next" value="{{ qui }}">
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-sm btn-outline-danger" title="Elimina" aria-label="Elimina l'opportunità {{ o.titolo }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
             </form>
             {% endif %}
           </td>
@@ -428,7 +429,7 @@
             <form class="d-inline" method="post" action="{{ url_for('followups.delete', followup_id=f.id) }}"
                   data-confirm="Eliminare il follow-up?">
               {{ csrf_field() }}
-              <button class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-sm btn-outline-danger" title="Elimina" aria-label="Elimina"><i class="bi bi-trash" aria-hidden="true"></i></button>
             </form>
             {% endif %}
           </td>

@@ -592,6 +592,7 @@ def delete_policy(policy_id):
         fu.policy_id = None
     elimina_notifiche(
         f"polizza:{policy.id}:", f"disdetta:{policy.id}:", f"decorrenza:{policy.id}:",
+        *(f"automatismo:{tipo}:{policy.id}:" for tipo in ("tacito", "quietanze", "chiusura")),
         *(f"titolo:{t.id}:" for t in policy.titoli),
     )
     audit("elimina", "polizza", policy.id,

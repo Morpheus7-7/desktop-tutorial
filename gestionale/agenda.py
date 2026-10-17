@@ -86,7 +86,7 @@ def eventi_agenda(dal: date, al: date, tipi: set[str] | None = None) -> list[Eve
             )
             aggiungi(p.data_scadenza, "scadenza", f"Scadenza polizza {p.numero_polizza}",
                      f"{nome} ({esito})", link, f"polizza-{p.id}-scadenza-{p.data_scadenza:%Y%m%d}")
-        if p.data_decorrenza and p.non_ancora_in_vigore:
+        if p.data_decorrenza and p.data_decorrenza >= date.today():  # anche se decorre oggi
             aggiungi(p.data_decorrenza, "decorrenza", f"Decorrenza polizza {p.numero_polizza}",
                      nome, link, f"polizza-{p.id}-decorrenza-{p.data_decorrenza:%Y%m%d}")
         termine = p.termine_disdetta

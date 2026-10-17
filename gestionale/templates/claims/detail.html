@@ -72,11 +72,11 @@
           <span><i class="bi {{ d.icona }} me-1"></i>{{ d.original_name }} <span class="badge badge-soft">{{ d.categoria_label }}</span>
             <span class="small ga-muted">{{ d.dimensione_leggibile if d.dimensione else '' }}</span></span>
           <span class="text-nowrap">
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}"><i class="bi bi-download"></i></a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}" title="Scarica" aria-label="Scarica {{ d.original_name }}"><i class="bi bi-download" aria-hidden="true"></i></a>
             {% if puo_modificare %}
             <form class="d-inline" method="post" action="{{ url_for('documents.delete', document_id=d.id) }}" data-confirm="Eliminare il documento {{ d.original_name }}?">
               {{ csrf_field() }}<input type="hidden" name="da_sinistro" value="1">
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-sm btn-outline-danger" title="Elimina" aria-label="Elimina il documento {{ d.original_name }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
             </form>
             {% endif %}
           </span>
@@ -151,7 +151,7 @@
           {{ csrf_field() }}
           <div class="input-group">
             <input class="form-control" name="testo" placeholder="Aggiungi una nota (telefonata, sollecito, documenti ricevuti…)" required aria-label="Testo della nota">
-            <button class="btn btn-outline-primary"><i class="bi bi-plus-lg"></i></button>
+            <button class="btn btn-outline-primary" title="Aggiungi nota" aria-label="Aggiungi nota"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
           </div>
         </form>
         {% endif %}

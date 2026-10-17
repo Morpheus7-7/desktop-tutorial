@@ -19,6 +19,7 @@ from ..security import (
     username_problem,
     verifica_password,
     verifica_password_fittizia,
+    trova_utente,
 )
 
 bp = Blueprint("auth", __name__)
@@ -45,7 +46,7 @@ def login():
         password = request.form.get("password") or ""
         user = None
         if username and len(username) <= LUNGHEZZA_MASSIMA_USERNAME:
-            user = User.query.filter(db.func.lower(User.username) == username.lower()).first()
+            user = trova_utente(username)
 
         if user is not None and user.attivo:
             esito = verifica_password(user, password)

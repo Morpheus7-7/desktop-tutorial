@@ -32,7 +32,7 @@
               <button class="btn btn-sm btn-outline-warning"><i class="bi bi-unlock"></i> Sblocca</button>
             </form>
             {% endif %}
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('users.edit_user', user_id=u.id) }}"><i class="bi bi-pencil"></i></a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('users.edit_user', user_id=u.id) }}" title="Modifica" aria-label="Modifica l'utente {{ u.username }}"><i class="bi bi-pencil" aria-hidden="true"></i></a>
           </td>
         </tr>
       {% endfor %}

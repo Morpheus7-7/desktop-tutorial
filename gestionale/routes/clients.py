@@ -298,6 +298,7 @@ def delete_client(client_id):
     prefissi = [f"cliente:{client.id}:"]
     for p in client.polizze:
         prefissi += [f"polizza:{p.id}:", f"disdetta:{p.id}:", f"decorrenza:{p.id}:"]
+        prefissi += [f"automatismo:{tipo}:{p.id}:" for tipo in ("tacito", "quietanze", "chiusura")]
         prefissi += [f"titolo:{t.id}:" for t in p.titoli]
     prefissi += [f"sinistro:{s.id}:" for s in client.sinistri]
     prefissi += [f"followup:{f.id}:" for f in client.followups]

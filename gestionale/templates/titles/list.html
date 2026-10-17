@@ -7,7 +7,7 @@
     <h1 class="page-title"><i class="bi bi-cash-coin me-2"></i>Titoli e incassi</h1>
     <div class="page-subtitle">Quietanze e rate da incassare, arretrati e incassi registrati</div>
   </div>
-  <a class="btn btn-outline-secondary" href="{{ url_for('titles.export_portfolio', **filtri.to_dict()) }}"><i class="bi bi-filetype-csv"></i> Esporta</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('titles.export_portfolio', **filtri_url()) }}"><i class="bi bi-filetype-csv"></i> Esporta</a>
 </div>
 {% include "titles/_nav.html" %}
 

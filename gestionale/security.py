@@ -107,7 +107,9 @@ def csrf_field() -> Markup:
 
 
 def _check_csrf():
-    if request.endpoint in LARGE_UPLOAD_ENDPOINTS:
+    # Il limite alto (ripristino backup) vale solo per gli amministratori: gli
+    # altri ricevono 413 subito, senza che il server legga centinaia di MB.
+    if request.endpoint in LARGE_UPLOAD_ENDPOINTS and g.get("user") is not None and g.user.is_admin:
         request.max_content_length = current_app.config.get("MAX_RESTORE_SIZE")
     if not current_app.config.get("CSRF_ENABLED", True):
         return None
@@ -229,6 +231,10 @@ def password_problem(password: str, conferma: str | None = None) -> str | None:
     return None
 
 
+# Nome con cui gli automatismi firmano il registro attività: non assegnabile.
+USERNAME_RISERVATI = {"sistema"}
+
+
 def username_problem(username: str) -> str | None:
     """Messaggio d'errore se il nome utente non è accettabile, altrimenti None."""
     if not username:
@@ -237,7 +243,22 @@ def username_problem(username: str) -> str | None:
         return f"Il nome utente può avere al massimo {LUNGHEZZA_MASSIMA_USERNAME} caratteri."
     if _CARATTERI_CONTROLLO.search(username):
         return "Il nome utente contiene caratteri non ammessi."
+    if username.strip().casefold() in USERNAME_RISERVATI:
+        return "Questo nome utente è riservato agli automatismi del gestionale: scegline un altro."
     return None
+
+
+def trova_utente(username: str) -> User | None:
+    """Utente per nome senza distinguere maiuscole e minuscole, anche accentate.
+
+    Il confronto si fa in Python con casefold(): lower() di SQLite converte
+    solo le lettere ASCII, quindi «Èrica» non troverebbe mai «èrica» (né sé
+    stessa scritta in maiuscolo). La tabella utenti è piccola.
+    """
+    chiave = (username or "").strip().casefold()
+    if not chiave:
+        return None
+    return next((u for u in User.query.all() if (u.username or "").casefold() == chiave), None)
 
 
 # ----------------------------------------------------------------------

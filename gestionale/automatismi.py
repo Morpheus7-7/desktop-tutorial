@@ -23,6 +23,9 @@ from .titoli import TitoliGiaPresenti, add_months, genera_titoli, periodi_polizz
 # Il rinnovo tacito automatico agisce solo su scadenze recenti: una polizza
 # dimenticata da anni va verificata a mano, non rinnovata in blocco.
 FINESTRA_RINNOVO_TACITO_GIORNI = 60
+# Emissione automatica: un'annualità già iniziata si recupera solo se è
+# iniziata da pochi giorni (gestionale non usato per qualche giorno).
+FINESTRA_RECUPERO_QUIETANZE_GIORNI = 30
 STATI_ATTIVI = ("attiva", "in_rinnovo")
 
 
@@ -39,8 +42,12 @@ def _notifica(dedup_key: str, messaggio: str, policy: Policy, livello: str = "in
 
 
 def _gestisce_titoli(policy: Policy) -> bool:
-    """Le automazioni sui titoli valgono solo per le polizze che li gestiscono già."""
-    return bool(policy.premio_annuo and policy.premio_annuo > 0 and policy.titoli)
+    """Le automazioni sui titoli valgono solo per le polizze che gestiscono già le
+    rate nel gestionale: un'appendice (es. regolazione premio) non basta."""
+    return bool(
+        policy.premio_annuo and policy.premio_annuo > 0
+        and any(t.tipo != "appendice" and t.stato != "stornato" for t in policy.titoli)
+    )
 
 
 def storna_titoli_futuri(policy: Policy, dal: date, motivo: str) -> int:
@@ -73,6 +80,16 @@ def ripristina_titoli_stornati(policy: Policy, motivo: str) -> int:
         titolo.stato = "da_incassare"
         ripristinati += 1
     return ripristinati
+
+
+def _chiudi_followup_rinnovo(policy: Policy, stato: str) -> None:
+    """Chiude i follow-up di rinnovo ancora aperti (rinnovo o chiusura automatici)."""
+    from .notifications import segna_lette
+
+    for fu in FollowUp.query.filter_by(policy_id=policy.id, tipo="rinnovo", stato="aperto").all():
+        fu.stato = stato
+        fu.completed_at = now()
+        segna_lette(f"followup:{fu.id}:")
 
 
 def _chiudi_notifiche_ciclo(policy: Policy, scadenza: date, tieni_scaduta: bool = False) -> None:
@@ -116,9 +133,7 @@ def rinnova_taciti(oggi: date, settings: Settings) -> int:
         policy.data_scadenza = nuova
         policy.stato = "attiva"
         _chiudi_notifiche_ciclo(policy, vecchia)
-        for fu in FollowUp.query.filter_by(policy_id=policy.id, tipo="rinnovo", stato="aperto").all():
-            fu.stato = "completato"
-            fu.completed_at = now()
+        _chiudi_followup_rinnovo(policy, "completato")
         _audit_sistema(
             "rinnovo", policy,
             f"Rinnovo tacito automatico della polizza {policy.numero_polizza}: "
@@ -144,21 +159,39 @@ def emetti_quietanze(oggi: date, settings: Settings) -> int:
         Policy.premio_annuo > 0,
     ).all()
     emesse = 0
+    recupero = oggi - timedelta(days=FINESTRA_RECUPERO_QUIETANZE_GIORNI)
     for policy in polizze:
         # Anche con la disdetta registrata le annualità fino alla scadenza restano
         # dovute (es. poliennale disdetta alla scadenza): periodi_polizza non va
         # mai oltre la scadenza, quindi non si emette nulla dopo la cessazione.
-        if not policy.titoli:
+        if not _gestisce_titoli(policy):
             continue
-        for inizio, fine in periodi_polizza(policy, fino_a=orizzonte):
+        periodi = list(periodi_polizza(policy, fino_a=orizzonte))
+        # Tacito rinnovo ormai certo (termine di disdetta passato senza disdetta):
+        # la quietanza dell'annualità successiva si emette in anticipo come le altre.
+        termine = policy.termine_disdetta
+        if (policy.rinnovo_tacito and policy.data_disdetta is None and termine and termine < oggi
+                and policy.data_scadenza and policy.data_scadenza <= orizzonte):
+            try:
+                periodi.append((policy.data_scadenza, add_months(policy.data_scadenza, 12)))
+            except (ValueError, OverflowError):
+                pass
+        for inizio, fine in periodi:
             if fine <= oggi or inizio > orizzonte:
+                continue
+            # Mai un primo premio automatico (lo emette chi registra la polizza)
+            # né annualità iniziate da tempo: genererebbero arretrati e false
+            # «coperture sospese». Si recuperano solo i ritardi di pochi giorni.
+            if policy.data_decorrenza and inizio == policy.data_decorrenza:
+                continue
+            if inizio < recupero:
                 continue
             # Periodo già emesso (anche se poi stornato o con date spostate): non
             # si riemette, così uno storno dell'operatore non viene annullato.
             if titoli_coprono(policy, inizio, fine, includi_stornati=True):
                 continue
             try:
-                titoli = genera_titoli(policy, inizio=inizio, fine=fine)
+                titoli = genera_titoli(policy, inizio=inizio, fine=fine, tipo_primo="quietanza")
             except (TitoliGiaPresenti, ValueError):
                 continue
             _audit_sistema(
@@ -195,6 +228,7 @@ def scadi_polizze(oggi: date, settings: Settings) -> int:
             continue
         policy.stato = "disdetta" if disdetta else "scaduta"
         _chiudi_notifiche_ciclo(policy, policy.data_scadenza, tieni_scaduta=True)
+        _chiudi_followup_rinnovo(policy, "annullato")
         stornati = storna_titoli_futuri(policy, policy.data_scadenza, f"polizza {policy.stato}")
         dettaglio = f", stornate {stornati} rate successive" if stornati else ""
         _audit_sistema(

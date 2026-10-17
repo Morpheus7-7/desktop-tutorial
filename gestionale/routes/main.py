@@ -85,9 +85,12 @@ def dashboard():
 
     attive = Policy.query.filter(Policy.stato.in_(STATI_ATTIVI))
     premi_totali, provvigioni_totali = _premi_provvigioni_attive()
-    arretrati = _somma_titoli(Title.stato == "da_incassare", Title.data_effetto < today)
+    # Solo premi da riscuotere: le appendici di rimborso (importo negativo) non
+    # sono arretrati, come nel portafoglio titoli a cui rimanda la card.
+    arretrati = _somma_titoli(Title.stato == "da_incassare", Title.data_effetto < today, Title.premio_lordo > 0)
     in_scadenza = _somma_titoli(
-        Title.stato == "da_incassare", Title.data_effetto >= today, Title.data_effetto <= limite_30
+        Title.stato == "da_incassare", Title.data_effetto >= today, Title.data_effetto <= limite_30,
+        Title.premio_lordo > 0,
     )
     incassato_mese = _somma_titoli(
         Title.stato == "incassato", Title.data_incasso >= today.replace(day=1)
@@ -153,7 +156,7 @@ def dashboard():
         e for e in eventi_agenda(today, limite_30, {"decorrenza", "disdetta", "denuncia", "sospensione"})
     ][:8]
     titoli_urgenti = (
-        Title.query.filter(Title.stato == "da_incassare", Title.data_effetto <= limite_30)
+        Title.query.filter(Title.stato == "da_incassare", Title.data_effetto <= limite_30, Title.premio_lordo > 0)
         .order_by(Title.data_effetto.asc())
         .limit(8)
         .all()
@@ -338,7 +341,7 @@ def analytics():
     for ramo, r in per_ramo.items():
         r["sinistri"] = costo_per_ramo.get(ramo, 0.0)
         r["premi_competenza"] = premi_competenza.get(ramo, 0.0)
-        r["rapporto_sp"] = (100.0 * r["sinistri"] / r["premi_competenza"]) if r["premi_competenza"] else None
+        r["rapporto_sp"] = (100.0 * r["sinistri"] / r["premi_competenza"]) if r["premi_competenza"] > 0 else None
     rami = sorted(per_ramo.values(), key=lambda x: -x["premi"])
     premi_max = max([r["premi"] for r in rami], default=0.0)
 
@@ -437,7 +440,7 @@ def analytics():
         premi_competenza_12m=sum(premi_competenza.values()),
         rapporto_sp=(
             100.0 * sum(s.costo for s in sinistri_periodo) / sum(premi_competenza.values())
-            if sum(premi_competenza.values()) else None
+            if sum(premi_competenza.values()) > 0 else None
         ),
         sinistri_senza_polizza_12m=sum(s.costo for s in sinistri_periodo if not s.polizza),
         sinistri_per_stato=sinistri_per_stato,

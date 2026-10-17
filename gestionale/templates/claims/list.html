@@ -8,7 +8,7 @@
     <div class="page-subtitle">Denunce, perizie e liquidazioni dei clienti</div>
   </div>
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="{{ url_for('claims.export_claims', **filtri.to_dict()) }}"><i class="bi bi-filetype-csv"></i> Esporta</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('claims.export_claims', **filtri_url()) }}"><i class="bi bi-filetype-csv"></i> Esporta</a>
     {% if puo_modificare %}<a class="btn btn-primary" href="{{ url_for('claims.new_claim') }}"><i class="bi bi-plus-lg"></i> Nuovo sinistro</a>{% endif %}
   </div>
 </div>
@@ -55,7 +55,7 @@
   </div>
   <div class="col-md-4 d-flex gap-1">
     <input class="form-control form-control-sm" name="q" value="{{ filtri.get('q', '') }}" placeholder="Numero, cliente, polizza, controparte…" aria-label="Cerca">
-    <button class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
+    <button class="btn btn-sm btn-primary" aria-label="Cerca" title="Cerca"><i class="bi bi-search" aria-hidden="true"></i></button>
   </div>
 </form>
 

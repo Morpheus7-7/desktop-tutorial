@@ -156,10 +156,10 @@ def auto_create_renewal_followups(oggi: date | None = None) -> int:
         inizio_ciclo = riferimento - timedelta(days=RENEWAL_LEAD_DAYS)
         if today < inizio_ciclo:
             continue
+        # Basta un follow-up di rinnovo del ciclo, automatico o creato a mano.
         gia_presente = FollowUp.query.filter(
             FollowUp.policy_id == policy.id,
             FollowUp.tipo == "rinnovo",
-            FollowUp.auto_generato.is_(True),
             FollowUp.data_scadenza >= inizio_ciclo,
             FollowUp.data_scadenza <= scadenza,
         ).first()
@@ -376,13 +376,21 @@ def _notifiche_titoli(today: date) -> int:
                 link, f"{chiave}:sospesa",
             )
             risoluzione = t.data_risoluzione
-            if risoluzione and (risoluzione - today).days <= RISOLUZIONE_REMINDER_DAYS:
+            if risoluzione and 0 <= (risoluzione - today).days <= RISOLUZIONE_REMINDER_DAYS:
                 created += _add(
                     "titolo", "danger",
                     f"Rata del {t.data_effetto:%d/%m/%Y} ({importo}) della {descr} impagata da quasi sei mesi: "
                     f"il contratto si risolve di diritto il {risoluzione:%d/%m/%Y} se la compagnia non agisce "
                     "per la riscossione (art. 1901 c.c., comma 3).",
                     link, f"{chiave}:risoluzione",
+                )
+            elif risoluzione and risoluzione < today:
+                created += _add(
+                    "titolo", "danger",
+                    f"Rata del {t.data_effetto:%d/%m/%Y} ({importo}) della {descr} impagata da oltre sei mesi: "
+                    f"il contratto è risolto di diritto dal {risoluzione:%d/%m/%Y}, salvo che la compagnia abbia "
+                    "agito per la riscossione (art. 1901 c.c., comma 3). Verifica e aggiorna lo stato della polizza.",
+                    link, f"{chiave}:risolta",
                 )
         elif t.data_effetto < today:
             created += _add(

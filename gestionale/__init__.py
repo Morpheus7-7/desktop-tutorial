@@ -339,16 +339,26 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     app.jinja_env.globals["plurale"] = plurale
 
+    def filtri_url() -> dict:
+        """Parametri della richiesta da ripassare a url_for (filtri, pagina…).
+
+        Esclude «endpoint» (argomento di url_for: un parametro con questo nome
+        manderebbe in errore la pagina) e i nomi che iniziano con «_» (opzioni
+        di url_for come _external o _anchor, che altererebbero i link).
+        """
+        return {k: v for k, v in request.args.to_dict().items() if k != "endpoint" and not k.startswith("_")}
+
     def url_pagina(numero: int) -> str:
         """URL della pagina corrente con un altro numero di pagina (paginazione)."""
         argomenti = dict(request.view_args or {})
-        argomenti.update(request.args.to_dict())
+        argomenti.update(filtri_url())
         argomenti["page"] = numero
         return url_for(request.endpoint, **argomenti)
 
     from .models import PAYMENT_METHODS
 
     app.jinja_env.globals["url_pagina"] = url_pagina
+    app.jinja_env.globals["filtri_url"] = filtri_url
     app.jinja_env.globals["versione"] = __version__
     app.jinja_env.globals["payment_methods"] = PAYMENT_METHODS
 

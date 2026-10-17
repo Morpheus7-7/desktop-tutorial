@@ -246,6 +246,7 @@ def edit_claim(claim_id):
     if request.method == "POST":
         vecchio_evento = claim.data_evento
         vecchia_polizza = claim.policy_id
+        vecchia_denuncia = claim.data_denuncia
         with db.session.no_autoflush:
             errori = _populate(claim, request.form)
             policy = _policy_for(claim.cliente, request.form.get("policy_id"))
@@ -260,6 +261,9 @@ def edit_claim(claim_id):
         if claim.data_evento != vecchio_evento:
             # Il termine dell'art. 1913 dipende dalla data dell'evento: si ricalcola.
             elimina_notifiche(f"sinistro:{claim.id}:")
+        elif vecchia_denuncia and not claim.data_denuncia:
+            # Data di denuncia tolta (inserita per errore): il promemoria deve tornare.
+            elimina_notifiche(f"sinistro:{claim.id}:{claim.data_evento.isoformat()}:denuncia")
         if claim.data_denuncia:
             segna_lette(f"sinistro:{claim.id}:{claim.data_evento.isoformat()}:denuncia")
         audit("modifica", "sinistro", claim.id, f"Modificato sinistro {claim.numero}")

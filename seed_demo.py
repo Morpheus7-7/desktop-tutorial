@@ -199,7 +199,11 @@ with app.app_context():
                 titolo.stato = "incassato"
                 titolo.data_incasso = titolo.data_effetto + timedelta(days=3)
                 titolo.mezzo_pagamento = "bonifico"
-    arretrato = next(t for t in polizze[1].titoli if t.stato == "incassato")
+    # L'ultima rata pagata (non il primo premio) torna da incassare: arretrata.
+    arretrato = max(
+        (t for t in polizze[1].titoli if t.stato == "incassato" and t.tipo != "perfezionamento"),
+        key=lambda t: t.data_effetto,
+    )
     arretrato.stato, arretrato.data_incasso, arretrato.mezzo_pagamento = "da_incassare", None, None
 
     sinistri = [
@@ -228,7 +232,7 @@ with app.app_context():
 
     followups = [
         FollowUp(
-            client_id=falegnameria.id, tipo="rinnovo", priorita="alta",
+            client_id=falegnameria.id, policy_id=polizze[0].id, tipo="rinnovo", priorita="alta",
             titolo="Preparare rinnovo polizza incendio GEN-2024-1181",
             descrizione="Chiedere aggiornamento valori di magazzino prima del rinnovo.",
             data_scadenza=oggi + timedelta(days=10),

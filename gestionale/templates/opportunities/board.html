@@ -47,12 +47,12 @@
                   {% for f, lab in stages %}<option value="{{ f }}" {% if o.fase == f %}selected{% endif %}>{{ lab }}</option>{% endfor %}
                 </select>
               </form>
-              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('opportunities.edit_opportunity', opportunity_id=o.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('opportunities.edit_opportunity', opportunity_id=o.id) }}" title="Modifica" aria-label="Modifica l'opportunità {{ o.titolo }}"><i class="bi bi-pencil" aria-hidden="true"></i></a>
               <form method="post" action="{{ url_for('opportunities.delete_opportunity', opportunity_id=o.id) }}"
                     data-confirm="Eliminare l'opportunità?">
                 {{ csrf_field() }}
                 <input type="hidden" name="next" value="{{ url_for('opportunities.board') }}">
-                <button class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-sm btn-outline-danger" title="Elimina" aria-label="Elimina l'opportunità {{ o.titolo }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
               </form>
             </div>
             {% endif %}

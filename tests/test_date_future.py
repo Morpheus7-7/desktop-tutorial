@@ -1,5 +1,6 @@
 """Test delle date future: periodi di polizza, disdetta, automatismi, previsione
 incassi, agenda/calendario e delle correzioni emerse dalla verifica."""
+import io
 from datetime import date, timedelta
 
 from flask import template_rendered
@@ -102,12 +103,12 @@ def test_genera_titoli_di_un_annualita_futura(client, app):
         titoli = db.session.get(Policy, pid).titoli
         assert [t.data_effetto for t in titoli] == [seconda]
         assert titoli[0].tipo == "quietanza"
-    # Un inizio che non corrisponde a un'annualità viene rifiutato. (Intanto
-    # l'emissione automatica recupera la quietanza dell'annualità in corso.)
+    # Un inizio che non corrisponde a un'annualità viene rifiutato; l'emissione
+    # automatica non crea mai da sé il primo premio (già iniziato) della polizza.
     client.post(f"/polizze/{pid}/genera-titoli", data={"inizio": (seconda + timedelta(days=3)).isoformat()})
     with app.app_context():
         effetti = sorted(t.data_effetto for t in db.session.get(Policy, pid).titoli)
-        assert effetti == [decorrenza, seconda]
+        assert effetti == [seconda]
 
 
 def test_polizza_non_ancora_in_vigore(client, app):
@@ -810,3 +811,194 @@ def test_modifica_titolo_con_data_gia_usata_non_da_500(client, app):
     resp = client.post(f"/titoli/{altro_id}/modifica", data={
         "tipo": "quietanza", "data_effetto": effetto_primo.isoformat(), "premio_lordo": "1200"})
     assert resp.status_code == 400 and "ha già una rata con questa data" in resp.get_data(as_text=True)
+
+
+# ----------------------------------------------------------------------
+# Verifica finale (secondo giro): accessi, clienti, sinistri, dashboard
+# ----------------------------------------------------------------------
+def test_nomi_utente_accentati(client, app):
+    from conftest import add_user
+    from gestionale.cli import reimposta_password
+    add_user(app, "Èrica", "password-erica-1")
+    nuovo = app.test_client()
+    resp = nuovo.post("/accesso", data={"username": "èrica", "password": "password-erica-1"})
+    assert resp.status_code == 302
+    # Duplicato che differisce solo per maiuscola accentata: rifiutato.
+    resp = client.post("/utenti/nuovo", data={"username": "ÈRICA", "ruolo": "operatore",
+                                              "password": "password-x-1234", "conferma": "password-x-1234"})
+    assert resp.status_code == 400
+    with app.app_context():
+        assert "«Èrica»" in reimposta_password("èrica", "nuova-password-1")
+
+
+def test_nome_utente_sistema_riservato(client, app):
+    resp = client.post("/utenti/nuovo", data={"username": "Sistema", "ruolo": "operatore",
+                                              "password": "password-x-1234", "conferma": "password-x-1234"})
+    assert resp.status_code == 400 and "riservato" in resp.get_data(as_text=True)
+
+
+def test_ripristino_limite_alto_solo_per_amministratori(tmp_path):
+    from conftest import add_user, make_app
+    app = make_app(tmp_path, CSRF_ENABLED=True)  # come in produzione: il token CSRF si legge dal form
+    add_user(app, "operatore1", "password-op-1")
+    operatore = app.test_client()
+    with operatore.session_transaction() as sessione:
+        sessione["_csrf"] = "tok"
+    operatore.post("/accesso", data={"username": "operatore1", "password": "password-op-1", "csrf_token": "tok"})
+    with operatore.session_transaction() as sessione:
+        sessione["_csrf"] = "tok"
+    corpo = b"x" * (25 * 1024 * 1024)
+    resp = operatore.post("/impostazioni/backup/ripristina",
+                          data={"csrf_token": "tok", "archivio": (io.BytesIO(corpo), "b.zip")},
+                          content_type="multipart/form-data")
+    # Oltre i 20 MB ordinari: rifiutato subito, senza leggere il corpo fino a 512 MB.
+    assert resp.status_code == 413
+    with app.app_context():
+        db.session.remove()
+        db.engine.dispose()
+
+
+def test_parametro_endpoint_non_rompe_le_liste(client, app):
+    for url in ("/polizze/?endpoint=1", "/sinistri/?endpoint=1", "/titoli/?endpoint=1", "/registro/?endpoint=1",
+                "/clienti/?endpoint=x&_external=1"):
+        assert client.get(url).status_code == 200, url
+
+
+def test_dipendente_mantiene_la_mansione(client, app):
+    pagina = client.get("/clienti/nuovo").get_data(as_text=True)
+    assert 'class="col-md-3 campo-professione"' in pagina and 'id="label-professione"' in pagina
+
+
+def test_questionario_in_scadenza_non_mancante(client, app):
+    cid = _cliente(app)
+    with app.app_context():
+        c = db.session.get(Client, cid)
+        c.data_adeguatezza = add_months(OGGI, -12) + timedelta(days=10)
+        db.session.commit()
+    pagina = client.get(f"/clienti/{cid}").get_data(as_text=True)
+    sezione = pagina.split("Questionario di adeguatezza")[1][:300]
+    assert "mancante" not in sezione and "scade il" in sezione
+
+
+def test_togliere_la_data_di_denuncia_riattiva_il_promemoria(client, app):
+    cid = _cliente(app)
+    evento = (OGGI - timedelta(days=10)).isoformat()
+    client.post("/sinistri/nuovo", data={"client_id": cid, "tipologia": "altro", "data_evento": evento})
+    client.get("/")
+    with app.app_context():
+        sid = Claim.query.one().id
+    client.post(f"/sinistri/{sid}/modifica", data={"tipologia": "altro", "data_evento": evento,
+                                                   "data_denuncia": OGGI.isoformat()})
+    client.post(f"/sinistri/{sid}/modifica", data={"tipologia": "altro", "data_evento": evento})
+    client.get("/")
+    with app.app_context():
+        n = Notification.query.filter(Notification.dedup_key.like(f"sinistro:{sid}:%denuncia:scaduta")).one()
+        assert not n.letta
+
+
+def test_dashboard_arretrati_senza_rimborsi(client, app):
+    pid = _polizza(app)
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        db.session.add_all([
+            Title(policy_id=pid, client_id=p.client_id, tipo="quietanza", data_effetto=OGGI - timedelta(days=5),
+                  premio_lordo=1000.0),
+            Title(policy_id=pid, client_id=p.client_id, tipo="appendice", data_effetto=OGGI - timedelta(days=5),
+                  premio_lordo=-200.0),
+        ])
+        db.session.commit()
+    with _Contesti(app) as contesti:
+        client.get("/")
+    stats = dict(contesti)["dashboard.html"]["stats"]
+    assert stats["titoli_arretrati"] == 1 and stats["importo_arretrati"] == 1000.0
+
+
+def test_eliminare_il_cliente_toglie_le_notifiche_degli_automatismi(client, app):
+    cid = _cliente(app)
+    pid = _polizza(app, cid)
+    with app.app_context():
+        db.session.add(Notification(tipo="automatismo", livello="info", messaggio="m", link=f"/polizze/{pid}",
+                                    dedup_key=f"automatismo:tacito:{pid}:2026-01-01"))
+        db.session.commit()
+    client.post(f"/clienti/{cid}/elimina")
+    with app.app_context():
+        assert Notification.query.filter(Notification.dedup_key.like("automatismo:%")).count() == 0
+
+
+def test_agenda_decorrenza_di_oggi(app):
+    _polizza(app, data_decorrenza=OGGI, data_scadenza=add_months(OGGI, 12))
+    with app.test_request_context():
+        assert any(e.tipo == "decorrenza" and e.data == OGGI for e in eventi_agenda(OGGI, OGGI + timedelta(days=5)))
+
+
+def test_rapporto_sp_con_base_negativa(client, app):
+    pid = _polizza(app, ramo="furto")
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        db.session.add(Title(policy_id=pid, client_id=p.client_id, tipo="appendice",
+                             data_effetto=OGGI - timedelta(days=5), premio_lordo=-50.0))
+        db.session.add(Claim(client_id=p.client_id, policy_id=pid, numero="SIN-SP-1", tipologia="furto",
+                             stato="aperto", data_evento=OGGI - timedelta(days=3), importo_riservato=100.0))
+        db.session.commit()
+    with _Contesti(app) as contesti:
+        client.get("/statistiche")
+    ctx = dict(contesti)["analytics.html"]
+    furto = next(r for r in ctx["rami"] if r["ramo"] == "furto")
+    assert furto["rapporto_sp"] is None and ctx["rapporto_sp"] is None
+
+
+def test_appendice_non_attiva_l_emissione_automatica(client, app):
+    pid = _polizza(app, data_decorrenza=OGGI - timedelta(days=120),
+                   data_scadenza=add_months(OGGI - timedelta(days=120), 12))
+    client.post(f"/titoli/nuovo/{pid}", data={"tipo": "appendice", "data_effetto": OGGI.isoformat(),
+                                              "premio_lordo": "350,00"})
+    client.get("/")
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        assert [t.tipo for t in p.titoli] == ["appendice"] and not p.copertura_sospesa
+
+
+def test_risoluzione_gia_avvenuta_ha_un_messaggio_proprio(client, app):
+    pid = _polizza(app, data_decorrenza=OGGI - timedelta(days=400), data_scadenza=OGGI + timedelta(days=330))
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        t = Title(policy_id=pid, client_id=p.client_id, tipo="quietanza",
+                  data_effetto=OGGI - timedelta(days=300), premio_lordo=600.0)
+        db.session.add(t)
+        db.session.commit()
+        tid = t.id
+    client.get("/")
+    with app.app_context():
+        chiavi = {n.dedup_key for n in Notification.query.filter(Notification.dedup_key.like(f"titolo:{tid}:%"))}
+        assert any(k.endswith(":risolta") for k in chiavi)
+        assert not any(k.endswith(":risoluzione") for k in chiavi)
+
+
+def test_scadenza_automatica_chiude_il_follow_up_di_rinnovo(app):
+    scadenza = OGGI - timedelta(days=40)
+    pid = _polizza(app, data_decorrenza=add_months(scadenza, -12), data_scadenza=scadenza)
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        db.session.add(FollowUp(client_id=p.client_id, policy_id=pid, tipo="rinnovo", titolo="Rinnovo",
+                                data_scadenza=scadenza - timedelta(days=15), auto_generato=True))
+        db.session.commit()
+        assert scadi_polizze(OGGI, Settings.get()) == 1
+        db.session.commit()
+        assert FollowUp.query.filter_by(policy_id=pid, stato="aperto").count() == 0
+
+
+def test_quietanza_anticipata_per_tacito_rinnovo_certo(app):
+    scadenza = OGGI + timedelta(days=10)
+    pid = _polizza(app, data_decorrenza=add_months(scadenza, -12), data_scadenza=scadenza,
+                   tacito_rinnovo=True, preavviso_disdetta_giorni=30)
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        genera_titoli(p, add_months(scadenza, -12), scadenza)
+        db.session.commit()
+        assert emetti_quietanze(OGGI, Settings.get()) == 1
+        db.session.commit()
+        assert any(t.data_effetto == scadenza and t.tipo == "quietanza" for t in db.session.get(Policy, pid).titoli)
+        # Al rinnovo tacito la quietanza non viene duplicata.
+        assert rinnova_taciti(scadenza, Settings.get()) == 1
+        db.session.commit()
+        assert sum(1 for t in db.session.get(Policy, pid).titoli if t.data_effetto == scadenza) == 1

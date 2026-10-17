@@ -13,8 +13,8 @@ import getpass
 import click
 from flask import Flask
 
-from .models import User, db
-from .security import audit, invalida_sessioni, password_problem
+from .models import db
+from .security import audit, invalida_sessioni, password_problem, trova_utente
 
 
 def reimposta_password(username: str, password: str) -> str:
@@ -22,7 +22,7 @@ def reimposta_password(username: str, password: str) -> str:
 
     Va chiamata dentro un application context.
     """
-    user = User.query.filter(db.func.lower(User.username) == username.lower()).first()
+    user = trova_utente(username)
     if user is None:
         raise ValueError(f"Utente «{username}» inesistente.")
     errore = password_problem(password)

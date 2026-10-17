@@ -7,7 +7,7 @@
     <h1 class="page-title"><i class="bi bi-file-earmark-text me-2"></i>Polizze</h1>
     <div class="page-subtitle">{{ pagination.total }} polizze · premi {{ totale_premi | euro }}</div>
   </div>
-  <a class="btn btn-outline-secondary" href="{{ url_for('policies.export_policies', **filtri.to_dict()) }}"><i class="bi bi-filetype-csv"></i> Esporta</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('policies.export_policies', **filtri_url()) }}"><i class="bi bi-filetype-csv"></i> Esporta</a>
 </div>
 
 <form class="filter-bar row g-2 align-items-end" method="get">
@@ -34,7 +34,7 @@
   </div>
   <div class="col-md-4 d-flex gap-1">
     <input class="form-control form-control-sm" name="q" value="{{ filtri.get('q', '') }}" placeholder="Numero polizza o cliente…" aria-label="Cerca">
-    <button class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
+    <button class="btn btn-sm btn-primary" aria-label="Cerca" title="Cerca"><i class="bi bi-search" aria-hidden="true"></i></button>
   </div>
 </form>
 
