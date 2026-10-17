@@ -1,0 +1,21 @@
+{% extends "layout_auth.html" %}
+{% block title %}Accesso — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<form method="post" novalidate>
+  {{ csrf_field() }}
+  <div class="mb-3">
+    <label class="form-label" for="username">Nome utente</label>
+    <input class="form-control form-control-lg" id="username" name="username" value="{{ username }}"
+           autocomplete="username" autofocus required>
+  </div>
+  <div class="mb-4">
+    <label class="form-label" for="password">Password</label>
+    <input class="form-control form-control-lg" id="password" name="password" type="password"
+           autocomplete="current-password" required>
+  </div>
+  <button class="btn btn-primary btn-lg w-100"><i class="bi bi-box-arrow-in-right"></i> Accedi</button>
+</form>
+<p class="small ga-muted mt-3 mb-0 text-center">
+  Password dimenticata? Chiedi a un amministratore di reimpostarla dalla pagina Utenti.
+</p>
+{% endblock %}

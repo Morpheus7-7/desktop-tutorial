@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Utenti — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title"><i class="bi bi-person-gear me-2"></i>Utenti</h1>
+    <div class="page-subtitle">Chi può accedere al gestionale e con quali permessi</div>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('users.new_user') }}"><i class="bi bi-person-plus"></i> Nuovo utente</a>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Utente</th><th>Nome</th><th>Ruolo</th><th>Stato</th><th>Ultimo accesso</th><th></th></tr></thead>
+      <tbody>
+      {% for u in utenti %}
+        <tr class="{% if not u.attivo %}text-muted{% endif %}">
+          <td class="fw-semibold">{{ u.username }}{% if utente and u.id == utente.id %} <span class="badge badge-soft">tu</span>{% endif %}</td>
+          <td>{{ u.nome or '—' }}{% if u.email %}<div class="small ga-muted">{{ u.email }}</div>{% endif %}</td>
+          <td><span class="badge {% if u.ruolo == 'admin' %}bg-primary{% elif u.ruolo == 'operatore' %}bg-info text-dark{% else %}bg-secondary{% endif %}">{{ u.ruolo_label }}</span></td>
+          <td>
+            {% if not u.attivo %}<span class="badge bg-secondary">Disattivato</span>
+            {% elif u.bloccato %}<span class="badge bg-danger">Bloccato</span>
+            {% else %}<span class="badge bg-success">Attivo</span>{% endif %}
+          </td>
+          <td class="small">{{ u.ultimo_accesso | dataora_it }}</td>
+          <td class="text-end text-nowrap">
+            {% if u.bloccato %}
+            <form class="d-inline" method="post" action="{{ url_for('users.unlock_user', user_id=u.id) }}">
+              {{ csrf_field() }}
+              <button class="btn btn-sm btn-outline-warning"><i class="bi bi-unlock"></i> Sblocca</button>
+            </form>
+            {% endif %}
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('users.edit_user', user_id=u.id) }}" title="Modifica" aria-label="Modifica l'utente {{ u.username }}"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="row g-3 mt-2 small">
+  <div class="col-md-4"><div class="card card-body h-100"><strong><i class="bi bi-shield-lock me-1"></i> Amministratore</strong><span class="ga-muted">Tutte le funzioni, compresi utenti, impostazioni, backup e registro attività.</span></div></div>
+  <div class="col-md-4"><div class="card card-body h-100"><strong><i class="bi bi-person-workspace me-1"></i> Operatore</strong><span class="ga-muted">Lavoro quotidiano: clienti, polizze, incassi, sinistri, documenti e pipeline.</span></div></div>
+  <div class="col-md-4"><div class="card card-body h-100"><strong><i class="bi bi-eye me-1"></i> Sola consultazione</strong><span class="ga-muted">Può vedere e cercare i dati ma non modificarli.</span></div></div>
+</div>
+{% endblock %}

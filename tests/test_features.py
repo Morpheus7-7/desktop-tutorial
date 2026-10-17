@@ -1,37 +1,9 @@
 """Test delle funzionalità aggiunte: dipendente, provvigioni, pipeline,
 spunti di trattativa, ricerca, statistiche e upload multiplo."""
 import io
-import os
-import tempfile
-from datetime import date, timedelta
 
-import pytest
-
-from gestionale import create_app
 from gestionale.models import Client, Document, Opportunity, Policy, db
 from gestionale.risk_engine import analyze_risks
-
-
-@pytest.fixture
-def app():
-    db_fd, db_path = tempfile.mkstemp(suffix=".db")
-    upload_dir = tempfile.mkdtemp()
-    app = create_app(
-        {
-            "TESTING": True,
-            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}",
-            "UPLOAD_FOLDER": upload_dir,
-            "SECRET_KEY": "test",
-        }
-    )
-    yield app
-    os.close(db_fd)
-    os.unlink(db_path)
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
 
 
 def _crea_cliente(client, **extra):

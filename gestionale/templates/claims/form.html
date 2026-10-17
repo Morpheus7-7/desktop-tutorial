@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% set modifica = claim.id is not none %}
+{% set v = valori or {} %}
+{% set inviato = v | length > 0 %}
+{% block title %}{{ 'Modifica sinistro' if modifica else 'Nuovo sinistro' }} — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('claims.list_claims') }}">Sinistri</a></li>
+  {% if client %}<li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.ragione_sociale }}</a></li>{% endif %}
+  <li class="breadcrumb-item active">{{ claim.numero if modifica else 'Nuovo sinistro' }}</li>
+</ol></nav>
+<h1 class="page-title mb-3"><i class="bi bi-exclamation-octagon me-2"></i>{{ 'Modifica sinistro ' ~ claim.numero if modifica else 'Apertura sinistro' }}</h1>
+
+<form method="post" class="card" action="{{ url_for('claims.edit_claim', claim_id=claim.id) if modifica else url_for('claims.new_claim') }}">
+  {{ csrf_field() }}
+  <div class="card-body">
+    <div class="section-title">Cliente e polizza</div>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <label class="form-label" for="sel-cliente">Cliente *</label>
+        {% if client %}
+          <input class="form-control" id="sel-cliente" value="{{ client.ragione_sociale }}" disabled>
+          <input type="hidden" name="client_id" value="{{ client.id }}">
+        {% else %}
+          <select class="form-select" name="client_id" id="sel-cliente" data-filter-target="#sel-polizza" required>
+            <option value="">Seleziona il cliente…</option>
+            {% for c in clienti %}<option value="{{ c.id }}" {% if v.get('client_id') == c.id | string %}selected{% endif %}>{{ c.ragione_sociale }}</option>{% endfor %}
+          </select>
+        {% endif %}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="sel-polizza">Polizza coinvolta</label>
+        <select class="form-select" name="policy_id" id="sel-polizza">
+          <option value="">— nessuna / da individuare —</option>
+          {% for p in polizze %}
+          {% set pol_sel = (v.get('policy_id') == p.id | string) if inviato else (claim.policy_id == p.id) %}
+          <option value="{{ p.id }}" data-parent="{{ p.client_id }}" {% if pol_sel %}selected{% endif %}>
+            {{ p.numero_polizza }} — {{ p.compagnia }} · {{ p.ramo_label }}{% if not client %} ({{ p.cliente.ragione_sociale }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="section-title">Evento</div>
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <label class="form-label" for="cl-tipologia">Tipologia</label>
+        {% set tip_sel = v.get('tipologia', claim.tipologia) %}
+        <select class="form-select" name="tipologia" id="cl-tipologia">
+          {% for val, l in claim_types %}<option value="{{ val }}" {% if tip_sel == val %}selected{% endif %}>{{ l }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="cl-evento">Data evento *</label>
+        <input type="date" class="form-control" id="cl-evento" name="data_evento" required min="1900-01-01" max="{{ oggi.isoformat() }}"
+               value="{{ v.get('data_evento', claim.data_evento.isoformat() if claim.data_evento else '') }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="cl-denuncia">Data denuncia alla compagnia</label>
+        <input type="date" class="form-control" id="cl-denuncia" name="data_denuncia" min="1900-01-01" max="{{ oggi.isoformat() }}" aria-describedby="cl-denuncia-help"
+               value="{{ v.get('data_denuncia', claim.data_denuncia.isoformat() if claim.data_denuncia else '') }}">
+        <div class="form-text" id="cl-denuncia-help">Lasciala vuota finché non hai denunciato il sinistro: entro 3 giorni dall'evento (art. 1913 c.c.) arriva un promemoria.</div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="cl-numero_compagnia">N. sinistro compagnia</label>
+        <input class="form-control" id="cl-numero_compagnia" name="numero_compagnia" value="{{ v.get('numero_compagnia', claim.numero_compagnia or '') }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="cl-luogo">Luogo</label>
+        <input class="form-control" id="cl-luogo" name="luogo" value="{{ v.get('luogo', claim.luogo or '') }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="cl-controparte">Controparte / danneggiato</label>
+        <input class="form-control" id="cl-controparte" name="controparte" value="{{ v.get('controparte', claim.controparte or '') }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="cl-descrizione">Descrizione dell'accaduto</label>
+        <textarea class="form-control" id="cl-descrizione" name="descrizione" rows="4">{{ v.get('descrizione', claim.descrizione or '') }}</textarea>
+      </div>
+    </div>
+
+    <div class="section-title">Gestione e importi</div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label" for="cl-perito">Perito</label>
+        <input class="form-control" id="cl-perito" name="perito" value="{{ v.get('perito', claim.perito or '') }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="cl-liquidatore">Liquidatore / ispettorato</label>
+        <input class="form-control" id="cl-liquidatore" name="liquidatore" value="{{ v.get('liquidatore', claim.liquidatore or '') }}">
+      </div>
+      {% for campo, etichetta in [('importo_richiesto', 'Danno stimato / richiesto (€)'), ('importo_riservato', 'Riserva compagnia (€)'), ('franchigia', 'Franchigia / scoperto (€)'), ('importo_liquidato', 'Importo liquidato (€)')] %}
+      <div class="col-md-3">
+        <label class="form-label" for="cl-{{ campo }}">{{ etichetta }}</label>
+        <input class="form-control" id="cl-{{ campo }}" name="{{ campo }}" inputmode="decimal"
+               value="{{ v.get(campo, claim[campo] | num_input) }}">
+      </div>
+      {% endfor %}
+      <div class="col-md-3">
+        <label class="form-label" for="cl-liquidazione">Data liquidazione</label>
+        <input type="date" class="form-control" id="cl-liquidazione" name="data_liquidazione" min="1900-01-01" max="{{ oggi.isoformat() }}"
+               value="{{ v.get('data_liquidazione', claim.data_liquidazione.isoformat() if claim.data_liquidazione else '') }}">
+      </div>
+      <div class="col-md-9">
+        <label class="form-label" for="cl-note">Note interne</label>
+        <input class="form-control" id="cl-note" name="note" value="{{ v.get('note', claim.note or '') }}">
+      </div>
+    </div>
+  </div>
+  <div class="card-footer d-flex gap-2">
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> {{ 'Salva' if modifica else 'Apri sinistro' }}</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('claims.detail', claim_id=claim.id) if modifica else (url_for('clients.detail', client_id=client.id) ~ '#sinistri' if client else url_for('claims.list_claims')) }}">Annulla</a>
+  </div>
+</form>
+{% endblock %}

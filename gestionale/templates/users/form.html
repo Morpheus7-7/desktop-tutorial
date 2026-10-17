@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Nuovo utente' if nuovo else 'Modifica utente' }} — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('users.list_users') }}">Utenti</a></li>
+  <li class="breadcrumb-item active">{{ 'Nuovo utente' if nuovo else user.username }}</li>
+</ol></nav>
+<div class="row"><div class="col-lg-8 col-xl-6">
+<form method="post" class="card">
+  {{ csrf_field() }}
+  <div class="card-header">{{ 'Nuovo utente' if nuovo else 'Modifica utente «' ~ user.username ~ '»' }}</div>
+  <div class="card-body row g-3">
+    <div class="col-md-6">
+      <label class="form-label" for="users-form-username">Nome utente *</label>
+      <input id="users-form-username" class="form-control" name="username" value="{{ user.username or '' }}" maxlength="60" {% if not nuovo %}disabled{% else %}required{% endif %} autocomplete="off">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="users-form-ruolo">Ruolo</label>
+      <select id="users-form-ruolo" class="form-select" name="ruolo">
+        {% for v, l in roles %}<option value="{{ v }}" {% if user.ruolo == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="users-form-nome">Nome e cognome</label>
+      <input id="users-form-nome" class="form-control" name="nome" value="{{ user.nome or '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="users-form-email">Email</label>
+      <input id="users-form-email" class="form-control" name="email" type="email" value="{{ user.email or '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="users-form-password">{{ 'Password *' if nuovo else 'Nuova password' }}</label>
+      <input id="users-form-password" class="form-control" name="password" type="password" autocomplete="new-password" {% if nuovo %}required minlength="8"{% endif %}>
+      {% if not nuovo %}<div class="form-text">Compila solo per reimpostarla.</div>{% endif %}
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="users-form-conferma">Conferma password</label>
+      <input id="users-form-conferma" class="form-control" name="conferma" type="password" autocomplete="new-password">
+    </div>
+    {% if not nuovo %}
+    <div class="col-12">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="attivo" name="attivo" {% if user.attivo %}checked{% endif %}>
+        <label class="form-check-label" for="attivo">Utente attivo (può accedere)</label>
+      </div>
+      <div class="form-text">Gli utenti non si eliminano: si disattivano, così il registro attività resta completo.</div>
+      <div class="form-text">Cambiando ruolo, stato o password, le sessioni aperte da questo utente vengono chiuse.</div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="card-footer d-flex gap-2">
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Salva</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('users.list_users') }}">Annulla</a>
+  </div>
+</form>
+</div></div>
+{% endblock %}

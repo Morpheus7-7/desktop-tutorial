@@ -1,0 +1,40 @@
+{% extends "layout_auth.html" %}
+{% block title %}Configurazione iniziale — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<h2 class="h5">Benvenuto! Configuriamo il gestionale</h2>
+<p class="small ga-muted">
+  Crea l'account <strong>amministratore</strong>: potrà gestire utenti, impostazioni e backup.
+  Potrai aggiungere i colleghi in seguito dalla pagina Utenti.
+</p>
+<form method="post">
+  {{ csrf_field() }}
+  <div class="row g-3">
+    <div class="col-12">
+      <label class="form-label" for="studio_nome">Nome dello studio / agenzia</label>
+      <input class="form-control" id="studio_nome" name="studio_nome" value="{{ dati.studio_nome }}" placeholder="es. Rossi Assicurazioni S.n.c.">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="nome">Il tuo nome</label>
+      <input class="form-control" id="nome" name="nome" value="{{ dati.nome }}" autocomplete="name">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="email">Email</label>
+      <input class="form-control" id="email" name="email" type="email" value="{{ dati.email }}" autocomplete="email">
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="username">Nome utente *</label>
+      <input class="form-control" id="username" name="username" value="{{ dati.username }}" autocomplete="username" required>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="password">Password *</label>
+      <input class="form-control" id="password" name="password" type="password" autocomplete="new-password" required minlength="8">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="conferma">Conferma password *</label>
+      <input class="form-control" id="conferma" name="conferma" type="password" autocomplete="new-password" required minlength="8">
+    </div>
+    <div class="col-12 form-text mt-1">Almeno 8 caratteri, con lettere e numeri o simboli.</div>
+  </div>
+  <button class="btn btn-primary w-100 mt-4"><i class="bi bi-check-lg"></i> Crea amministratore e accedi</button>
+</form>
+{% endblock %}

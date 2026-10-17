@@ -1,0 +1,12 @@
+{% extends "base.html" if utente else "layout_auth.html" %}
+{% block title %}{{ titolo }} — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="text-center py-5">
+  <div class="display-4 fw-bold ga-muted">{{ codice }}</div>
+  <h1 class="h4 mt-2">{{ titolo }}</h1>
+  <p class="ga-muted">{{ messaggio }}</p>
+  <a class="btn btn-primary" href="{{ url_for('main.dashboard') if utente else url_for('auth.login') }}">
+    <i class="bi bi-house"></i> {{ 'Torna alla dashboard' if utente else 'Vai all\'accesso' }}
+  </a>
+</div>
+{% endblock %}

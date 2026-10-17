@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Registro attività — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title"><i class="bi bi-journal-text me-2"></i>Registro attività</h1>
+    <div class="page-subtitle">Chi ha fatto cosa e quando: accessi, modifiche, incassi, esportazioni e backup</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('audit.export_log', **filtri_url()) }}"><i class="bi bi-filetype-csv"></i> Esporta CSV</a>
+</div>
+
+<form class="filter-bar row g-2 align-items-end" method="get">
+  {% if filtri.get('entita_id') %}<input type="hidden" name="entita_id" value="{{ filtri.get('entita_id') }}">{% endif %}
+  <div class="col-6 col-md-2">
+    <label class="form-label small" for="audit-list-utente">Utente</label>
+    <select id="audit-list-utente" class="form-select form-select-sm" name="utente">
+      <option value="">Tutti</option>
+      {% for u in utenti %}<option {% if filtri.get('utente') == u %}selected{% endif %}>{{ u }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small" for="audit-list-azione">Azione</label>
+    <select id="audit-list-azione" class="form-select form-select-sm" name="azione">
+      <option value="">Tutte</option>
+      {% for v, l in azioni %}<option value="{{ v }}" {% if filtri.get('azione') == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small" for="audit-list-entita">Elemento</label>
+    <select id="audit-list-entita" class="form-select form-select-sm" name="entita">
+      <option value="">Tutti</option>
+      {% for v, l in entita %}<option value="{{ v }}" {% if filtri.get('entita') == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small" for="audit-list-dal">Dal</label>
+    <input id="audit-list-dal" type="date" class="form-control form-control-sm" name="dal" value="{{ filtri.get('dal', '') }}">
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small" for="audit-list-al">Al</label>
+    <input id="audit-list-al" type="date" class="form-control form-control-sm" name="al" value="{{ filtri.get('al', '') }}">
+  </div>
+  <div class="col-6 col-md-2 d-flex gap-1">
+    <input class="form-control form-control-sm" name="q" value="{{ filtri.get('q', '') }}" placeholder="Testo…" aria-label="Cerca nel registro">
+    <button class="btn btn-sm btn-primary" aria-label="Applica i filtri" title="Applica i filtri"><i class="bi bi-funnel" aria-hidden="true"></i></button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead><tr><th>Data e ora</th><th>Utente</th><th>Azione</th><th>Elemento</th><th>Descrizione</th><th>IP</th></tr></thead>
+      <tbody>
+      {% for v in voci %}
+        <tr>
+          <td class="small text-nowrap tabular">{{ v.created_at | dataora_it }}</td>
+          <td class="small">{{ v.username or '—' }}</td>
+          <td><span class="badge {% if v.azione in ('elimina', 'login_fallito', 'ripristino') %}bg-danger{% elif v.azione in ('crea', 'incasso') %}bg-success{% elif v.azione in ('login', 'logout') %}bg-light text-dark border{% else %}bg-info text-dark{% endif %}">{{ azioni_label.get(v.azione, v.azione) }}</span></td>
+          <td class="small">{{ entita_label.get(v.entita, v.entita or '—') }}</td>
+          <td class="small">{{ v.descrizione }}</td>
+          <td class="small ga-muted">{{ v.ip or '' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="text-muted p-4">Nessuna attività registrata con questi filtri.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ m.paginazione(pagination) }}
+</div>
+{% endblock %}

@@ -19,13 +19,20 @@ datas = [
 # register_blueprints(): li dichiariamo esplicitamente. Per Flask e SQLAlchemy
 # provvedono gli hook integrati di PyInstaller.
 hiddenimports = [
-    "gestionale.routes.main",
+    "gestionale.routes.audit",
+    "gestionale.routes.auth",
+    "gestionale.routes.claims",
     "gestionale.routes.clients",
-    "gestionale.routes.policies",
     "gestionale.routes.documents",
     "gestionale.routes.followups",
+    "gestionale.routes.main",
     "gestionale.routes.notifications",
+    "gestionale.routes.opportunities",
+    "gestionale.routes.policies",
     "gestionale.routes.settings",
+    "gestionale.routes.titles",
+    "gestionale.routes.users",
+    "gestionale.cli",
     "flask_sqlalchemy",
     "sqlalchemy.dialects.sqlite",
     "waitress",
