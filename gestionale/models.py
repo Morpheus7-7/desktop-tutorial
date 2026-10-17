@@ -452,6 +452,15 @@ class Client(db.Model):
         """Avvertenze per l'intermediario legate alla professione (es. polizza collettiva dei notai)."""
         return self._obblighi_di_legge()[1]
 
+    @property
+    def eta(self):
+        if not self.data_nascita or self.data_nascita > date.today():
+            return None
+        oggi = date.today()
+        return oggi.year - self.data_nascita.year - (
+            (oggi.month, oggi.day) < (self.data_nascita.month, self.data_nascita.day)
+        )
+
     # --- Compliance -----------------------------------------------------
     @property
     def adeguatezza_scadenza(self):

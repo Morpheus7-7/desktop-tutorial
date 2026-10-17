@@ -279,8 +279,11 @@ def test_sanitario_dipendente_deve_avere_la_colpa_grave(app):
 
 def test_scheda_mostra_gli_obblighi(client, app):
     cid = _crea(app, tipo="professionista", ragione_sociale="Avv. Rossi", professione="Avvocato",
-                specializzazioni="Civilista; Penalista")
+                specializzazioni="Civilista; Penalista", data_nascita=date(1980, 1, 1))
     pagina = client.get(f"/clienti/{cid}").get_data(as_text=True)
+    with app.app_context():
+        eta = db.session.get(Client, cid).eta
+    assert eta is not None and f"({eta} anni)" in pagina
     assert "Assicurazioni obbligatorie per legge" in pagina and "non in portafoglio" in pagina
     assert "Civilista" in pagina and "Penalista" in pagina
 

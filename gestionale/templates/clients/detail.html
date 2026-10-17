@@ -96,8 +96,8 @@
           <dt class="col-sm-5">Indirizzo</dt>
           <dd class="col-sm-7">{{ client.indirizzo or '—' }}{% if client.cap %}, {{ client.cap }}{% endif %}
             {% if client.citta %} {{ client.citta }}{% endif %}{% if client.provincia %} ({{ client.provincia }}){% endif %}</dd>
-          <dt class="col-sm-5">Email</dt><dd class="col-sm-7">{% if client.email %}<a href="mailto:{{ client.email }}">{{ client.email }}</a>{% else %}—{% endif %}</dd>
-          <dt class="col-sm-5">PEC</dt><dd class="col-sm-7">{{ client.pec or '—' }}</dd>
+          <dt class="col-sm-5">Email</dt><dd class="col-sm-7 text-break">{% if client.email %}<a href="mailto:{{ client.email }}">{{ client.email }}</a>{% else %}—{% endif %}</dd>
+          <dt class="col-sm-5">PEC</dt><dd class="col-sm-7 text-break">{{ client.pec or '—' }}</dd>
           <dt class="col-sm-5">Telefono</dt><dd class="col-sm-7">{{ client.telefono or '—' }}</dd>
         </dl>
       </div>
