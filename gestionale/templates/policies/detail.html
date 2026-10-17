@@ -21,7 +21,7 @@
     {% endif %}
     {% if policy.attiva and not policy.disdetta_inviata %}
     <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#modalDisdetta"><i class="bi bi-envelope-x" aria-hidden="true"></i> Disdetta</button>
-    {% elif policy.attiva and policy.disdetta_inviata %}
+    {% elif policy.disdetta_inviata and (policy.attiva or policy.stato == 'disdetta') %}
     <form method="post" action="{{ url_for('policies.cancel_cancellation', policy_id=policy.id) }}" data-confirm="Annullare la disdetta registrata il {{ policy.data_disdetta | data_it }}?">
       {{ csrf_field() }}
       <button class="btn btn-outline-warning"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Annulla disdetta</button>
@@ -57,7 +57,7 @@
 {% endif %}
 {% if policy.attiva and policy.disdetta_inviata and eff != 'da_rinnovare' %}
 <div class="alert {% if policy.disdetta_tardiva %}alert-warning{% else %}alert-secondary{% endif %}"><i class="bi bi-envelope-x me-1" aria-hidden="true"></i>
-  Disdetta inviata il {{ policy.data_disdetta | data_it }}{% if policy.data_scadenza %}: la polizza cessa alla scadenza del {{ policy.data_scadenza | data_it }}{% endif %}.
+  Disdetta inviata il {{ policy.data_disdetta | data_it }}{% if policy.scadenza_originale %}: cessazione anticipata, la polizza termina il {{ policy.data_scadenza | data_it }}{% if policy.scadenza_originale != policy.data_scadenza %} (scadenza contrattuale {{ policy.scadenza_originale | data_it }}){% endif %}{% elif policy.data_scadenza %}: la polizza cessa alla scadenza del {{ policy.data_scadenza | data_it }}{% endif %}.
   {% if policy.disdetta_tardiva %}<strong>Inviata oltre il termine di preavviso</strong> ({{ policy.termine_disdetta | data_it }}): la compagnia potrebbe considerarla tardiva.{% endif %}</div>
 {% elif policy.attiva and policy.termine_disdetta and policy.giorni_al_termine_disdetta is not none and 0 <= policy.giorni_al_termine_disdetta <= 60 %}
 <div class="alert alert-warning"><i class="bi bi-alarm me-1" aria-hidden="true"></i>
@@ -74,7 +74,7 @@
   <div class="col-6 col-lg-3"><div class="card stat-card accent-info h-100"><div class="card-body">
     <span class="stat-icon"><i class="bi bi-calendar-event"></i></span>
     <div class="stat-label">Scadenza</div><div class="stat-value small-value">{{ policy.data_scadenza | data_it }}</div>
-    <div class="small ga-muted">{% if policy.giorni_alla_scadenza is not none %}{% if policy.giorni_alla_scadenza < 0 %}scaduta {{ policy.giorni_alla_scadenza | giorni }}{% else %}{{ policy.giorni_alla_scadenza | giorni }}{% endif %}{% endif %}{% if policy.tacito_rinnovo %} · tacito rinnovo{% endif %}</div>
+    <div class="small ga-muted">{% if policy.giorni_alla_scadenza is not none %}{% if policy.giorni_alla_scadenza < 0 %}scaduta {{ policy.giorni_alla_scadenza | giorni }}{% else %}{{ policy.giorni_alla_scadenza | giorni }}{% endif %}{% endif %}{% if policy.rinnovo_tacito %} · tacito rinnovo{% endif %}</div>
     {% if policy.termine_disdetta and policy.attiva %}<div class="small ga-muted">disdetta entro il {{ policy.termine_disdetta | data_it }}</div>{% endif %}
     {% if policy.non_ancora_in_vigore %}<div class="small text-info-emphasis">decorre il {{ policy.data_decorrenza | data_it }}</div>{% endif %}
   </div></div></div>
@@ -112,7 +112,7 @@
           <button class="btn btn-sm btn-primary"><i class="bi bi-magic" aria-hidden="true"></i> Genera titoli dell'annualità ({{ plurale(policy.rate_annue, 'rata', 'rate') }})</button>
         </form>
         {% endif %}
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#nuovoTitolo" aria-expanded="false" aria-controls="nuovoTitolo"><i class="bi bi-plus-lg" aria-hidden="true"></i> Titolo manuale</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#nuovoTitolo" aria-expanded="{{ 'true' if valori_titolo else 'false' }}" aria-controls="nuovoTitolo"><i class="bi bi-plus-lg" aria-hidden="true"></i> Titolo manuale</button>
       </div>
       {% endif %}
     </div>
@@ -127,12 +127,12 @@
             <td class="text-nowrap">{{ per.inizio | data_it }} – {{ per.fine | data_it }}</td>
             <td class="small">
               {% if per.corrente %}<span class="badge bg-primary">in corso</span>{% elif per.futura %}<span class="badge bg-info text-dark">futura</span>{% else %}<span class="badge bg-secondary">passata</span>{% endif %}
-              {% if per.titoli %}{{ plurale(per.titoli | length, 'titolo', 'titoli') }}{% else %}<span class="ga-muted">nessun titolo emesso</span>{% endif %}
+              {% if per.titoli %}{{ plurale(per.titoli | length, 'titolo', 'titoli') }}{% elif per.coperto %}<span class="ga-muted">coperto da titoli di un altro periodo</span>{% else %}<span class="ga-muted">nessun titolo emesso</span>{% endif %}
             </td>
             <td class="num small">{{ per.incassato | euro }}</td>
             <td class="num small">{{ per.da_incassare | euro }}</td>
             <td class="text-end">
-              {% if puo_modificare and not per.titoli and policy.premio_annuo and policy.attiva %}
+              {% if puo_modificare and not per.coperto and policy.premio_annuo and policy.attiva %}
               <form method="post" action="{{ url_for('policies.generate_titles', policy_id=policy.id) }}" class="d-inline"
                     {% if per.futura %}data-confirm="Emettere ora i titoli dell'annualità {{ per.inizio | data_it }} – {{ per.fine | data_it }}?"{% endif %}>
                 {{ csrf_field() }}
@@ -148,16 +148,17 @@
     </div>
     {% endif %}
     {% if puo_modificare %}
-    <div class="collapse mb-3" id="nuovoTitolo">
+    {% set vt = valori_titolo or {} %}
+    <div class="collapse mb-3{% if valori_titolo %} show{% endif %}" id="nuovoTitolo">
       <form method="post" action="{{ url_for('titles.new_title', policy_id=policy.id) }}" class="row g-2 border rounded p-3 bg-light">
         {{ csrf_field() }}
         <div class="col-md-3"><label class="form-label small" for="nt-tipo">Tipo</label>
-          <select class="form-select form-select-sm" id="nt-tipo" name="tipo">{% for v, l in title_types %}<option value="{{ v }}" {% if v == 'appendice' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
-        <div class="col-md-2"><label class="form-label small" for="nt-effetto">Effetto *</label><input type="date" class="form-control form-control-sm" id="nt-effetto" name="data_effetto" required></div>
-        <div class="col-md-2"><label class="form-label small" for="nt-fine">Copertura fino al</label><input type="date" class="form-control form-control-sm" id="nt-fine" name="data_fine_copertura"></div>
-        <div class="col-md-2"><label class="form-label small" for="nt-premio">Premio lordo € *</label><input class="form-control form-control-sm" id="nt-premio" name="premio_lordo" required inputmode="decimal"></div>
-        <div class="col-md-3"><label class="form-label small" for="nt-provv">Provvigione € <span class="ga-muted">(vuoto = {{ policy.provvigione_perc or 0 }}%)</span></label><input class="form-control form-control-sm" id="nt-provv" name="provvigione" inputmode="decimal"></div>
-        <div class="col-md-10"><label class="visually-hidden" for="nt-note">Note</label><input class="form-control form-control-sm" id="nt-note" name="note" placeholder="Note (es. regolazione premio consuntivo 2025)"></div>
+          <select class="form-select form-select-sm" id="nt-tipo" name="tipo">{% for v, l in title_types %}<option value="{{ v }}" {% if v == vt.get('tipo', 'appendice') %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+        <div class="col-md-2"><label class="form-label small" for="nt-effetto">Effetto *</label><input type="date" class="form-control form-control-sm" id="nt-effetto" name="data_effetto" required value="{{ vt.get('data_effetto', '') }}"></div>
+        <div class="col-md-2"><label class="form-label small" for="nt-fine">Copertura fino al</label><input type="date" class="form-control form-control-sm" id="nt-fine" name="data_fine_copertura" value="{{ vt.get('data_fine_copertura', '') }}"></div>
+        <div class="col-md-2"><label class="form-label small" for="nt-premio">Premio lordo € *</label><input class="form-control form-control-sm" id="nt-premio" name="premio_lordo" required inputmode="decimal" value="{{ vt.get('premio_lordo', '') }}"></div>
+        <div class="col-md-3"><label class="form-label small" for="nt-provv">Provvigione € <span class="ga-muted">(vuoto = {{ policy.provvigione_perc or 0 }}%)</span></label><input class="form-control form-control-sm" id="nt-provv" name="provvigione" inputmode="decimal" value="{{ vt.get('provvigione', '') }}"></div>
+        <div class="col-md-10"><label class="visually-hidden" for="nt-note">Note</label><input class="form-control form-control-sm" id="nt-note" name="note" placeholder="Note (es. regolazione premio consuntivo 2025)" value="{{ vt.get('note', '') }}"></div>
         <div class="col-md-2"><button class="btn btn-sm btn-primary w-100">Aggiungi</button></div>
       </form>
     </div>
@@ -215,7 +216,7 @@
           <dt class="col-sm-5">Scadenza</dt><dd class="col-sm-7">{{ policy.data_scadenza | data_it }}</dd>
           <dt class="col-sm-5">Frazionamento</dt><dd class="col-sm-7">{{ policy.frazionamento_label }}</dd>
           <dt class="col-sm-5">Provvigione</dt><dd class="col-sm-7">{{ (policy.provvigione_perc | perc) if policy.provvigione_perc is not none else '—' }}{% if policy.provvigione_annua %} · {{ policy.provvigione_annua | euro }}/anno{% endif %}</dd>
-          <dt class="col-sm-5">Tacito rinnovo</dt><dd class="col-sm-7">{% if policy.tacito_rinnovo %}Sì · preavviso {{ policy.preavviso_disdetta }} giorni{% if policy.termine_disdetta %} (entro il {{ policy.termine_disdetta | data_it }}){% endif %}{% else %}No{% endif %}</dd>
+          <dt class="col-sm-5">Tacito rinnovo</dt><dd class="col-sm-7">{% if policy.rinnovo_tacito %}Sì · preavviso {{ policy.preavviso_disdetta }} giorni{% if policy.termine_disdetta %} (entro il {{ policy.termine_disdetta | data_it }}){% endif %}{% else %}No{% endif %}</dd>
           {% if policy.data_disdetta %}<dt class="col-sm-5">Disdetta inviata</dt><dd class="col-sm-7">{{ policy.data_disdetta | data_it }}{% if policy.disdetta_tardiva %} <span class="badge bg-warning text-dark">oltre il preavviso</span>{% endif %}</dd>{% endif %}
         </dl>
       </div>

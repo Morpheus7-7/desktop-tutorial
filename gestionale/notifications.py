@@ -137,32 +137,40 @@ def auto_create_renewal_followups(oggi: date | None = None) -> int:
     rinnovo la scadenza cambia e il ciclo successivo avrà il suo follow-up.
     """
     today = oggi or date.today()
-    limite = today + timedelta(days=RENEWAL_LEAD_DAYS)
     created = 0
+    # Il preavviso di disdetta può arrivare a un anno: si guarda oltre i 45 giorni
+    # e si decide polizza per polizza in base alla data di riferimento.
     polizze = Policy.query.filter(
         Policy.stato.in_(STATI_ATTIVI),
         Policy.data_scadenza.isnot(None),
         Policy.data_scadenza >= today,
-        Policy.data_scadenza <= limite,
+        Policy.data_scadenza <= today + timedelta(days=RENEWAL_LEAD_DAYS + 366),
         Policy.data_disdetta.is_(None),
     ).all()
     for policy in polizze:
         scadenza = policy.data_scadenza
+        termine = policy.termine_disdetta
+        # Per il tacito rinnovo la data che conta è il termine di disdetta:
+        # il follow-up deve arrivare prima, non dopo che è già passato.
+        riferimento = min(scadenza, termine) if termine else scadenza
+        inizio_ciclo = riferimento - timedelta(days=RENEWAL_LEAD_DAYS)
+        if today < inizio_ciclo:
+            continue
         gia_presente = FollowUp.query.filter(
             FollowUp.policy_id == policy.id,
             FollowUp.tipo == "rinnovo",
             FollowUp.auto_generato.is_(True),
-            FollowUp.data_scadenza >= scadenza - timedelta(days=RENEWAL_LEAD_DAYS),
+            FollowUp.data_scadenza >= inizio_ciclo,
             FollowUp.data_scadenza <= scadenza,
         ).first()
         if gia_presente:
             continue
         target = max(scadenza - timedelta(days=RENEWAL_FOLLOWUP_OFFSET), today)
-        if policy.tacito_rinnovo and policy.termine_disdetta:
-            target = max(min(target, policy.termine_disdetta), today)
+        if termine:
+            target = max(min(target, termine - timedelta(days=RENEWAL_FOLLOWUP_OFFSET)), today)
             descrizione = (
                 f"Polizza a tacito rinnovo: scade il {scadenza:%d/%m/%Y}, termine per la disdetta "
-                f"il {policy.termine_disdetta:%d/%m/%Y}. Verificare con il cliente se rinnovare o disdire."
+                f"il {termine:%d/%m/%Y}. Verificare con il cliente se rinnovare o disdire."
             )
         else:
             descrizione = (
@@ -217,7 +225,7 @@ def _notifiche_polizze(today: date) -> int:
         nome_cliente = policy.cliente.ragione_sociale
         ciclo = policy.data_scadenza.isoformat()
         descr = f"Polizza {policy.numero_polizza} ({policy.ramo_label}) di {nome_cliente}"
-        tacito = policy.tacito_rinnovo and not policy.disdetta_inviata
+        tacito = policy.rinnovo_tacito and not policy.disdetta_inviata
         if giorni < 0:
             if tacito:
                 created += _add(
@@ -258,7 +266,7 @@ def _notifiche_disdette(today: date) -> int:
         Policy.data_scadenza >= today,
     ).all()
     for policy in policies:
-        termine = policy.termine_disdetta
+        termine = policy.termine_disdetta  # None se il ramo non ammette il tacito rinnovo
         if termine is None or termine < today:
             continue
         giorni = (termine - today).days
@@ -352,7 +360,15 @@ def _notifiche_titoli(today: date) -> int:
         descr = f"polizza {policy.numero_polizza} di {policy.cliente.ragione_sociale}"
         chiave = f"titolo:{t.id}:{t.data_effetto.isoformat()}"
         importo = formatta_euro(t.premio_lordo)
-        if t.copertura_sospesa:
+        if not t.soggetto_art_1901 and t.data_effetto < today:
+            created += _add(
+                "titolo", "warning",
+                f"Premio NON PAGATO scaduto il {t.data_effetto:%d/%m/%Y} ({importo}) della {descr}: "
+                "assicurazione sulla vita, verificare le conseguenze previste dalle condizioni "
+                "di polizza (art. 1924 c.c.).",
+                link, f"{chiave}:arretrato",
+            )
+        elif t.copertura_sospesa:
             created += _add(
                 "titolo", "danger",
                 f"Copertura SOSPESA per mancato pagamento: rata del {t.data_effetto:%d/%m/%Y} ({importo}) "
@@ -372,7 +388,7 @@ def _notifiche_titoli(today: date) -> int:
             created += _add(
                 "titolo", "warning",
                 f"Rata NON PAGATA scaduta il {t.data_effetto:%d/%m/%Y} ({importo}) della {descr}: "
-                f"copertura sospesa dal {t.data_sospensione:%d/%m/%Y} se non incassata.",
+                f"copertura sospesa dal {t.inizio_sospensione:%d/%m/%Y} se non incassata.",
                 link, f"{chiave}:arretrato",
             )
         else:

@@ -41,7 +41,7 @@
 {% elif t.copertura_sospesa %}
   <span class="badge bg-danger" title="Art. 1901 c.c.: copertura sospesa fino al pagamento"><i class="bi bi-shield-x"></i> Copertura sospesa</span>
 {% elif t.arretrato %}
-  <span class="badge bg-warning text-dark" title="Copertura sospesa dal {{ t.data_sospensione | data_it }} se non pagato"><i class="bi bi-hourglass-split"></i> Arretrato {{ t.giorni_ritardo }} gg</span>
+  <span class="badge bg-warning text-dark" title="{% if t.soggetto_art_1901 %}Copertura sospesa dal {{ t.inizio_sospensione | data_it }} se non pagato{% else %}Assicurazione vita: vedi condizioni di polizza (art. 1924 c.c.){% endif %}"><i class="bi bi-hourglass-split" aria-hidden="true"></i> Arretrato {{ plurale(t.giorni_ritardo, 'giorno', 'giorni') }}</span>
 {% else %}
   <span class="badge bg-info text-dark">Da incassare</span>
 {% endif %}

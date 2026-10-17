@@ -44,7 +44,7 @@
               <td><a href="{{ url_for('policies.detail', policy_id=p.id) }}">{{ p.numero_polizza }}</a><br><span class="small ga-muted">{{ p.compagnia }} · {{ p.ramo_label }}</span></td>
               <td class="num">{{ p.premio_annuo | euro }}</td>
               <td>{% if p.disdetta_inviata %}<span class="badge bg-secondary">disdetta</span>
-                  {% elif p.tacito_rinnovo %}<span class="badge bg-info text-dark">tacito</span>{% if p.termine_disdetta and p.giorni_al_termine_disdetta is not none and p.giorni_al_termine_disdetta >= 0 %}<div class="small ga-muted">disdetta entro il {{ p.termine_disdetta | data_it }}</div>{% endif %}
+                  {% elif p.rinnovo_tacito %}<span class="badge bg-info text-dark">tacito</span>{% if p.termine_disdetta and p.giorni_al_termine_disdetta is not none and p.giorni_al_termine_disdetta >= 0 %}<div class="small ga-muted">disdetta entro il {{ p.termine_disdetta | data_it }}</div>{% endif %}
                   {% else %}<span class="badge bg-warning text-dark">da rinnovare</span>{% endif %}</td>
             </tr>
           {% endfor %}

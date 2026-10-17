@@ -82,7 +82,7 @@ def eventi_agenda(dal: date, al: date, tipi: set[str] | None = None) -> list[Eve
         if p.data_scadenza:
             esito = (
                 "disdetta inviata: cessa" if p.disdetta_inviata
-                else "rinnovo tacito" if p.tacito_rinnovo else "da rinnovare"
+                else "rinnovo tacito" if p.rinnovo_tacito else "da rinnovare"
             )
             aggiungi(p.data_scadenza, "scadenza", f"Scadenza polizza {p.numero_polizza}",
                      f"{nome} ({esito})", link, f"polizza-{p.id}-scadenza-{p.data_scadenza:%Y%m%d}")
@@ -103,8 +103,9 @@ def eventi_agenda(dal: date, al: date, tipi: set[str] | None = None) -> list[Eve
                  f"{nome}: {t.tipo_label} di {formatta_euro(t.premio_lordo)}",
                  link, f"titolo-{t.id}-effetto-{t.data_effetto:%Y%m%d}")
         # Sospensione solo per le rate già scadute: per quelle future basta la rata.
-        if t.tipo != "perfezionamento" and t.data_effetto <= date.today() and t.data_sospensione != date.max:
-            aggiungi(t.data_sospensione + timedelta(days=1), "sospensione",
+        if (t.tipo != "perfezionamento" and t.soggetto_art_1901 and t.data_effetto <= date.today()
+                and t.inizio_sospensione != date.max):
+            aggiungi(t.inizio_sospensione, "sospensione",
                      f"Copertura sospesa se non pagata: {t.polizza.numero_polizza}",
                      f"{nome}: rata del {t.data_effetto:%d/%m/%Y} (art. 1901 c.c.)",
                      link, f"titolo-{t.id}-sospensione-{t.data_effetto:%Y%m%d}")

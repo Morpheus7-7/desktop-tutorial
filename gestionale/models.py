@@ -131,6 +131,9 @@ POLICY_EFFECTIVE_STATES = {
 PREAVVISO_DISDETTA_DEFAULT = 30
 # Rami per cui il tacito rinnovo non è ammesso (RC auto: L. 221/2012).
 RAMI_SENZA_TACITO_RINNOVO = {"auto"}
+# Assicurazioni sulla vita: l'art. 1901 c.c. (sospensione e risoluzione per
+# mancato pagamento) non si applica; valgono l'art. 1924 c.c. e le condizioni.
+RAMI_VITA = {"vita", "previdenza"}
 # Durata massima di una polizza accettata nei form.
 DURATA_MASSIMA_ANNI = 10
 
@@ -428,6 +431,8 @@ class Policy(db.Model):
     # disdetta eventualmente già inviata (blocca il rinnovo automatico).
     preavviso_disdetta_giorni = db.Column(db.Integer)
     data_disdetta = db.Column(db.Date)
+    # Scadenza prima di una cessazione anticipata con data futura (per l'annullo).
+    scadenza_originale = db.Column(db.Date)
     stato = db.Column(db.String(20), nullable=False, default="attiva")
     note = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=now)
@@ -472,9 +477,15 @@ class Policy(db.Model):
         return (self.data_decorrenza - date.today()).days
 
     @property
+    def rinnovo_tacito(self):
+        """Tacito rinnovo effettivo: mai per i rami che non lo ammettono (RC auto),
+        anche se il flag è rimasto attivo da dati importati o da versioni precedenti."""
+        return bool(self.tacito_rinnovo) and self.ramo not in RAMI_SENZA_TACITO_RINNOVO
+
+    @property
     def preavviso_disdetta(self):
         """Giorni di preavviso per la disdetta (solo con tacito rinnovo)."""
-        if not self.tacito_rinnovo:
+        if not self.rinnovo_tacito:
             return None
         if self.preavviso_disdetta_giorni is None:
             return PREAVVISO_DISDETTA_DEFAULT
@@ -483,7 +494,7 @@ class Policy(db.Model):
     @property
     def termine_disdetta(self):
         """Ultimo giorno utile per inviare la disdetta ed evitare il rinnovo tacito."""
-        if not self.tacito_rinnovo or not self.data_scadenza:
+        if not self.rinnovo_tacito or not self.data_scadenza:
             return None
         try:
             return self.data_scadenza - timedelta(days=self.preavviso_disdetta or 0)
@@ -517,7 +528,7 @@ class Policy(db.Model):
         if self.non_ancora_in_vigore:
             return "non_in_vigore"
         if self.data_scadenza and self.data_scadenza < oggi:
-            if self.tacito_rinnovo and not self.disdetta_inviata:
+            if self.rinnovo_tacito and not self.disdetta_inviata:
                 return "tacito_da_registrare"
             return "da_rinnovare"
         if self.copertura_sospesa:
@@ -888,8 +899,26 @@ class Title(db.Model):
             return date.max
 
     @property
+    def inizio_sospensione(self):
+        """Primo giorno senza copertura se la rata resta impagata: la decorrenza
+        per il primo premio, altrimenti il 16° giorno (sospesa dalle ore 24 del 15°)."""
+        if self.tipo == "perfezionamento":
+            return self.data_effetto
+        try:
+            return self.data_sospensione + timedelta(days=1)
+        except OverflowError:
+            return date.max
+
+    @property
+    def soggetto_art_1901(self):
+        """L'art. 1901 c.c. non si applica alle assicurazioni sulla vita."""
+        return self.polizza is None or self.polizza.ramo not in RAMI_VITA
+
+    @property
     def data_risoluzione(self):
         """Art. 1901 c. 3: risoluzione di diritto se la rata resta impagata 6 mesi."""
+        if not self.soggetto_art_1901:
+            return None
         return add_months_sicuro(self.data_effetto, MESI_RISOLUZIONE_PREMIO)
 
     @property
@@ -897,6 +926,8 @@ class Title(db.Model):
         """Art. 1901 c.c.: primo premio non pagato → copertura non operante;
         premi successivi → sospesa dopo 15 giorni dalla scadenza."""
         if self.stato != "da_incassare" or (self.premio_lordo or 0) <= 0:
+            return False
+        if not self.soggetto_art_1901:
             return False
         oggi = date.today()
         if self.tipo == "perfezionamento":
@@ -909,13 +940,13 @@ class Title(db.Model):
 
     def sospende_alla_data(self, giorno: date) -> bool:
         """True se, alla data indicata, questa rata impagata sospendeva la copertura."""
-        if self.stato == "stornato" or (self.premio_lordo or 0) <= 0:
+        if self.stato == "stornato" or (self.premio_lordo or 0) <= 0 or not self.soggetto_art_1901:
             return False
-        if giorno < self.data_sospensione:
+        if giorno < self.inizio_sospensione:
             return False
-        if self.tipo != "perfezionamento" and giorno == self.data_sospensione:
-            return False  # sospensione dalle ore 24 del 15° giorno
-        return self.data_incasso is None or self.data_incasso > giorno
+        # La copertura riprende dalle ore 24 del giorno del pagamento: un evento
+        # accaduto proprio quel giorno è ancora scoperto.
+        return self.data_incasso is None or self.data_incasso >= giorno
 
 
 class Claim(db.Model):

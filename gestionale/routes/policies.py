@@ -1,10 +1,10 @@
 """Gestione polizze: portafoglio, scheda, rinnovo, disdetta e generazione dei titoli."""
-from datetime import date
+from datetime import date, timedelta
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from sqlalchemy.exc import IntegrityError
 
-from ..automatismi import storna_titoli_futuri
+from ..automatismi import ripristina_titoli_stornati, storna_titoli_futuri
 from ..export import csv_response
 from ..models import (
     DOCUMENT_CATEGORIES,
@@ -31,9 +31,10 @@ from ..titoli import (
     genera_titoli,
     periodi_polizza,
     prossima_scadenza_utile,
+    titoli_coprono,
     titoli_periodo,
 )
-from ..utils import add_months_sicuro, clean, leggi_data, leggi_importo, paginate, parse_date, parse_int
+from ..utils import add_months_sicuro, clean, leggi_data, leggi_importo, paginate, parse_date, parse_int, plurale
 
 bp = Blueprint("policies", __name__, url_prefix="/polizze")
 
@@ -64,7 +65,8 @@ def _populate_from_form(policy: Policy, form) -> list[str]:
         if valore is None:
             errori.append("Preavviso di disdetta: indica un numero di giorni tra 0 e 365.")
         policy.preavviso_disdetta_giorni = valore
-    elif not policy.tacito_rinnovo:
+    else:
+        # Campo vuoto = preavviso predefinito (come indica il modulo).
         policy.preavviso_disdetta_giorni = None
     stato = form.get("stato")
     policy.stato = stato if stato in dict(POLICY_STATUSES) else "attiva"
@@ -201,6 +203,8 @@ def _periodi_con_titoli(policy: Policy):
             "inizio": inizio,
             "fine": fine,
             "titoli": titoli,
+            # Già coperto da titoli (anche emessi con date diverse): niente «Genera».
+            "coperto": bool(titoli_coprono(policy, inizio, fine)),
             "corrente": inizio <= oggi < fine,
             "futura": inizio > oggi,
             "incassato": sum(t.premio_lordo or 0 for t in titoli if t.stato == "incassato"),
@@ -211,9 +215,13 @@ def _periodi_con_titoli(policy: Policy):
 
 @bp.route("/<int:policy_id>")
 def detail(policy_id):
-    policy = db.get_or_404(Policy, policy_id)
+    return render_detail(db.get_or_404(Policy, policy_id))
+
+
+def render_detail(policy: Policy, valori_titolo=None):
+    """Scheda polizza; ``valori_titolo`` ripresenta un titolo manuale non salvato."""
     annualita = annualita_corrente(policy)
-    titoli_correnti = titoli_periodo(policy, *annualita) if annualita else []
+    titoli_correnti = titoli_coprono(policy, *annualita) if annualita else []
     storico = (
         AuditLog.query.filter_by(entita="polizza", entita_id=policy.id)
         .order_by(AuditLog.created_at.desc())
@@ -241,6 +249,7 @@ def detail(policy_id):
         prossima_utile=prossima_utile if prossima_utile != proposta else None,
         massimo_rinnovo=add_months_sicuro(policy.data_scadenza, 12 * DURATA_MASSIMA_ANNI),
         oggi_iso=date.today().isoformat(),
+        valori_titolo=valori_titolo,
         payment_methods=PAYMENT_METHODS,
         title_types=TITLE_TYPES,
         document_categories=DOCUMENT_CATEGORIES,
@@ -272,7 +281,7 @@ def edit_policy(policy_id):
         if prima[2] != policy.stato:
             dettagli.append(f"stato {prima[2]} → {policy.stato}")
         stornati = 0
-        if prima[2] in ("attiva", "in_rinnovo") and policy.stato in STATI_CESSATI:
+        if prima[2] not in STATI_CESSATI and policy.stato in STATI_CESSATI:
             stornati = storna_titoli_futuri(policy, date.today(), f"polizza {policy.stato}")
             if stornati:
                 dettagli.append(f"stornate {stornati} rate future")
@@ -283,8 +292,9 @@ def edit_policy(policy_id):
         if stornati:
             flash(f"Stornate {stornati} rate non ancora scadute: le rate arretrate restano dovute per il periodo coperto.", "info")
         date_cambiate = (prima[1], prima[3], prima[4]) != (policy.data_scadenza, policy.data_decorrenza, policy.frazionamento)
-        if date_cambiate and policy.titoli_da_incassare:
-            flash("Date o frazionamento sono cambiati: verifica che i titoli da incassare siano ancora corretti.", "warning")
+        if date_cambiate and any(t.stato != "stornato" for t in policy.titoli):
+            flash("Date o frazionamento sono cambiati: verifica che i titoli già emessi (anche quelli incassati) "
+                  "corrispondano ancora alle annualità della polizza.", "warning")
         return redirect(url_for("policies.detail", policy_id=policy.id))
     return _form_polizza(policy)
 
@@ -335,8 +345,9 @@ def renew(policy_id):
 
     Sposta la scadenza, aggiorna il premio, chiude i follow-up di rinnovo
     ancora aperti, annulla un'eventuale disdetta registrata e (se richiesto)
-    genera i titoli della prima annualità rinnovata; le annualità successive
-    di un rinnovo pluriennale vengono emesse all'anniversario.
+    genera i titoli dei periodi rinnovati fino alla prima annualità (o, se la
+    polizza era scaduta da tempo, fino a quella in corso: le altre sono
+    arretrate); le annualità successive vengono emesse all'anniversario.
     """
     policy = db.get_or_404(Policy, policy_id)
     torna = redirect(url_for("policies.detail", policy_id=policy.id))
@@ -390,15 +401,21 @@ def renew(policy_id):
     messaggio = f"Polizza {policy.numero_polizza} rinnovata fino al {nuova:%d/%m/%Y}."
     livello = "success"
     if request.form.get("genera_titoli") and policy.premio_annuo:
-        fine_prima = min(nuova, dodici_mesi)
-        try:
-            titoli = genera_titoli(policy, inizio=vecchia, fine=fine_prima, tipo_primo="quietanza")
-            messaggio += f" Generati {len(titoli)} titoli"
-            messaggio += " della prima annualità (le successive verranno emesse all'anniversario)." if nuova > dodici_mesi else "."
-        except TitoliGiaPresenti:
+        generati, arretrati, problemi = _genera_titoli_rinnovo(policy, vecchia, dodici_mesi)
+        if generati:
+            messaggio += f" Generati {plurale(generati, 'titolo', 'titoli')}"
+            messaggio += (" (le annualità successive verranno emesse all'anniversario)."
+                          if nuova > max(dodici_mesi, date.today()) else ".")
+        elif not problemi:
             messaggio += " I titoli della nuova annualità erano già presenti."
-        except ValueError as exc:
-            messaggio += f" Titoli non generati: {exc}"
+        if arretrati:
+            if arretrati == 1:
+                testo = "1 rata ha effetto già passato e risulta arretrata"
+            else:
+                testo = f"{arretrati} rate hanno effetto già passato e risultano arretrate"
+            flash(f"Attenzione: {testo} (annualità scadute prima del rinnovo).", "warning")
+        for problema in problemi:
+            messaggio += f" Titoli non generati: {problema}"
             livello = "warning"
     if chiusi:
         messaggio += f" Chiusi {chiusi} follow-up di rinnovo."
@@ -420,6 +437,37 @@ def renew(policy_id):
             "warning",
         )
     return torna
+
+
+def _genera_titoli_rinnovo(policy: Policy, vecchia: date, dodici_mesi: date) -> tuple[int, int, list[str]]:
+    """Titoli dei periodi rinnovati, allineati alle annualità della nuova scadenza.
+
+    Le annualità si contano a ritroso dalla nuova scadenza: se questa non dista
+    un numero intero di anni dalla vecchia, il primo periodo dopo la vecchia
+    scadenza è un rateo (premio pro rata giorni). Si generano i periodi che
+    iniziano entro la prima annualità rinnovata o entro oggi (rinnovo di una
+    polizza scaduta da tempo: le annualità intermedie sono dovute anch'esse).
+    Restituisce (titoli generati, di cui arretrati, errori).
+    """
+    oggi = date.today()
+    limite = max(dodici_mesi, oggi + timedelta(days=1))
+    generati, arretrati, problemi = 0, 0, []
+    for inizio, fine in periodi_polizza(policy, fino_a=limite):
+        if fine <= vecchia:
+            continue
+        inizio = max(inizio, vecchia)
+        if inizio >= limite:
+            break
+        try:
+            titoli = genera_titoli(policy, inizio=inizio, fine=fine, tipo_primo="quietanza")
+        except TitoliGiaPresenti:
+            continue
+        except ValueError as exc:
+            problemi.append(str(exc))
+            break
+        generati += len(titoli)
+        arretrati += sum(1 for t in titoli if t.data_effetto < oggi)
+    return generati, arretrati, problemi
 
 
 @bp.route("/<int:policy_id>/disdetta", methods=["POST"])
@@ -453,13 +501,23 @@ def register_cancellation(policy_id):
         return torna
 
     policy.data_disdetta = data_disdetta
+    # Il motivo dello storno identifica questa disdetta: annullandola, le rate
+    # stornate tornano da incassare.
+    motivo_storno = f"{_marcatore_disdetta(data_disdetta)} — {motivo}"
     if immediata:
-        stornati = storna_titoli_futuri(policy, data_cessazione, f"disdetta: {motivo}")
+        stornati = storna_titoli_futuri(policy, data_cessazione, motivo_storno)
         if data_cessazione <= oggi:
             policy.stato = "disdetta"
+        elif policy.data_scadenza is None or data_cessazione < policy.data_scadenza:
+            # Cessazione futura: la polizza termina in quella data (la scadenza
+            # automatica la chiude il giorno dopo). La scadenza originale resta
+            # salvata per poter annullare la disdetta; se la polizza non aveva
+            # scadenza, si salva la stessa data della cessazione.
+            policy.scadenza_originale = policy.data_scadenza or data_cessazione
+            policy.data_scadenza = data_cessazione
         descrizione = f"con effetto dal {data_cessazione:%d/%m/%Y}"
     else:
-        stornati = storna_titoli_futuri(policy, policy.data_scadenza, f"disdetta: {motivo}")
+        stornati = storna_titoli_futuri(policy, policy.data_scadenza, motivo_storno)
         descrizione = f"alla scadenza del {policy.data_scadenza:%d/%m/%Y}"
     for fu in FollowUp.query.filter_by(policy_id=policy.id, tipo="rinnovo", stato="aperto").all():
         fu.stato = "completato"
@@ -479,17 +537,36 @@ def register_cancellation(policy_id):
     return torna
 
 
+def _marcatore_disdetta(data_disdetta: date) -> str:
+    return f"disdetta del {data_disdetta:%d/%m/%Y}"
+
+
 @bp.route("/<int:policy_id>/annulla-disdetta", methods=["POST"])
 def cancel_cancellation(policy_id):
+    """Annulla la disdetta registrata: ripristina rate stornate, scadenza e stato."""
     policy = db.get_or_404(Policy, policy_id)
-    if policy.data_disdetta is None or not policy.attiva:
+    if policy.data_disdetta is None or not (policy.attiva or policy.stato == "disdetta"):
         flash("Non c'è una disdetta da annullare.", "warning")
-    else:
-        audit("modifica", "polizza", policy.id,
-              f"Annullata la disdetta del {policy.data_disdetta:%d/%m/%Y} della polizza {policy.numero_polizza}")
-        policy.data_disdetta = None
-        db.session.commit()
-        flash("Disdetta annullata. Se servono, rigenera i titoli stornati dalla scheda.", "info")
+        return redirect(url_for("policies.detail", policy_id=policy.id))
+    data_disdetta = policy.data_disdetta
+    ripristinati = ripristina_titoli_stornati(policy, _marcatore_disdetta(data_disdetta))
+    dettagli = []
+    if policy.scadenza_originale:
+        originale = None if policy.scadenza_originale == policy.data_scadenza else policy.scadenza_originale
+        dettagli.append("scadenza ripristinata" + (f" al {originale:%d/%m/%Y}" if originale else " (nessuna)"))
+        policy.data_scadenza = originale
+        policy.scadenza_originale = None
+    if policy.stato == "disdetta":
+        policy.stato = "attiva"
+        dettagli.append("polizza di nuovo attiva")
+    if ripristinati:
+        dettagli.append(f"{plurale(ripristinati, 'rata ripristinata', 'rate ripristinate')}")
+    policy.data_disdetta = None
+    audit("modifica", "polizza", policy.id,
+          f"Annullata la disdetta del {data_disdetta:%d/%m/%Y} della polizza {policy.numero_polizza}"
+          + (f": {', '.join(dettagli)}" if dettagli else ""))
+    db.session.commit()
+    flash("Disdetta annullata" + (f": {', '.join(dettagli)}." if dettagli else "."), "info")
     return redirect(url_for("policies.detail", policy_id=policy.id))
 
 

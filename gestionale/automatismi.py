@@ -17,8 +17,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from .models import FollowUp, Policy, Settings, db, now
-from .titoli import TitoliGiaPresenti, add_months, genera_titoli, periodi_polizza, titoli_periodo
+from .models import RAMI_SENZA_TACITO_RINNOVO, FollowUp, Policy, Settings, db, now
+from .titoli import TitoliGiaPresenti, add_months, genera_titoli, periodi_polizza, titoli_coprono
 
 # Il rinnovo tacito automatico agisce solo su scadenze recenti: una polizza
 # dimenticata da anni va verificata a mano, non rinnovata in blocco.
@@ -57,12 +57,43 @@ def storna_titoli_futuri(policy: Policy, dal: date, motivo: str) -> int:
     return stornati
 
 
+def ripristina_titoli_stornati(policy: Policy, motivo: str) -> int:
+    """Rimette da incassare i titoli stornati con un motivo che inizia con
+    ``motivo`` (es. l'annullo di una disdetta) e toglie la riga dello storno."""
+    marcatore = f"Storno: {motivo}"
+    ripristinati = 0
+    for titolo in policy.titoli:
+        if titolo.stato != "stornato" or not titolo.note:
+            continue
+        righe = titolo.note.split("\n")
+        rimaste = [r for r in righe if not r.startswith(marcatore)]
+        if len(rimaste) == len(righe):
+            continue
+        titolo.note = "\n".join(rimaste) or None
+        titolo.stato = "da_incassare"
+        ripristinati += 1
+    return ripristinati
+
+
+def _chiudi_notifiche_ciclo(policy: Policy, scadenza: date, tieni_scaduta: bool = False) -> None:
+    """Segna lette le notifiche del ciclo di scadenza superato (rinnovo o chiusura)."""
+    from .notifications import segna_lette
+
+    if tieni_scaduta:
+        for fascia in ("60", "30", "7"):
+            segna_lette(f"polizza:{policy.id}:{scadenza.isoformat()}:{fascia}")
+    else:
+        segna_lette(f"polizza:{policy.id}:{scadenza.isoformat()}:")
+    segna_lette(f"disdetta:{policy.id}:{scadenza.isoformat()}:")
+
+
 def rinnova_taciti(oggi: date, settings: Settings) -> int:
     if not settings.rinnovo_tacito_automatico:
         return 0
     polizze = Policy.query.filter(
         Policy.stato.in_(STATI_ATTIVI),
         Policy.tacito_rinnovo.is_(True),
+        Policy.ramo.notin_(RAMI_SENZA_TACITO_RINNOVO),  # RC auto: vietato (L. 221/2012)
         Policy.data_disdetta.is_(None),
         Policy.data_scadenza.isnot(None),
         Policy.data_scadenza <= oggi,
@@ -84,6 +115,7 @@ def rinnova_taciti(oggi: date, settings: Settings) -> int:
                 pass
         policy.data_scadenza = nuova
         policy.stato = "attiva"
+        _chiudi_notifiche_ciclo(policy, vecchia)
         for fu in FollowUp.query.filter_by(policy_id=policy.id, tipo="rinnovo", stato="aperto").all():
             fu.stato = "completato"
             fu.completed_at = now()
@@ -113,12 +145,17 @@ def emetti_quietanze(oggi: date, settings: Settings) -> int:
     ).all()
     emesse = 0
     for policy in polizze:
-        if not policy.titoli or policy.data_disdetta:
+        # Anche con la disdetta registrata le annualità fino alla scadenza restano
+        # dovute (es. poliennale disdetta alla scadenza): periodi_polizza non va
+        # mai oltre la scadenza, quindi non si emette nulla dopo la cessazione.
+        if not policy.titoli:
             continue
         for inizio, fine in periodi_polizza(policy, fino_a=orizzonte):
             if fine <= oggi or inizio > orizzonte:
                 continue
-            if titoli_periodo(policy, inizio, fine):
+            # Periodo già emesso (anche se poi stornato o con date spostate): non
+            # si riemette, così uno storno dell'operatore non viene annullato.
+            if titoli_coprono(policy, inizio, fine, includi_stornati=True):
                 continue
             try:
                 titoli = genera_titoli(policy, inizio=inizio, fine=fine)
@@ -151,12 +188,13 @@ def scadi_polizze(oggi: date, settings: Settings) -> int:
     chiuse = 0
     for policy in polizze:
         disdetta = policy.data_disdetta is not None
-        if policy.tacito_rinnovo and not disdetta:
+        if policy.rinnovo_tacito and not disdetta:
             continue  # si rinnova per legge: la gestisce il rinnovo tacito
         limite = policy.data_scadenza + timedelta(days=0 if disdetta else tolleranza)
         if oggi <= limite:
             continue
         policy.stato = "disdetta" if disdetta else "scaduta"
+        _chiudi_notifiche_ciclo(policy, policy.data_scadenza, tieni_scaduta=True)
         stornati = storna_titoli_futuri(policy, policy.data_scadenza, f"polizza {policy.stato}")
         dettaglio = f", stornate {stornati} rate successive" if stornati else ""
         _audit_sistema(

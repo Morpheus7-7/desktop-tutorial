@@ -14,7 +14,7 @@ sull'ultima rata: le somme coincidono sempre con i totali.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from .models import Policy, Title
 from .utils import add_months, arrotonda, ripartisci
@@ -65,7 +65,10 @@ def periodi_polizza(policy: Policy, fino_a: date | None = None) -> list[tuple[da
         return list(reversed(periodi))
     if decorrenza:
         periodi = []
-        for passo in range(MAX_PERIODI):
+        # Polizze molto vecchie: si parte abbastanza avanti da arrivare sempre
+        # all'annualità che contiene ``oggi`` entro MAX_PERIODI passi.
+        primo_passo = max(0, (oggi.year - decorrenza.year) - MAX_PERIODI + 2)
+        for passo in range(primo_passo, primo_passo + MAX_PERIODI):
             try:
                 inizio = add_months(decorrenza, 12 * passo)
                 fine = add_months(decorrenza, 12 * (passo + 1))
@@ -92,8 +95,10 @@ def annualita_corrente(policy: Policy, oggi: date | None = None) -> tuple[date, 
 
 
 def annualita_piena(inizio: date, fine: date) -> bool:
+    """True se il periodo dura esattamente un anno, contato in avanti o (come
+    fa periodi_polizza) a ritroso dalla fine: 28/02/2027 – 29/02/2028 è pieno."""
     try:
-        return add_months(inizio, 12) == fine
+        return add_months(inizio, 12) == fine or add_months(fine, -12) == inizio
     except (ValueError, OverflowError):
         return False
 
@@ -110,7 +115,8 @@ def premio_periodo(premio_annuo: float, inizio: date, fine: date) -> float:
 
 
 def titoli_periodo(policy: Policy, inizio: date, fine: date) -> list[Title]:
-    """Titoli ordinari (perfezionamento, quietanza, rata) non stornati del periodo.
+    """Titoli ordinari (perfezionamento, quietanza, rata) non stornati con
+    effetto nel periodo (per l'elenco delle annualità nella scheda).
 
     Le appendici (regolazioni, variazioni, rimborsi) non contano: possono
     convivere con le rate ordinarie della stessa annualità.
@@ -118,6 +124,31 @@ def titoli_periodo(policy: Policy, inizio: date, fine: date) -> list[Title]:
     return [
         t for t in policy.titoli
         if t.stato != "stornato" and t.tipo != "appendice" and inizio <= t.data_effetto < fine
+    ]
+
+
+def _fine_copertura(titolo: Title) -> date:
+    """Fine (esclusa) della copertura di un titolo; in mancanza, il giorno dopo l'effetto."""
+    if titolo.data_fine_copertura and titolo.data_fine_copertura > titolo.data_effetto:
+        return titolo.data_fine_copertura
+    return titolo.data_effetto + timedelta(days=1)
+
+
+def titoli_coprono(policy: Policy, inizio: date, fine: date, includi_stornati: bool = False) -> list[Title]:
+    """Titoli ordinari la cui copertura si sovrappone al periodo [inizio, fine).
+
+    Serve a decidere se un periodo è già stato emesso: guardare solo la data
+    effetto non basta, perché spostando decorrenza o scadenza (o rinnovando per
+    una durata diversa da 12 mesi) la griglia delle annualità si sposta e un
+    titolo già emesso finirebbe nel periodo accanto, che sembrerebbe scoperto.
+    Con ``includi_stornati`` conta anche i titoli stornati (emissione
+    automatica: un titolo stornato o eliminato dall'operatore non si riemette).
+    """
+    return [
+        t for t in policy.titoli
+        if t.tipo != "appendice"
+        and (includi_stornati or t.stato != "stornato")
+        and t.data_effetto < fine and _fine_copertura(t) > inizio
     ]
 
 
@@ -136,10 +167,13 @@ def date_rate(policy: Policy, inizio: date, fine: date) -> list[tuple[date, date
             break
         if effetto >= fine:
             break
-        try:
-            fine_rata = min(add_months(inizio, (i + 1) * passo), fine)
-        except (ValueError, OverflowError):
-            fine_rata = fine
+        if i == policy.rate_annue - 1:
+            fine_rata = fine  # l'ultima rata arriva sempre a fine periodo (es. 29 febbraio)
+        else:
+            try:
+                fine_rata = min(add_months(inizio, (i + 1) * passo), fine)
+            except (ValueError, OverflowError):
+                fine_rata = fine
         rate.append((effetto, fine_rata))
     return rate
 
@@ -168,7 +202,7 @@ def genera_titoli(
     premio_annuo = policy.premio_annuo if premio is None else premio
     if not premio_annuo or premio_annuo <= 0:
         raise ValueError("Per generare i titoli serve il premio annuo della polizza.")
-    if titoli_periodo(policy, inizio, fine):
+    if titoli_coprono(policy, inizio, fine):
         raise TitoliGiaPresenti(
             f"Il periodo {inizio:%d/%m/%Y} – {fine:%d/%m/%Y} ha già dei titoli."
         )

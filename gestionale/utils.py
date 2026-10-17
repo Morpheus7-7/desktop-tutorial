@@ -249,3 +249,7 @@ def paginate(query):
         risultato = query.paginate(page=risultato.pages, per_page=per_pagina, error_out=False)
     return risultato
 
+
+def plurale(numero, singolare: str, plurale_: str) -> str:
+    """«1 titolo», «3 titoli»."""
+    return f"{numero} {singolare if numero == 1 else plurale_}"

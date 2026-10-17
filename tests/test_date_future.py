@@ -348,16 +348,19 @@ def test_agenda_e_calendario_ics(client, app):
         db.session.add(Claim(client_id=cid, numero="SIN-T-1", tipologia="altro", stato="aperto",
                              data_evento=OGGI - timedelta(days=1)))
         db.session.commit()
+    # La prima richiesta esegue anche gli automatismi (es. il follow-up di rinnovo
+    # della polizza a tacito rinnovo, che arriva prima del termine di disdetta).
+    pagina = client.get("/scadenzario?giorni=60").get_data(as_text=True)
+    assert "Agenda: altre scadenze" in pagina and "Termine disdetta" in pagina
     with app.test_request_context():
         eventi = eventi_agenda(OGGI, OGGI + timedelta(days=60))
     tipi = {e.tipo for e in eventi}
-    assert {"decorrenza", "disdetta", "documento", "denuncia", "scadenza"} <= tipi
+    assert {"decorrenza", "disdetta", "documento", "denuncia", "scadenza", "followup"} <= tipi
     disdetta = next(e for e in eventi if e.tipo == "disdetta")
     assert disdetta.data == scadenza - timedelta(days=30)
+    followup = next(e for e in eventi if e.tipo == "followup")
+    assert followup.data <= disdetta.data  # il promemoria arriva prima del termine
     assert [e.data for e in eventi] == sorted(e.data for e in eventi)
-
-    pagina = client.get("/scadenzario?giorni=60").get_data(as_text=True)
-    assert "Agenda: altre scadenze" in pagina and "Termine disdetta" in pagina
 
     resp = client.get("/scadenzario.ics?giorni=60")
     assert resp.mimetype == "text/calendar"
@@ -568,3 +571,242 @@ def test_csp_senza_script_inline_e_template_senza_gestori(client, app):
         testo = f.read_text()
         assert not re.search(r"\son[a-z]+\s*=\s*\"", testo), f"gestore inline in {f.name}"
         assert not re.search(r"<script(?![^>]*\bsrc=)", testo), f"script inline in {f.name}"
+
+
+# ----------------------------------------------------------------------
+# Verifica finale: emissione automatica, rinnovi, disdette, vita, migrazioni
+# ----------------------------------------------------------------------
+def test_storno_non_viene_riemesso_dall_automatismo(client, app):
+    decorrenza = OGGI - timedelta(days=355)
+    pid = _polizza(app, data_decorrenza=decorrenza, data_scadenza=add_months(decorrenza, 24))
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        genera_titoli(p, decorrenza, add_months(decorrenza, 12))
+        db.session.commit()
+    client.get("/")  # emissione automatica della seconda annualità (anticipo 30 gg)
+    with app.app_context():
+        seconda = [t for t in db.session.get(Policy, pid).titoli if t.data_effetto == add_months(decorrenza, 12)]
+        assert len(seconda) == 1
+        tid = seconda[0].id
+    client.post(f"/titoli/{tid}/storna", data={"motivo": "sostituita"})
+    client.get("/")
+    client.get(f"/polizze/{pid}")
+    with app.app_context():
+        seconda = [t for t in db.session.get(Policy, pid).titoli if t.data_effetto == add_months(decorrenza, 12)]
+        assert [t.stato for t in seconda] == ["stornato"]
+
+
+def test_spostare_la_scadenza_non_duplica_il_premio(client, app):
+    decorrenza = OGGI - timedelta(days=30)
+    pid = _polizza(app, data_decorrenza=decorrenza, data_scadenza=add_months(decorrenza, 12))
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        genera_titoli(p)
+        db.session.commit()
+        nuova = p.data_scadenza + timedelta(days=1)
+    resp = client.post(f"/polizze/{pid}/modifica", data={
+        "compagnia": "Generali", "numero_polizza": "P-1", "ramo": "incendio", "stato": "attiva",
+        "premio_annuo": "1200", "frazionamento": "annuale",
+        "data_decorrenza": decorrenza.isoformat(), "data_scadenza": nuova.isoformat()},
+        follow_redirects=True)
+    assert "verifica che i titoli già emessi" in resp.get_data(as_text=True)
+    client.get("/")
+    with app.app_context():
+        titoli = [t for t in db.session.get(Policy, pid).titoli if t.stato != "stornato"]
+        assert sum(t.premio_lordo for t in titoli) == 1200.0
+
+
+def test_rinnovo_di_13_mesi_rateo_senza_doppio_premio(client, app):
+    pid = _polizza(app)
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        genera_titoli(p)
+        db.session.commit()
+        vecchia = p.data_scadenza
+    nuova = add_months(vecchia, 13)
+    client.post(f"/polizze/{pid}/rinnova", data={"nuova_scadenza": nuova.isoformat(), "genera_titoli": "on"})
+    client.get("/")
+    with app.app_context():
+        nuovi = sorted((t for t in db.session.get(Policy, pid).titoli if t.data_effetto >= vecchia),
+                       key=lambda t: t.data_effetto)
+        # Rateo di un mese + annualità piena: nessuna sovrapposizione.
+        assert [t.data_effetto for t in nuovi] == [vecchia, add_months(vecchia, 1)]
+        assert nuovi[1].premio_lordo == 1200.0 and 90 < nuovi[0].premio_lordo < 110
+
+
+def test_rinnovo_di_polizza_scaduta_da_anni_genera_tutte_le_annualita(client, app):
+    with app.app_context():
+        Settings.get().scadenza_automatica = False
+        db.session.commit()
+    vecchia = add_months(OGGI, -30)
+    pid = _polizza(app, data_decorrenza=add_months(vecchia, -12), data_scadenza=vecchia)
+    nuova = add_months(vecchia, 36)
+    client.post(f"/polizze/{pid}/rinnova", data={
+        "nuova_scadenza": nuova.isoformat(), "genera_titoli": "on", "pluriennale": "on"})
+    with app.app_context():
+        effetti = sorted(t.data_effetto for t in db.session.get(Policy, pid).titoli)
+        assert effetti == [vecchia, add_months(vecchia, 12), add_months(vecchia, 24)]
+
+
+def test_disdetta_poliennale_alla_scadenza_mantiene_le_annualita(app):
+    decorrenza = OGGI - timedelta(days=350)
+    pid = _polizza(app, data_decorrenza=decorrenza, data_scadenza=add_months(decorrenza, 36),
+                   data_disdetta=OGGI - timedelta(days=1))
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        genera_titoli(p, decorrenza, add_months(decorrenza, 12))
+        db.session.commit()
+        assert emetti_quietanze(OGGI, Settings.get()) == 1
+        db.session.commit()
+        dati = calcola_previsione(24, oggi=OGGI)
+        # Previsione: l'ultima annualità (prima della scadenza) sì, il rinnovo no.
+        assert dati["totale_emessi"] == 1200.0 and dati["totale_stimati"] == 1200.0
+
+
+def test_cessazione_futura_e_annullo_disdetta(client, app):
+    pid = _polizza(app, frazionamento="semestrale")
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        genera_titoli(p)
+        db.session.commit()
+        scadenza = p.data_scadenza
+        seconda = add_months(p.data_decorrenza, 6)
+    cessazione = seconda - timedelta(days=1)
+    client.post(f"/polizze/{pid}/disdetta", data={
+        "data_disdetta": OGGI.isoformat(), "effetto": "immediato", "data_cessazione": cessazione.isoformat()})
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        assert p.data_scadenza == cessazione and p.scadenza_originale == scadenza
+        assert [t.stato for t in p.titoli if t.data_effetto == seconda] == ["stornato"]
+        assert scadi_polizze(cessazione + timedelta(days=1), Settings.get()) == 1
+        db.session.commit()
+        assert db.session.get(Policy, pid).stato == "disdetta"
+    client.post(f"/polizze/{pid}/annulla-disdetta")
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        assert p.stato == "attiva" and p.data_scadenza == scadenza and p.data_disdetta is None
+        assert [t.stato for t in p.titoli if t.data_effetto == seconda] == ["da_incassare"]
+
+
+def test_rc_auto_mai_rinnovata_tacitamente(app):
+    scadenza = OGGI - timedelta(days=2)
+    pid = _polizza(app, ramo="auto", tacito_rinnovo=True,
+                   data_decorrenza=add_months(scadenza, -12), data_scadenza=scadenza)
+    with app.app_context():
+        assert rinnova_taciti(OGGI, Settings.get()) == 0
+        p = db.session.get(Policy, pid)
+        assert not p.rinnovo_tacito and p.termine_disdetta is None
+
+
+def test_vita_esclusa_dall_art_1901(app):
+    pid = _polizza(app, ramo="vita")
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        t = Title(policy_id=pid, client_id=p.client_id, tipo="quietanza",
+                  data_effetto=OGGI - timedelta(days=40), premio_lordo=500.0)
+        db.session.add(t)
+        db.session.commit()
+        assert t.arretrato and not t.copertura_sospesa and t.data_risoluzione is None
+        assert not t.sospende_alla_data(OGGI)
+
+
+def test_copertura_sospesa_fino_al_giorno_del_pagamento(app):
+    pid = _polizza(app)
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        effetto = OGGI - timedelta(days=60)
+        t = Title(policy_id=pid, client_id=p.client_id, tipo="quietanza", data_effetto=effetto,
+                  premio_lordo=500.0, stato="incassato", data_incasso=OGGI - timedelta(days=10))
+        db.session.add(t)
+        db.session.commit()
+        assert t.inizio_sospensione == effetto + timedelta(days=16)
+        assert not t.sospende_alla_data(effetto + timedelta(days=15))
+        assert t.sospende_alla_data(effetto + timedelta(days=16))
+        assert t.sospende_alla_data(OGGI - timedelta(days=10))  # giorno del pagamento
+        assert not t.sospende_alla_data(OGGI - timedelta(days=9))
+
+
+def test_annualita_29_febbraio_piena():
+    from gestionale.titoli import annualita_piena, premio_periodo
+    assert annualita_piena(date(2027, 2, 28), date(2028, 2, 29))
+    assert premio_periodo(1000.0, date(2027, 2, 28), date(2028, 2, 29)) == 1000.0
+
+
+def test_migrazione_chiavi_titoli_e_sinistri(app):
+    from gestionale import _migra_chiavi_notifiche
+    pid = _polizza(app)
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        t = Title(policy_id=pid, client_id=p.client_id, tipo="quietanza",
+                  data_effetto=OGGI - timedelta(days=20), premio_lordo=500.0)
+        s = Claim(client_id=p.client_id, numero="SIN-M-1", tipologia="altro", stato="aperto",
+                  data_evento=OGGI - timedelta(days=10))
+        db.session.add_all([t, s])
+        db.session.flush()
+        for chiave in (f"titolo:{t.id}:sospesa", f"sinistro:{s.id}:denuncia", f"sinistro:{s.id}:aperto:180"):
+            db.session.add(Notification(tipo="x", livello="info", messaggio="m", dedup_key=chiave, letta=True))
+        db.session.commit()
+        _migra_chiavi_notifiche()
+        chiavi = {n.dedup_key for n in Notification.query.all()}
+        assert f"titolo:{t.id}:{t.data_effetto.isoformat()}:sospesa" in chiavi
+        assert f"sinistro:{s.id}:{s.data_evento.isoformat()}:denuncia:scaduta" in chiavi
+        assert f"sinistro:{s.id}:{s.data_evento.isoformat()}:aperto:180" in chiavi
+
+
+def test_titolo_manuale_con_errore_conserva_i_dati(client, app):
+    pid = _polizza(app)
+    resp = client.post(f"/titoli/nuovo/{pid}", data={
+        "tipo": "rata", "data_effetto": OGGI.isoformat(), "premio_lordo": "100",
+        "provvigione": "150", "note": "regolazione lunga"})
+    assert resp.status_code == 400
+    pagina = resp.get_data(as_text=True)
+    assert 'value="regolazione lunga"' in pagina and "collapse mb-3 show" in pagina
+
+
+def test_preavviso_vuoto_torna_al_predefinito(client, app):
+    pid = _polizza(app, tacito_rinnovo=True, preavviso_disdetta_giorni=90)
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        dati = {"compagnia": "Generali", "numero_polizza": "P-1", "ramo": "incendio", "stato": "attiva",
+                "premio_annuo": "1200", "frazionamento": "annuale", "tacito_rinnovo": "on",
+                "preavviso_disdetta_giorni": "",
+                "data_decorrenza": p.data_decorrenza.isoformat(), "data_scadenza": p.data_scadenza.isoformat()}
+    client.post(f"/polizze/{pid}/modifica", data=dati)
+    with app.app_context():
+        assert db.session.get(Policy, pid).preavviso_disdetta == 30
+
+
+def test_operatore_non_incassa_nei_mesi_chiusi(app):
+    from conftest import add_user, login
+    from gestionale.utils import inizio_mese
+    pid = _polizza(app)
+    with app.app_context():
+        genera_titoli(db.session.get(Policy, pid))
+        db.session.commit()
+        tid = db.session.get(Policy, pid).titoli[0].id
+    add_user(app, "operatore1", "password-op-1")
+    operatore = app.test_client()
+    login(operatore, "operatore1", "password-op-1")
+    mese_scorso = inizio_mese(OGGI) - timedelta(days=1)
+    operatore.post(f"/titoli/{tid}/incassa", data={"mezzo_pagamento": "pos", "data_incasso": mese_scorso.isoformat()})
+    with app.app_context():
+        assert db.session.get(Title, tid).stato == "da_incassare"
+    operatore.post(f"/titoli/{tid}/incassa", data={"mezzo_pagamento": "pos", "data_incasso": OGGI.isoformat()})
+    with app.app_context():
+        assert db.session.get(Title, tid).stato == "incassato"
+
+
+def test_modifica_titolo_con_data_gia_usata_non_da_500(client, app):
+    pid = _polizza(app)
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        primo = genera_titoli(p)[0]
+        db.session.flush()
+        altro = Title(policy_id=pid, client_id=p.client_id, tipo="quietanza", numero_rata=1,
+                      data_effetto=add_months(primo.data_effetto, 12), premio_lordo=1200.0)
+        db.session.add(altro)
+        db.session.commit()
+        effetto_primo, altro_id = primo.data_effetto, altro.id
+    resp = client.post(f"/titoli/{altro_id}/modifica", data={
+        "tipo": "quietanza", "data_effetto": effetto_primo.isoformat(), "premio_lordo": "1200"})
+    assert resp.status_code == 400 and "ha già una rata con questa data" in resp.get_data(as_text=True)

@@ -18,7 +18,7 @@ from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import Engine
 
 from .models import db
-from .utils import formatta_euro
+from .utils import formatta_euro, plurale
 
 __version__ = "2.0.0"
 
@@ -63,6 +63,7 @@ def _ensure_schema() -> None:
             "provvigione_perc": "ALTER TABLE policies ADD COLUMN provvigione_perc FLOAT",
             "preavviso_disdetta_giorni": "ALTER TABLE policies ADD COLUMN preavviso_disdetta_giorni INTEGER",
             "data_disdetta": "ALTER TABLE policies ADD COLUMN data_disdetta DATE",
+            "scadenza_originale": "ALTER TABLE policies ADD COLUMN scadenza_originale DATE",
         },
         "users": {
             "sessione_versione": "ALTER TABLE users ADD COLUMN sessione_versione INTEGER NOT NULL DEFAULT 0",
@@ -125,6 +126,9 @@ def _ensure_schema() -> None:
 
 _CHIAVE_POLIZZA_VECCHIA = re.compile(r"^polizza:(\d+):(\d+|scaduta)$")
 _CHIAVE_FOLLOWUP_VECCHIA = re.compile(r"^followup:(\d+):(ritardo|oggi|prossimo)$")
+_CHIAVE_TITOLO_VECCHIA = re.compile(r"^titolo:(\d+):(arretrato|sospesa|prossimo)$")
+_CHIAVE_SINISTRO_APERTO_VECCHIA = re.compile(r"^sinistro:(\d+):aperto:(\d+)$")
+_CHIAVE_SINISTRO_DENUNCIA_VECCHIA = re.compile(r"^sinistro:(\d+):denuncia$")
 
 
 def _migra_chiavi_notifiche() -> None:
@@ -133,10 +137,11 @@ def _migra_chiavi_notifiche() -> None:
     Evita che, dopo l'aggiornamento, gli avvisi già ricevuti (anche via email)
     vengano generati e inviati una seconda volta.
     """
-    from .models import FollowUp, Notification, Policy
+    from .models import GIORNI_DENUNCIA_SINISTRO, Claim, FollowUp, Notification, Policy, Title
 
     vecchie = Notification.query.filter(
-        db.or_(Notification.dedup_key.like("polizza:%"), Notification.dedup_key.like("followup:%"))
+        db.or_(*(Notification.dedup_key.like(f"{entita}:%")
+                 for entita in ("polizza", "followup", "titolo", "sinistro")))
     ).all()
     esistenti = {n.dedup_key for n in vecchie}
     cambiato = False
@@ -152,6 +157,23 @@ def _migra_chiavi_notifiche() -> None:
             fu = db.session.get(FollowUp, int(m.group(1)))
             if fu:
                 nuova = f"followup:{fu.id}:{fu.data_scadenza.isoformat()}:{m.group(2)}"
+        m = _CHIAVE_TITOLO_VECCHIA.match(n.dedup_key)
+        if m:
+            titolo = db.session.get(Title, int(m.group(1)))
+            if titolo and titolo.data_effetto:
+                nuova = f"titolo:{titolo.id}:{titolo.data_effetto.isoformat()}:{m.group(2)}"
+        m = _CHIAVE_SINISTRO_APERTO_VECCHIA.match(n.dedup_key)
+        if m:
+            sinistro = db.session.get(Claim, int(m.group(1)))
+            if sinistro and sinistro.data_evento:
+                nuova = f"sinistro:{sinistro.id}:{sinistro.data_evento.isoformat()}:aperto:{m.group(2)}"
+        m = _CHIAVE_SINISTRO_DENUNCIA_VECCHIA.match(n.dedup_key)
+        if m:
+            sinistro = db.session.get(Claim, int(m.group(1)))
+            if sinistro and sinistro.data_evento:
+                scaduto = (date.today() - sinistro.data_evento).days > GIORNI_DENUNCIA_SINISTRO
+                fascia = "scaduta" if scaduto else "termine"
+                nuova = f"sinistro:{sinistro.id}:{sinistro.data_evento.isoformat()}:denuncia:{fascia}"
         if nuova and nuova not in esistenti:
             esistenti.discard(n.dedup_key)
             n.dedup_key = nuova
@@ -314,10 +336,6 @@ def create_app(test_config: dict | None = None) -> Flask:
         if value == -1:
             return "da ieri"
         return f"tra {value} giorni" if value > 0 else f"da {-value} giorni"
-
-    def plurale(numero, singolare: str, plurale_: str) -> str:
-        """«1 titolo», «3 titoli»."""
-        return f"{numero} {singolare if numero == 1 else plurale_}"
 
     app.jinja_env.globals["plurale"] = plurale
 

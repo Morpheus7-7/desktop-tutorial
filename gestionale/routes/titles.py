@@ -4,6 +4,7 @@ from collections import OrderedDict
 from datetime import date, timedelta
 
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from sqlalchemy.exc import IntegrityError
 
 from ..export import csv_response
 from ..models import (
@@ -16,7 +17,7 @@ from ..models import (
 )
 from ..notifications import elimina_notifiche, segna_lette
 from ..security import admin_required, audit, safe_next
-from ..titoli import add_months, annualita_piena, date_rate, periodi_polizza, premio_periodo, titoli_periodo
+from ..titoli import add_months, annualita_piena, date_rate, periodi_polizza, premio_periodo, titoli_coprono
 from ..utils import (
     arrotonda,
     fine_mese,
@@ -155,9 +156,14 @@ def collect(title_id):
         return _torna(titolo)
     errori: list[str] = []
     oggi = date.today()
+    # Come per l'annullo: i mesi già chiusi nel foglio cassa li tocca solo l'amministratore.
+    minimo = None if g.user.is_admin else inizio_mese(oggi)
     data_incasso = leggi_data(
         request.form, "data_incasso", "Data di incasso", errori, massimo=oggi,
         msg_massimo="La data di incasso non può essere futura.",
+        minimo=minimo,
+        msg_minimo="La data di incasso appartiene a un mese già chiuso nel foglio cassa: "
+                   "solo un amministratore può registrarla.",
     ) or (oggi if not errori else None)
     importo = leggi_importo(request.form, "importo", "Importo", errori)
     if importo is not None and abs(importo - (titolo.premio_lordo or 0)) > 0.005:
@@ -275,19 +281,28 @@ def edit(title_id):
         valori = _leggi_titolo(request.form, titolo.polizza, errori)
         if not errori:
             vecchia_data = titolo.data_effetto
-            titolo.data_effetto = valori["effetto"]
-            titolo.data_fine_copertura = valori["fine"]
-            titolo.premio_lordo = valori["premio"]
-            titolo.provvigione = valori["provvigione"]
-            if valori["tipo"]:
-                titolo.tipo = valori["tipo"]
-            titolo.note = valori["note"]
-            if vecchia_data != titolo.data_effetto:
-                elimina_notifiche(f"titolo:{titolo.id}:")
-            audit("modifica", "titolo", titolo.id,
-                  f"Modificato titolo polizza {titolo.polizza.numero_polizza}: effetto "
-                  f"{titolo.data_effetto:%d/%m/%Y}, {formatta_euro(titolo.premio_lordo)}")
-            db.session.commit()
+            try:
+                titolo.data_effetto = valori["effetto"]
+                titolo.data_fine_copertura = valori["fine"]
+                titolo.premio_lordo = valori["premio"]
+                titolo.provvigione = valori["provvigione"]
+                if valori["tipo"]:
+                    titolo.tipo = valori["tipo"]
+                titolo.note = valori["note"]
+                db.session.flush()  # una rata con la stessa data e numero: errore qui
+                if vecchia_data != titolo.data_effetto:
+                    elimina_notifiche(f"titolo:{titolo.id}:")
+                audit("modifica", "titolo", titolo.id,
+                      f"Modificato titolo polizza {titolo.polizza.numero_polizza}: effetto "
+                      f"{titolo.data_effetto:%d/%m/%Y}, {formatta_euro(titolo.premio_lordo)}")
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                titolo = db.session.get(Title, title_id)
+                flash("La polizza ha già una rata con questa data effetto e questo numero: "
+                      "controlla la data (o modifica l'altra rata).", "danger")
+                return render_template("titles/form.html", titolo=titolo, valori=request.form,
+                                       title_types=TITLE_TYPES), 400
             flash("Titolo aggiornato.", "success")
             return redirect(url_for("policies.detail", policy_id=titolo.policy_id) + "#titoli")
         for e in errori:
@@ -304,9 +319,11 @@ def new_title(policy_id):
     errori: list[str] = []
     valori = _leggi_titolo(request.form, policy, errori)
     if errori:
+        from .policies import render_detail
+
         for e in errori:
             flash(e, "danger")
-        return redirect(url_for("policies.detail", policy_id=policy.id) + "#titoli")
+        return render_detail(policy, valori_titolo=request.form), 400
     provvigione = valori["provvigione"]
     if provvigione is None and policy.provvigione_perc:
         provvigione = arrotonda(valori["premio"] * policy.provvigione_perc / 100.0)
@@ -561,6 +578,9 @@ def undo_remittance():
 # Previsione degli incassi futuri
 # ----------------------------------------------------------------------
 MESI_PREVISIONE = (6, 12, 18, 24)
+# Rate stimate con effetto nei giorni appena passati (non ancora emesse):
+# entrano nel mese corrente invece di sparire dalla previsione.
+FINESTRA_RATE_RECENTI = 60
 
 
 def calcola_previsione(mesi: int = 12, compagnia: str = "", oggi: date | None = None) -> dict:
@@ -597,22 +617,27 @@ def calcola_previsione(mesi: int = 12, compagnia: str = "", oggi: date | None = 
             voce["provvigioni"] += t.provvigione or 0.0
             voce["numero_emessi"] += 1
 
+    # Le polizze disdette restano nella previsione fino alla scadenza (le annualità
+    # residue di una poliennale sono dovute), ma senza ipotizzarne il rinnovo.
     polizze = Policy.query.filter(
         Policy.stato.in_(["attiva", "in_rinnovo"]), Policy.premio_annuo > 0,
-        Policy.data_disdetta.is_(None),
     )
     if compagnia:
         polizze = polizze.filter(Policy.compagnia == compagnia)
+    recenti = oggi - timedelta(days=FINESTRA_RATE_RECENTI)
     for policy in polizze.all():
         for inizio, fine in _periodi_futuri(policy, oggi, fine_orizzonte):
-            if titoli_periodo(policy, inizio, fine):
+            if titoli_coprono(policy, inizio, fine):
                 continue
             rate = date_rate(policy, inizio, fine)
             premi = ripartisci(premio_periodo(policy.premio_annuo, inizio, fine),
                                [1] * len(rate) if annualita_piena(inizio, fine) else [(f - e).days for e, f in rate])
             for (effetto, _fine), premio in zip(rate, premi):
-                if not oggi <= effetto < fine_orizzonte:
+                if effetto >= fine_orizzonte or effetto < recenti:
                     continue
+                # Rata appena passata ma non ancora emessa (es. polizza scaduta da
+                # pochi giorni in attesa di rinnovo): è l'incasso più vicino, va nel mese corrente.
+                effetto = max(effetto, oggi)
                 voce = indice.get((effetto.year, effetto.month))
                 if voce:
                     voce["stimati"] += premio
@@ -642,8 +667,9 @@ def calcola_previsione(mesi: int = 12, compagnia: str = "", oggi: date | None = 
 def _periodi_futuri(policy: Policy, oggi: date, fine_orizzonte: date):
     """Annualità (anche oltre la scadenza attuale, ipotizzando il rinnovo) che
     si sovrappongono all'orizzonte di previsione."""
-    periodi = [p for p in periodi_polizza(policy, fino_a=fine_orizzonte) if p[1] > oggi]
-    if policy.data_scadenza:
+    recenti = oggi - timedelta(days=FINESTRA_RATE_RECENTI)
+    periodi = [p for p in periodi_polizza(policy, fino_a=fine_orizzonte) if p[1] > recenti]
+    if policy.data_scadenza and policy.data_disdetta is None:
         inizio = policy.data_scadenza
         while inizio < fine_orizzonte and len(periodi) < 40:
             try:
