@@ -180,7 +180,7 @@ def new_policy(client_id):
     if request.form.get("genera_titoli") and policy.premio_annuo:
         try:
             titoli = genera_titoli(policy)
-            messaggio += f" Generati {len(titoli)} titoli da incassare."
+            messaggio += f" {'Generato' if len(titoli) == 1 else 'Generati'} {plurale(len(titoli), 'titolo', 'titoli')} da incassare."
         except (ValueError, TitoliGiaPresenti) as exc:
             messaggio += f" Titoli non generati: {exc}"
             livello = "warning"
@@ -325,7 +325,7 @@ def generate_titles(policy_id):
     try:
         titoli = genera_titoli(policy, *(periodo or (None, None)))
         audit("crea", "titolo", None,
-              f"Generati {len(titoli)} titoli per la polizza {policy.numero_polizza} "
+              f"Generati {plurale(len(titoli), 'titolo', 'titoli')} per la polizza {policy.numero_polizza} "
               f"(annualità dal {titoli[0].data_effetto:%d/%m/%Y})")
         db.session.commit()
     except (ValueError, TitoliGiaPresenti) as exc:
@@ -335,7 +335,7 @@ def generate_titles(policy_id):
         db.session.rollback()
         flash("I titoli di questa annualità sono già presenti.", "warning")
     else:
-        flash(f"Generati {len(titoli)} titoli.", "success")
+        flash(f"{'Generato' if len(titoli) == 1 else 'Generati'} {plurale(len(titoli), 'titolo', 'titoli')}.", "success")
     return redirect(url_for("policies.detail", policy_id=policy.id) + "#titoli")
 
 
@@ -403,7 +403,7 @@ def renew(policy_id):
     if request.form.get("genera_titoli") and policy.premio_annuo:
         generati, arretrati, problemi = _genera_titoli_rinnovo(policy, vecchia, dodici_mesi)
         if generati:
-            messaggio += f" Generati {plurale(generati, 'titolo', 'titoli')}"
+            messaggio += f" {'Generato' if generati == 1 else 'Generati'} {plurale(generati, 'titolo', 'titoli')}"
             messaggio += (" (le annualità successive verranno emesse all'anniversario)."
                           if nuova > max(dodici_mesi, date.today()) else ".")
         elif not problemi:
