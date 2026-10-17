@@ -16,9 +16,8 @@
       <span class="badge {{ client.tipo_badge }} align-middle fs-6">{{ client.tipo_label }}</span>
     </h1>
     <div class="page-subtitle">
-      {% if client.settore %}{{ client.settore }} · {% endif %}
-      {% if client.professione %}{{ client.professione }} · {% endif %}
-      {% if client.datore_lavoro %}presso {{ client.datore_lavoro }} · {% endif %}
+      {% if client.attivita_sintesi %}{{ client.attivita_sintesi }} · {% endif %}
+      {% if client.studio %}<a href="{{ url_for('clients.detail', client_id=client.studio.id) }}"><i class="bi bi-building" aria-hidden="true"></i> {{ client.studio.ragione_sociale }}</a> · {% endif %}
       {% if client.citta %}{{ client.citta }}{% if client.provincia %} ({{ client.provincia }}){% endif %}{% endif %}
       {% if client.telefono %} · <i class="bi bi-telephone"></i> <a href="tel:{{ client.telefono | replace(' ', '') }}">{{ client.telefono }}</a>{% endif %}
       {% if client.email %} · <i class="bi bi-envelope"></i> <a href="mailto:{{ client.email }}">{{ client.email }}</a>{% endif %}
@@ -85,9 +84,12 @@
         <dl class="row mb-4">
           <dt class="col-sm-5">Partita IVA</dt><dd class="col-sm-7 tabular">{{ client.partita_iva or '—' }}</dd>
           <dt class="col-sm-5">Codice fiscale</dt><dd class="col-sm-7 tabular">{{ client.codice_fiscale or '—' }}</dd>
-          {% if client.tipo == 'azienda' %}<dt class="col-sm-5">Codice ATECO</dt><dd class="col-sm-7">{{ client.codice_ateco or '—' }}</dd>{% endif %}
+          {% if client.tipo in ('azienda', 'studio') %}
+          <dt class="col-sm-5">Forma giuridica</dt><dd class="col-sm-7">{{ client.forma_giuridica or '—' }}</dd>
+          <dt class="col-sm-5">Codice ATECO</dt><dd class="col-sm-7">{{ client.codice_ateco or '—' }}</dd>
+          <dt class="col-sm-5">{{ 'Referente / legale rappr.' if client.tipo == 'studio' else 'Referente' }}</dt><dd class="col-sm-7">{{ client.referente or '—' }}</dd>
+          {% endif %}
           {% if client.persona_fisica %}<dt class="col-sm-5">Data di nascita</dt><dd class="col-sm-7">{{ client.data_nascita | data_it }}{% if client.eta is not none %} ({{ client.eta }} anni){% endif %}</dd>{% endif %}
-          <dt class="col-sm-5">Referente</dt><dd class="col-sm-7">{{ client.referente or '—' }}</dd>
         </dl>
         <h2 class="section-title">Contatti</h2>
         <dl class="row mb-0">
@@ -100,18 +102,57 @@
         </dl>
       </div>
       <div class="col-lg-4">
+        {% macro chip(elenco) -%}
+          {% if elenco %}{% for v in elenco %}<span class="badge badge-soft me-1 mb-1">{{ v }}</span>{% endfor %}{% else %}—{% endif %}
+        {%- endmacro %}
+        {% if client.tipo in ('professionista', 'studio') %}
+        <h2 class="section-title">{{ 'Lo studio' if client.tipo == 'studio' else 'Attività professionale' }}</h2>
+        <dl class="row mb-3">
+          <dt class="col-sm-5">Professione</dt><dd class="col-sm-7">{{ client.professione or '—' }}
+            {% if client.professione_catalogo and client.professione_catalogo.nome != client.professione %}<div class="small ga-muted">{{ client.professione_catalogo.nome }}</div>{% endif %}</dd>
+          <dt class="col-sm-5">{{ 'Aree di attività' if client.tipo == 'studio' else 'Specializzazioni' }}</dt><dd class="col-sm-7">{{ chip(client.specializzazioni_elenco) }}</dd>
+          <dt class="col-sm-5">Attività svolte</dt><dd class="col-sm-7">{{ chip(client.attivita_elenco) }}</dd>
+          {% if client.tipo == 'professionista' %}
+          <dt class="col-sm-5">Inquadramento</dt><dd class="col-sm-7">{{ client.inquadramento_label or '—' }}</dd>
+          <dt class="col-sm-5">Studio</dt><dd class="col-sm-7">{% if client.studio %}<a href="{{ url_for('clients.detail', client_id=client.studio.id) }}">{{ client.studio.ragione_sociale }}</a>{% else %}lavora da solo{% endif %}</dd>
+          {% endif %}
+          <dt class="col-sm-5">Albo / ordine</dt>
+          <dd class="col-sm-7">{% if client.albo_ordine or client.albo_numero %}{{ client.albo_ordine or '' }}{% if client.albo_numero %} n. {{ client.albo_numero }}{% endif %}{% if client.albo_data_iscrizione %}<div class="small ga-muted">dal {{ client.albo_data_iscrizione | data_it }}</div>{% endif %}{% else %}—{% endif %}</dd>
+          {% if client.tipo == 'studio' %}
+          <dt class="col-sm-5">Professionisti</dt><dd class="col-sm-7">{{ client.numero_professionisti if client.numero_professionisti is not none else '—' }}</dd>
+          <dt class="col-sm-5">Dipendenti e collab.</dt><dd class="col-sm-7">{{ client.numero_dipendenti if client.numero_dipendenti is not none else '—' }}</dd>
+          <dt class="col-sm-5">Fatturato annuo</dt><dd class="col-sm-7">{{ client.fatturato_annuo | euro }}</dd>
+          {% else %}
+          <dt class="col-sm-5">Volume d'affari</dt><dd class="col-sm-7">{{ client.fatturato_annuo | euro }}</dd>
+          {% endif %}
+        </dl>
+        {% if client.tipo == 'studio' %}
+        <h2 class="section-title">Professionisti dello studio tra i clienti</h2>
+        {% if client.professionisti %}
+        <ul class="list-unstyled small mb-2">
+          {% for prof in client.professionisti %}
+          <li class="mb-1"><a href="{{ url_for('clients.detail', client_id=prof.id) }}">{{ prof.ragione_sociale }}</a>{% if prof.attivita_sintesi %} <span class="ga-muted">· {{ prof.attivita_sintesi }}</span>{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% else %}<p class="small ga-muted mb-2">Nessun professionista collegato.</p>{% endif %}
+        {% if puo_modificare %}<a class="btn btn-sm btn-outline-primary mb-3" href="{{ url_for('clients.new_client', tipo='professionista', studio=client.id) }}"><i class="bi bi-person-plus"></i> Aggiungi professionista</a>{% endif %}
+        {% endif %}
+        {% else %}
         <h2 class="section-title">Attività</h2>
         <dl class="row mb-3">
-          <dt class="col-sm-5">Settore</dt><dd class="col-sm-7">{{ client.settore or '—' }}</dd>
           {% if client.tipo == 'dipendente' %}
           <dt class="col-sm-5">Mansione</dt><dd class="col-sm-7">{{ client.professione or '—' }}</dd>
           <dt class="col-sm-5">Datore di lavoro</dt><dd class="col-sm-7">{{ client.datore_lavoro or '—' }}</dd>
+          <dt class="col-sm-5">Settore</dt><dd class="col-sm-7">{{ client.settore or '—' }}</dd>
+          {% elif client.tipo == 'privato' %}
+          <dt class="col-sm-5">Condizione</dt><dd class="col-sm-7">{{ client.professione or '—' }}</dd>
           {% else %}
-          <dt class="col-sm-5">Professione</dt><dd class="col-sm-7">{{ client.professione or '—' }}</dd>
+          <dt class="col-sm-5">Settore</dt><dd class="col-sm-7">{{ client.settore or '—' }}</dd>
           <dt class="col-sm-5">Dipendenti</dt><dd class="col-sm-7">{{ client.numero_dipendenti if client.numero_dipendenti is not none else '—' }}</dd>
           <dt class="col-sm-5">Fatturato annuo</dt><dd class="col-sm-7">{{ client.fatturato_annuo | euro }}</dd>
           {% endif %}
         </dl>
+        {% endif %}
         <h2 class="section-title">Descrizione attività</h2>
         <p class="border rounded p-3 bg-light small">{{ client.descrizione_attivita or 'Nessuna descrizione inserita: aggiungila per poter eseguire l\'analisi automatica dei rischi.' }}</p>
         {% if client.note %}
@@ -154,6 +195,39 @@
           <div class="card-body py-2"><a class="small" href="{{ url_for('clients.edit_client', client_id=client.id) }}"><i class="bi bi-pencil"></i> Completa i dati di compliance</a></div>
           {% endif %}
         </div>
+        {% set obblighi = client.obblighi_assicurativi %}
+        {% set avvertenze = client.avvertenze_assicurative %}
+        {% if obblighi or avvertenze %}
+        {% set scoperti = obblighi | rejectattr('in_portafoglio') | list %}
+        {% set sotto_minimo = obblighi | selectattr('massimale_insufficiente') | list %}
+        <div class="card mt-3 {{ 'border-warning' if scoperti or sotto_minimo else 'border-success' }}">
+          <div class="card-header"><i class="bi bi-bank me-1" aria-hidden="true"></i> Assicurazioni obbligatorie per legge</div>
+          <ul class="list-group list-group-flush small">
+            {% for o in obblighi %}
+            <li class="list-group-item">
+              <div class="d-flex justify-content-between gap-2">
+                <span class="fw-semibold">{{ o.copertura }}</span>
+                {% if o.in_portafoglio == 'proprio' %}<span class="text-success text-nowrap"><i class="bi bi-check-circle" aria-hidden="true"></i> in portafoglio</span>
+                {% elif o.in_portafoglio == 'studio' %}<span class="text-success text-nowrap"><i class="bi bi-check-circle" aria-hidden="true"></i> polizza dello studio</span>
+                {% else %}<span class="text-warning text-nowrap"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> non in portafoglio</span>{% endif %}
+              </div>
+              <div class="ga-muted">{{ o.norma }}</div>
+              {% if o.descrizione %}<div class="mt-1">{{ o.descrizione }}</div>{% endif %}
+              {% if o.nota_massimale %}<div class="mt-1"><i class="bi bi-rulers" aria-hidden="true"></i> {{ o.nota_massimale[:1] | upper }}{{ o.nota_massimale[1:] }}.</div>{% endif %}
+              {% if o.massimale_insufficiente %}
+              <div class="mt-1 text-danger"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Massimale in polizza {{ o.massimale_polizza | euro }}: inferiore al minimo di legge di {{ o.massimale_minimo | euro }}.</div>
+              {% endif %}
+            </li>
+            {% endfor %}
+            {% for a in avvertenze %}
+            <li class="list-group-item"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>{{ a }}</li>
+            {% endfor %}
+          </ul>
+          {% if scoperti %}
+          <div class="card-body py-2 small ga-muted">Verifica se è assicurato con un altro intermediario: è un'opportunità di proposta.</div>
+          {% endif %}
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -492,7 +566,7 @@
         <h2 class="section-title">Esegui nuova analisi</h2>
         <p class="small ga-muted">
           L'analisi automatica legge la descrizione dell'attività (insieme a settore,
-          professione, dipendenti e fatturato in anagrafica), individua i pericoli,
+          professione, specializzazioni, attività svolte, dipendenti e fatturato in anagrafica), individua i pericoli,
           propone le coperture e le confronta con le polizze attive.
         </p>
         <form method="post" action="{{ url_for('clients.run_analysis', client_id=client.id) }}">

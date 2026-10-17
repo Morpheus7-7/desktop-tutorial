@@ -4,6 +4,8 @@ from datetime import date, timedelta
 from flask import Blueprint, Response, render_template, request
 
 from ..models import (
+    CLIENT_TYPE_PLURALI,
+    CLIENT_TYPES,
     BRANCH_LABELS,
     CLAIM_OPEN_STATUSES,
     CLAIM_STATUSES,
@@ -22,7 +24,7 @@ from ..models import (
 from ..agenda import eventi_agenda, esporta_ics
 from ..security import audit
 from ..titoli import add_months
-from ..utils import parse_int
+from ..utils import parse_int, plurale
 
 bp = Blueprint("main", __name__)
 
@@ -50,6 +52,16 @@ def _premi_provvigioni_attive():
         .scalar()
     )
     return premi, provv
+
+
+def _clienti_per_tipo() -> list[dict]:
+    """Numero di clienti per tipo, nell'ordine dei tipi."""
+    conteggi = dict(db.session.query(Client.tipo, db.func.count(Client.id)).group_by(Client.tipo).all())
+    return [
+        {"chiave": tipo, "tipo": CLIENT_TYPE_PLURALI[tipo][2], "n": conteggi.get(tipo, 0),
+         "breve": plurale(conteggi.get(tipo, 0), *CLIENT_TYPE_PLURALI[tipo][:2])}
+        for tipo, _ in CLIENT_TYPES
+    ]
 
 
 def _somma_titoli(*condizioni):
@@ -98,9 +110,7 @@ def dashboard():
     sinistri_aperti = Claim.query.filter(Claim.stato.in_(CLAIM_OPEN_STATUSES))
     stats = {
         "clienti": Client.query.count(),
-        "aziende": Client.query.filter_by(tipo="azienda").count(),
-        "professionisti": Client.query.filter_by(tipo="professionista").count(),
-        "dipendenti": Client.query.filter_by(tipo="dipendente").count(),
+        "clienti_per_tipo": _clienti_per_tipo(),
         "polizze_attive": attive.count(),
         "premi_totali": premi_totali,
         "provvigioni_totali": provvigioni_totali,
@@ -271,6 +281,8 @@ def search():
                     Client.citta.ilike(like),
                     Client.settore.ilike(like),
                     Client.professione.ilike(like),
+                    Client.specializzazioni.ilike(like),
+                    Client.attivita_svolte.ilike(like),
                     Client.datore_lavoro.ilike(like),
                     Client.email.ilike(like),
                     Client.telefono.ilike(like),
@@ -357,11 +369,7 @@ def analytics():
     compagnie_max = max([c["premi"] for c in compagnie], default=0.0)
 
     # Clienti per tipo e migliori clienti per premi.
-    clienti_per_tipo = [
-        {"tipo": "Aziende", "n": Client.query.filter_by(tipo="azienda").count()},
-        {"tipo": "Professionisti", "n": Client.query.filter_by(tipo="professionista").count()},
-        {"tipo": "Dipendenti", "n": Client.query.filter_by(tipo="dipendente").count()},
-    ]
+    clienti_per_tipo = _clienti_per_tipo()
     premi_cliente = {}
     for p in polizze_attive:
         premi_cliente[p.cliente] = premi_cliente.get(p.cliente, 0.0) + (p.premio_annuo or 0.0)

@@ -24,13 +24,59 @@ def now() -> datetime:
 # ----------------------------------------------------------------------
 CLIENT_TYPES = [
     ("azienda", "Azienda"),
-    ("professionista", "Professionista"),
+    ("studio", "Studio professionale"),
+    ("professionista", "Libero professionista"),
     ("dipendente", "Lavoratore dipendente"),
+    ("privato", "Privato"),
 ]
+CLIENT_TYPE_DESCRIZIONI = {
+    "azienda": "Impresa commerciale, artigiana o industriale (ditta individuale, S.n.c., S.r.l., S.p.A.…).",
+    "studio": "Più professionisti insieme: studio associato o società tra professionisti (STP). "
+              "Es. studio legale associato, studio pediatrico S.r.l.",
+    "professionista": "Una sola persona che esercita la professione: es. un avvocato civilista, "
+                      "un pediatra, un ingegnere.",
+    "dipendente": "Persona con un contratto di lavoro subordinato.",
+    "privato": "Persona senza attività lavorativa in corso: pensionato, studente, casalinga…",
+}
+# Per riepiloghi e statistiche: (singolare breve, plurale breve, plurale esteso).
+CLIENT_TYPE_PLURALI = {
+    "azienda": ("azienda", "aziende", "Aziende"),
+    "studio": ("studio", "studi", "Studi professionali"),
+    "professionista": ("prof.", "prof.", "Liberi professionisti"),
+    "dipendente": ("dip.", "dip.", "Lavoratori dipendenti"),
+    "privato": ("privato", "privati", "Privati"),
+}
 CLIENT_TYPE_BADGES = {
     "azienda": "tipo-azienda",
+    "studio": "tipo-studio",
     "professionista": "tipo-professionista",
     "dipendente": "tipo-dipendente",
+    "privato": "tipo-privato",
+}
+TIPI_PERSONA_FISICA = ("professionista", "dipendente", "privato")
+
+# Campi dell'anagrafica pertinenti a ciascun tipo di cliente: il modulo mostra
+# solo questi e il salvataggio azzera gli altri (es. niente dipendenti e
+# ragione sociale per il libero professionista, che è una persona sola).
+CAMPI_PER_TIPO = {
+    "referente": {"azienda", "studio"},
+    "forma_giuridica": {"azienda", "studio"},
+    "partita_iva": {"azienda", "studio", "professionista"},
+    "codice_ateco": {"azienda", "studio"},
+    "settore": {"azienda", "dipendente"},
+    "professione": {"studio", "professionista", "dipendente", "privato"},
+    "specializzazioni": {"studio", "professionista"},
+    "attivita_svolte": {"studio", "professionista"},
+    "albo_ordine": {"studio", "professionista"},
+    "albo_numero": {"studio", "professionista"},
+    "albo_data_iscrizione": {"studio", "professionista"},
+    "inquadramento": {"professionista"},
+    "studio_id": {"professionista"},
+    "numero_professionisti": {"studio"},
+    "numero_dipendenti": {"azienda", "studio"},
+    "fatturato_annuo": {"azienda", "studio", "professionista"},
+    "datore_lavoro": {"dipendente"},
+    "data_nascita": set(TIPI_PERSONA_FISICA),
 }
 
 POLICY_BRANCHES = [
@@ -245,7 +291,18 @@ class Client(db.Model):
     pec = db.Column(db.String(120))
     telefono = db.Column(db.String(30))
     numero_dipendenti = db.Column(db.Integer)
-    fatturato_annuo = db.Column(db.Float)
+    fatturato_annuo = db.Column(db.Float)  # volume d'affari per il professionista
+    # Aziende e studi: forma giuridica. Professionisti e studi: specializzazioni
+    # e attività svolte (voci separate da «; »), iscrizione all'albo.
+    forma_giuridica = db.Column(db.String(40))
+    specializzazioni = db.Column(db.Text)
+    attivita_svolte = db.Column(db.Text)
+    albo_ordine = db.Column(db.String(150))
+    albo_numero = db.Column(db.String(40))
+    albo_data_iscrizione = db.Column(db.Date)
+    inquadramento = db.Column(db.String(30))  # vedi professioni.INQUADRAMENTI
+    numero_professionisti = db.Column(db.Integer)  # soci / associati dello studio
+    studio_id = db.Column(db.Integer, db.ForeignKey("clients.id", ondelete="SET NULL"), index=True)
     descrizione_attivita = db.Column(db.Text)
     note = db.Column(db.Text)
     # Persone fisiche e compliance (GDPR, IVASS Reg. 40/2018, antiriciclaggio).
@@ -294,6 +351,12 @@ class Client(db.Model):
     titoli = db.relationship(
         "Title", viewonly=True, lazy=True, order_by="Title.data_effetto.desc()"
     )
+    # Il professionista può far parte di uno studio cliente; eliminato lo
+    # studio, il collegamento si azzera.
+    studio = db.relationship(
+        "Client", remote_side=[id], lazy=True,
+        backref=db.backref("professionisti", lazy=True, order_by="Client.ragione_sociale"),
+    )
 
     @property
     def tipo_label(self):
@@ -301,16 +364,93 @@ class Client(db.Model):
 
     @property
     def persona_fisica(self):
-        return self.tipo in ("professionista", "dipendente")
+        return self.tipo in TIPI_PERSONA_FISICA
+
+    # --- Professione ----------------------------------------------------
+    @property
+    def professione_catalogo(self):
+        """Voce del catalogo delle professioni (solo studi e professionisti)."""
+        from .professioni import trova_professione
+
+        if self.tipo not in ("studio", "professionista"):
+            return None
+        return trova_professione(self.professione)
 
     @property
-    def eta(self):
-        if not self.data_nascita or self.data_nascita > date.today():
-            return None
-        oggi = date.today()
-        return oggi.year - self.data_nascita.year - (
-            (oggi.month, oggi.day) < (self.data_nascita.month, self.data_nascita.day)
+    def specializzazioni_elenco(self):
+        from .professioni import dividi_voci
+
+        return dividi_voci(self.specializzazioni)
+
+    @property
+    def attivita_elenco(self):
+        from .professioni import dividi_voci
+
+        return dividi_voci(self.attivita_svolte)
+
+    @property
+    def inquadramento_label(self):
+        from .professioni import INQUADRAMENTI
+
+        return dict(INQUADRAMENTI).get(self.inquadramento, self.inquadramento)
+
+    @property
+    def attivita_sintesi(self):
+        """Breve descrizione dell'attività per elenchi e intestazioni."""
+        if self.tipo == "professionista":
+            parti = [self.professione, ", ".join(self.specializzazioni_elenco[:2])]
+            if len(self.specializzazioni_elenco) > 2:
+                parti[-1] += "…"
+        elif self.tipo == "studio":
+            parti = [self.professione, self.forma_giuridica]
+        elif self.tipo == "dipendente":
+            parti = [self.professione, f"presso {self.datore_lavoro}" if self.datore_lavoro else None]
+            if self.settore and not self.professione:
+                parti[0] = self.settore
+        elif self.tipo == "privato":
+            parti = [self.professione]
+        else:
+            parti = [self.settore]
+        return " · ".join(p for p in parti if p) or None
+
+    def _obblighi_di_legge(self):
+        from .professioni import obblighi_di_legge
+
+        return obblighi_di_legge(
+            self.tipo, self.professione_catalogo, inquadramento=self.inquadramento,
+            forma_giuridica=self.forma_giuridica, fatturato=self.fatturato_annuo,
+            numero_professionisti=self.numero_professionisti,
+            voci=self.specializzazioni_elenco + self.attivita_elenco,
         )
+
+    @property
+    def obblighi_assicurativi(self):
+        """Coperture obbligatorie per legge, se sono in portafoglio e con quale massimale.
+
+        Contano anche le polizze già emesse con decorrenza futura e, per il
+        professionista, quelle dello studio di appartenenza. Per i sanitari
+        l'RC dipende dall'inquadramento (L. 24/2017, art. 10).
+        """
+        obblighi, _ = self._obblighi_di_legge()
+        proprie = [p for p in self.polizze if p.attiva]
+        dello_studio = [p for p in self.studio.polizze if p.attiva] if self.tipo == "professionista" and self.studio else []
+        for obbligo in obblighi:
+            mie = [p for p in proprie if p.ramo == obbligo["ramo"]]
+            studio = [p for p in dello_studio if p.ramo == obbligo["ramo"]]
+            # "proprio" | "studio" (polizza dello studio di appartenenza) | None
+            obbligo["in_portafoglio"] = "proprio" if mie else "studio" if studio else None
+            massimali = [p.massimale for p in (mie or studio) if p.massimale]
+            obbligo["massimale_polizza"] = max(massimali) if massimali else None
+            obbligo["massimale_insufficiente"] = bool(
+                obbligo["massimale_minimo"] and obbligo["massimale_polizza"]
+                and obbligo["massimale_polizza"] < obbligo["massimale_minimo"]
+            )
+        return obblighi
+
+    @property
+    def avvertenze_assicurative(self):
+        """Avvertenze per l'intermediario legate alla professione (es. polizza collettiva dei notai)."""
+        return self._obblighi_di_legge()[1]
 
     # --- Compliance -----------------------------------------------------
     @property

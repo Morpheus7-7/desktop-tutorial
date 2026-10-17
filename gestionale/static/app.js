@@ -67,38 +67,92 @@
       });
     });
 
-    // --- Modulo cliente: mostra solo i campi pertinenti al tipo. I campi
-    // nascosti vengono disattivati, così non sono inviati né validati.
+    // --- Modulo cliente: mostra solo i campi pertinenti al tipo (data-tipi) e
+    // adatta etichette e suggerimenti (data-testo-*, data-placeholder-*). I
+    // campi nascosti vengono disattivati, così non sono inviati né validati.
     const tipoCliente = document.getElementById('tipo-cliente');
     if (tipoCliente) {
-      const etichettaNome = document.getElementById('label-nome');
+      const modulo = tipoCliente.form;
+      const campoProfessione = document.getElementById('cf-professione');
+      const infoProfessione = document.getElementById('info-professione');
+      const campoAlbo = document.getElementById('cf-albo');
+      let catalogo = [];
+      try { catalogo = JSON.parse((campoProfessione && campoProfessione.dataset.catalogo) || '[]'); } catch (e) { catalogo = []; }
+
+      const normalizza = function (testo) {
+        return (testo || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ').trim();
+      };
+      const escapeRegExp = function (s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
+      // Stesse regole del server (professioni.trova_professione): vince la
+      // professione nominata per prima, a parità l'alias più lungo; il medico
+      // generico cede alla specialità della stessa area («Medico pediatra»).
+      const trovaProfessione = function (testo) {
+        const n = normalizza(testo);
+        if (!n) return null;
+        const candidati = [];
+        catalogo.forEach(function (p, indice) {
+          let migliore = null;
+          p.alias.forEach(function (a) {
+            if (!a) return;
+            const m = new RegExp('(^|[^a-z0-9])' + escapeRegExp(a)).exec(n);
+            if (!m) return;
+            const voto = [m.index + m[1].length, -a.length];
+            if (!migliore || voto[0] < migliore[0] || (voto[0] === migliore[0] && voto[1] < migliore[1])) migliore = voto;
+          });
+          if (migliore) candidati.push([migliore[0], migliore[1], indice, p]);
+        });
+        if (!candidati.length) return null;
+        candidati.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]; });
+        let scelta = candidati[0][3];
+        if (scelta.generica) {
+          const specifica = candidati.find(function (c) { return c[3].area === scelta.area && !c[3].generica; });
+          if (specifica) scelta = specifica[3];
+        }
+        return scelta;
+      };
+
+      const aggiornaAbilitati = function () {
+        modulo.querySelectorAll('input, select, textarea').forEach(function (campo) {
+          if (campo === tipoCliente || campo.type === 'hidden') return;
+          campo.disabled = campo.closest('[hidden]') !== null;
+        });
+      };
+
+      const aggiornaProfessione = function () {
+        if (!campoProfessione) return;
+        const tipo = tipoCliente.value;
+        const attiva = tipo === 'studio' || tipo === 'professionista';
+        const p = attiva ? trovaProfessione(campoProfessione.value) : null;
+        modulo.querySelectorAll('.gruppo-professione').forEach(function (gruppo) {
+          gruppo.hidden = !p || gruppo.dataset.professione !== p.chiave;
+        });
+        if (infoProfessione) {
+          infoProfessione.textContent = p ? p.info
+            : (campoProfessione.value.trim()
+              ? 'Professione non in elenco: indica specializzazioni e attività nei campi «Altre».'
+              : 'Scegli dall\'elenco o scrivi la professione: compariranno specializzazioni e attività da selezionare.');
+        }
+        if (campoAlbo) campoAlbo.placeholder = p && p.albo ? p.albo + ' di …' : 'es. Ordine degli Avvocati di Milano';
+        aggiornaAbilitati();
+      };
+
       const aggiornaTipo = function () {
         const tipo = tipoCliente.value;
-        const regole = {
-          'campo-azienda': tipo === 'azienda',
-          'campo-piva': tipo !== 'dipendente',
-          'campo-professionista': tipo === 'professionista',
-          // Professione per i professionisti, mansione per i dipendenti.
-          'campo-professione': tipo === 'professionista' || tipo === 'dipendente',
-          'campo-dipendente': tipo === 'dipendente',
-          'campo-impresa': tipo === 'azienda' || tipo === 'professionista',
-          'campo-persona': tipo !== 'azienda'
-        };
-        Object.keys(regole).forEach(function (cls) {
-          document.querySelectorAll('.' + cls).forEach(function (el) {
-            el.style.display = regole[cls] ? '' : 'none';
-            el.querySelectorAll('input, select, textarea').forEach(function (campo) { campo.disabled = !regole[cls]; });
-          });
+        const suffisso = tipo.charAt(0).toUpperCase() + tipo.slice(1);
+        modulo.querySelectorAll('[data-tipi]').forEach(function (el) {
+          el.hidden = el.dataset.tipi.split(' ').indexOf(tipo) === -1;
         });
-        const etichettaProfessione = document.getElementById('label-professione');
-        if (etichettaProfessione) etichettaProfessione.textContent = tipo === 'dipendente' ? 'Mansione' : 'Professione';
-        if (etichettaNome) {
-          etichettaNome.textContent = tipo === 'azienda'
-            ? 'Ragione sociale *'
-            : (tipo === 'dipendente' ? 'Nome e cognome *' : 'Nominativo *');
-        }
+        modulo.querySelectorAll('[data-testo]').forEach(function (el) {
+          el.textContent = el.dataset['testo' + suffisso] || el.dataset.testo;
+        });
+        modulo.querySelectorAll('[data-placeholder]').forEach(function (el) {
+          el.placeholder = el.dataset['placeholder' + suffisso] || el.dataset.placeholder;
+        });
+        aggiornaProfessione();
       };
       tipoCliente.addEventListener('change', aggiornaTipo);
+      if (campoProfessione) campoProfessione.addEventListener('input', aggiornaProfessione);
       aggiornaTipo();
     }
 

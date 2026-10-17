@@ -70,7 +70,7 @@ def test_form_cliente_rifiuta_dati_non_validi_e_conserva_input(client, app):
 
 def test_form_cliente_normalizza_e_deriva_data_nascita(client, app):
     resp = client.post("/clienti/nuovo", data={
-        "tipo": "professionista", "ragione_sociale": "Mario Rossi",
+        "tipo": "professionista", "ragione_sociale": "Mario Rossi", "professione": "Commercialista",
         "codice_fiscale": "rssmra80a01h501u", "partita_iva": "IT 00743110157", "provincia": "mi",
         "data_consenso_privacy": date.today().isoformat(),
     })

@@ -163,7 +163,7 @@ def test_document_upload_and_download(client, app):
 
     client.post(
         "/clienti/nuovo",
-        data={"tipo": "professionista", "ragione_sociale": "Doc Test",
+        data={"tipo": "professionista", "ragione_sociale": "Doc Test", "professione": "Avvocato",
               "analizza_subito": ""},
         follow_redirects=True,
     )

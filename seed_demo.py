@@ -1,6 +1,7 @@
 """Carica dati di esempio nel gestionale: `python seed_demo.py`.
 
-Crea clienti (aziende, professionisti e un dipendente), polizze con scadenze
+Crea clienti (aziende, uno studio legale associato, liberi professionisti,
+un dipendente), polizze con scadenze
 varie, titoli da incassare e incassati, sinistri, follow-up, opportunità e
 analisi rischi, per provare subito tutte le funzioni.
 
@@ -60,16 +61,20 @@ with app.app_context():
     )
     studio = Client(
         tipo="professionista",
-        ragione_sociale="Ing. Laura Bianchi",
+        ragione_sociale="Laura Bianchi",
         codice_fiscale="BNCLRA80A41F205G",
         partita_iva="09876543217",
-        professione="Ingegnere civile",
-        settore="Progettazione strutturale",
+        professione="Ingegnere",
+        specializzazioni="Strutturale; Edile",
+        attivita_svolte="Progettazione strutturale; Direzione lavori; Collaudi; Perizie CTU e CTP",
+        inquadramento="libero_professionista",
+        albo_ordine="Ordine degli Ingegneri della Provincia di Milano",
+        albo_numero="A21456",
+        albo_data_iscrizione=date(2006, 3, 15),
         citta="Milano",
         provincia="MI",
         email="laura.bianchi@pec.ordineingegneri.it",
         telefono="02 8765432",
-        numero_dipendenti=1,
         fatturato_annuo=180_000,
         data_nascita=date(1980, 1, 1),
         data_consenso_privacy=oggi - timedelta(days=400),
@@ -78,10 +83,64 @@ with app.app_context():
         documento_numero="CA12345AB",
         documento_scadenza=oggi + timedelta(days=20),
         descrizione_attivita=(
-            "Studio di ingegneria civile: progettazione strutturale, direzione "
+            "Ingegnere strutturista: progettazione strutturale, direzione "
             "lavori e collaudi in cantiere. Consulenza tecnica d'ufficio per "
             "tribunali. Una collaboratrice, trasferte frequenti sui cantieri, "
             "gestione documentale in cloud."
+        ),
+    )
+    studio_legale = Client(
+        tipo="studio",
+        ragione_sociale="Studio Legale Associato Ferri & Conti",
+        forma_giuridica="Studio associato",
+        referente="Avv. Giulia Ferri",
+        partita_iva="07219830960",
+        codice_ateco="69.10.10",
+        professione="Avvocato",
+        specializzazioni="Civilista; Giuslavorista; Famiglia e minori",
+        attivita_svolte="Contenzioso giudiziale; Consulenza stragiudiziale; Curatore o commissario giudiziale",
+        numero_professionisti=3,
+        numero_dipendenti=2,
+        fatturato_annuo=420_000,
+        indirizzo="Corso di Porta Vittoria 18",
+        citta="Milano",
+        cap="20122",
+        provincia="MI",
+        email="segreteria@ferriconti.it",
+        pec="ferriconti@pec.it",
+        telefono="02 5512345",
+        data_consenso_privacy=oggi - timedelta(days=200),
+        data_adeguatezza=oggi - timedelta(days=200),
+        descrizione_attivita=(
+            "Studio legale associato con tre avvocati, una praticante e due "
+            "segretarie: contenzioso civile e del lavoro, diritto di famiglia, "
+            "curatele fallimentari per il Tribunale di Milano. Sede in affitto, "
+            "archivio digitale in cloud con dati giudiziari dei clienti."
+        ),
+    )
+    pediatra = Client(
+        tipo="professionista",
+        ragione_sociale="Paolo Neri",
+        codice_fiscale="NREPLA75C10L736K",
+        partita_iva="03344556679",
+        professione="Pediatra",
+        specializzazioni="Pediatria generale; Allergologia e immunologia pediatrica",
+        attivita_svolte="Visite ambulatoriali private; Bilanci di salute; Vaccinazioni",
+        inquadramento="convenzionato",
+        albo_ordine="Ordine dei Medici Chirurghi e degli Odontoiatri di Venezia",
+        albo_numero="9876",
+        albo_data_iscrizione=date(2001, 11, 5),
+        citta="Venezia",
+        provincia="VE",
+        email="dott.neri@email.it",
+        telefono="041 778899",
+        fatturato_annuo=95_000,
+        data_nascita=date(1975, 3, 10),
+        data_consenso_privacy=oggi - timedelta(days=30),
+        descrizione_attivita=(
+            "Pediatra di libera scelta con circa 800 assistiti; nel pomeriggio "
+            "visite private e test allergologici in ambulatorio. Usa una "
+            "cartella clinica elettronica in cloud."
         ),
     )
     ristorante = Client(
@@ -128,7 +187,29 @@ with app.app_context():
             "tutela del reddito e salute."
         ),
     )
-    db.session.add_all([falegnameria, studio, ristorante, dipendente])
+    db.session.add_all([falegnameria, studio, studio_legale, pediatra, ristorante, dipendente])
+    db.session.flush()
+    # L'avvocata Ferri è socia dello studio legale (cliente anche lei).
+    avvocata = Client(
+        tipo="professionista",
+        ragione_sociale="Giulia Ferri",
+        codice_fiscale="FRRGLI82D45F205U",
+        professione="Avvocato",
+        specializzazioni="Civilista; Famiglia e minori",
+        attivita_svolte="Contenzioso giudiziale; Mediatore civile",
+        inquadramento="libero_professionista",
+        albo_ordine="Ordine degli Avvocati di Milano",
+        albo_numero="M34567",
+        albo_data_iscrizione=date(2009, 1, 20),
+        studio_id=studio_legale.id,
+        citta="Milano",
+        provincia="MI",
+        email="g.ferri@ferriconti.it",
+        data_nascita=date(1982, 4, 5),
+        data_consenso_privacy=oggi - timedelta(days=200),
+        descrizione_attivita="Avvocata civilista e mediatrice, socia dello studio Ferri & Conti.",
+    )
+    db.session.add(avvocata)
     db.session.flush()
 
     polizze = [
@@ -179,6 +260,20 @@ with app.app_context():
             frazionamento="semestrale",
             data_decorrenza=oggi - timedelta(days=420),
             data_scadenza=add_months(oggi - timedelta(days=420), 36),
+            tacito_rinnovo=False, stato="attiva",
+        ),
+        Policy(
+            client_id=studio_legale.id, compagnia="AIG", numero_polizza="AIG-RCPRO-7788",
+            ramo="rc_professionale", premio_annuo=3_400, massimale=2_000_000, provvigione_perc=15,
+            data_decorrenza=oggi - timedelta(days=150), data_scadenza=oggi + timedelta(days=215),
+            tacito_rinnovo=False, stato="attiva",
+        ),
+        # RC del pediatra con massimale sotto il minimo del DM 232/2023: la
+        # scheda lo segnala.
+        Policy(
+            client_id=pediatra.id, compagnia="AmTrust", numero_polizza="AMT-MED-3321",
+            ramo="rc_professionale", premio_annuo=780, massimale=500_000, provvigione_perc=15,
+            data_decorrenza=oggi - timedelta(days=60), data_scadenza=add_months(oggi - timedelta(days=60), 12),
             tacito_rinnovo=False, stato="attiva",
         ),
         Policy(
@@ -272,7 +367,7 @@ with app.app_context():
     ]
     db.session.add_all(opportunita)
 
-    for cliente in (falegnameria, studio, ristorante, dipendente):
+    for cliente in (falegnameria, studio, studio_legale, pediatra, ristorante, dipendente):
         results = analyze_client(cliente)
         db.session.add(
             RiskAnalysis(
@@ -284,7 +379,8 @@ with app.app_context():
 
     db.session.commit()
     print(
-        "Dati demo caricati: 4 clienti, 8 polizze con i relativi titoli, 2 sinistri, "
-        "3 follow-up, 3 opportunità, 4 analisi rischi.\n"
+        "Dati demo caricati: 7 clienti (tra cui uno studio legale associato con un'avvocata "
+        "collegata e un pediatra), 10 polizze con i relativi titoli, 2 sinistri, "
+        "3 follow-up, 3 opportunità, 6 analisi rischi.\n"
         "Avvia il gestionale: al primo accesso ti verrà chiesto di creare l'amministratore."
     )

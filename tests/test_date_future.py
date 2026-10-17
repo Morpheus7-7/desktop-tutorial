@@ -1,6 +1,7 @@
 """Test delle date future: periodi di polizza, disdetta, automatismi, previsione
 incassi, agenda/calendario e delle correzioni emerse dalla verifica."""
 import io
+import re
 from datetime import date, timedelta
 
 from flask import template_rendered
@@ -866,7 +867,12 @@ def test_parametro_endpoint_non_rompe_le_liste(client, app):
 
 def test_dipendente_mantiene_la_mansione(client, app):
     pagina = client.get("/clienti/nuovo").get_data(as_text=True)
-    assert 'class="col-md-3 campo-professione"' in pagina and 'id="label-professione"' in pagina
+    assert re.search(r'data-tipi="dipendente"[^>]*>\s*<label class="form-label" for="cf-mansione">Mansione', pagina)
+    client.post("/clienti/nuovo", data={"tipo": "dipendente", "ragione_sociale": "Marco Verdi",
+                                        "professione": "Capo officina", "datore_lavoro": "Acme S.p.A."})
+    with app.app_context():
+        c = Client.query.filter_by(ragione_sociale="Marco Verdi").one()
+        assert (c.professione, c.datore_lavoro) == ("Capo officina", "Acme S.p.A.")
 
 
 def test_questionario_in_scadenza_non_mancante(client, app):

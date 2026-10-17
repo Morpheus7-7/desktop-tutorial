@@ -1,7 +1,8 @@
 # Gestionale Assicurativo
 
 Gestionale web per intermediari assicurativi (agenti e broker) che seguono
-**aziende, professionisti e lavoratori dipendenti**. Raccoglie in un unico
+**aziende, studi professionali, liberi professionisti, lavoratori dipendenti e
+privati**. Raccoglie in un unico
 posto anagrafiche, polizze, **titoli e incassi**, **sinistri** e documenti;
 **analizza automaticamente i pericoli** a partire dalla descrizione
 dell'attività e non fa perdere **scadenze, rate e follow-up** grazie a
@@ -11,10 +12,27 @@ attività** e **backup** integrati.
 ## Funzionalità
 
 ### Portafoglio
-- **Anagrafica clienti** — aziende, professionisti **e lavoratori dipendenti**
-  (con datore di lavoro e mansione): dati fiscali, contatti, sede, settore,
-  dipendenti, fatturato e descrizione dettagliata dell'attività. Il form adatta
-  i campi al tipo di cliente selezionato.
+- **Anagrafica clienti** per tipo, ciascuno con i propri campi (il form mostra
+  solo quelli pertinenti e il salvataggio azzera gli altri):
+  - **Azienda** — forma giuridica, referente, ATECO, settore, dipendenti, fatturato.
+  - **Studio professionale** (studio associato o STP: es. studio legale
+    associato, studio pediatrico S.r.l.) — forma giuridica, professione
+    esercitata, aree di attività, professionisti/soci, dipendenti e
+    collaboratori, fatturato, iscrizione all'albo; elenco dei professionisti
+    collegati e pulsante «Aggiungi professionista».
+  - **Libero professionista** (una persona sola: es. l'avvocato civilista, il
+    pediatra) — professione, **specializzazioni** e **attività svolte**
+    suggerite da un catalogo di 25 professioni (scrivendo «Medico pediatra»
+    compaiono i settori della pediatria), albo e numero di iscrizione,
+    inquadramento (libero professionista, convenzionato SSN, dipendente),
+    studio di appartenenza e volume d'affari. Niente dipendenti né ragione
+    sociale.
+  - **Lavoratore dipendente** (mansione, datore di lavoro, settore) e
+    **privato** (pensionato, studente…).
+  - **Assicurazioni obbligatorie per legge** in scheda per professionisti e
+    studi (es. RC e infortuni per gli avvocati, L. 247/2012; RC professionale o
+    per colpa grave per i sanitari secondo l'inquadramento, L. 24/2017), con
+    l'indicazione se sono in portafoglio, anche tramite la polizza dello studio.
   - **Validazione** di codice fiscale (anche omocodico e numerico di società),
     partita IVA, CAP, provincia ed email, con avviso sui **duplicati**; la data
     di nascita viene ricavata dal codice fiscale.
@@ -315,6 +333,9 @@ maiuscole). Ogni regola rappresenta un pericolo, con severità calcolata dal
 numero di riscontri e potenziata dai dati strutturati (es. numero di dipendenti
 → rischio infortuni, fatturato elevato → D&O). A queste si aggiungono
 raccomandazioni di base per tipo di cliente (es. catastrofali e tutela legale
-per le aziende, RC professionale e infortuni per i professionisti). Infine i
+per le aziende, multirischi e cyber per gli studi, RC capofamiglia e casa per i
+privati), gli **obblighi di legge della professione** (in testa, con la norma) e
+le estensioni richieste dalle attività svolte (incarichi giudiziari, sindaco e
+revisore, attività chirurgiche, direzione lavori, asseverazioni…). Infine i
 rami consigliati vengono confrontati con quelli delle polizze attive per la gap
 analysis. Il risultato è **sempre spiegabile** e non richiede servizi esterni.

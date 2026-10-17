@@ -18,6 +18,7 @@ from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import Engine
 
 from .models import db
+from .professioni import normalizza
 from .utils import formatta_euro, plurale
 
 __version__ = "2.0.0"
@@ -58,6 +59,15 @@ def _ensure_schema() -> None:
             "documento_tipo": "ALTER TABLE clients ADD COLUMN documento_tipo VARCHAR(30)",
             "documento_numero": "ALTER TABLE clients ADD COLUMN documento_numero VARCHAR(40)",
             "documento_scadenza": "ALTER TABLE clients ADD COLUMN documento_scadenza DATE",
+            "forma_giuridica": "ALTER TABLE clients ADD COLUMN forma_giuridica VARCHAR(40)",
+            "specializzazioni": "ALTER TABLE clients ADD COLUMN specializzazioni TEXT",
+            "attivita_svolte": "ALTER TABLE clients ADD COLUMN attivita_svolte TEXT",
+            "albo_ordine": "ALTER TABLE clients ADD COLUMN albo_ordine VARCHAR(150)",
+            "albo_numero": "ALTER TABLE clients ADD COLUMN albo_numero VARCHAR(40)",
+            "albo_data_iscrizione": "ALTER TABLE clients ADD COLUMN albo_data_iscrizione DATE",
+            "inquadramento": "ALTER TABLE clients ADD COLUMN inquadramento VARCHAR(30)",
+            "numero_professionisti": "ALTER TABLE clients ADD COLUMN numero_professionisti INTEGER",
+            "studio_id": "ALTER TABLE clients ADD COLUMN studio_id INTEGER REFERENCES clients (id)",
         },
         "policies": {
             "provvigione_perc": "ALTER TABLE policies ADD COLUMN provvigione_perc FLOAT",
@@ -110,6 +120,7 @@ def _ensure_schema() -> None:
     indici = [
         "CREATE INDEX IF NOT EXISTS ix_documents_claim_id ON documents (claim_id)",
         "CREATE INDEX IF NOT EXISTS ix_followups_policy_id ON followups (policy_id)",
+        "CREATE INDEX IF NOT EXISTS ix_clients_studio_id ON clients (studio_id)",
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_titles_rata ON titles (policy_id, data_effetto, numero_rata) "
         "WHERE stato != 'stornato' AND numero_rata IS NOT NULL AND tipo != 'appendice'",
     ]
@@ -122,6 +133,24 @@ def _ensure_schema() -> None:
                 db.session.rollback()
 
     _migra_chiavi_notifiche()
+    _migra_settore_professionisti()
+
+
+def _migra_settore_professionisti() -> None:
+    """Il «settore» dei liberi professionisti diventa una specializzazione.
+
+    Il professionista ora ha specializzazioni (civilista, pediatria…) e non un
+    settore come le aziende: il valore già inserito non va perso.
+    """
+    if "clients" not in set(inspect(db.engine).get_table_names()):
+        return
+    risultato = db.session.execute(text(
+        "UPDATE clients SET specializzazioni = settore, settore = NULL "
+        "WHERE tipo = 'professionista' AND settore IS NOT NULL AND TRIM(settore) != '' "
+        "AND (specializzazioni IS NULL OR TRIM(specializzazioni) = '')"
+    ))
+    if risultato.rowcount:
+        db.session.commit()
 
 
 _CHIAVE_POLIZZA_VECCHIA = re.compile(r"^polizza:(\d+):(\d+|scaduta)$")
@@ -338,6 +367,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         return f"tra {value} giorni" if value > 0 else f"da {-value} giorni"
 
     app.jinja_env.globals["plurale"] = plurale
+    app.add_template_filter(normalizza, "normalizza")
 
     def filtri_url() -> dict:
         """Parametri della richiesta da ripassare a url_for (filtri, pagina…).

@@ -184,6 +184,8 @@ body { background: var(--ga-bg); color: var(--ga-text); }
 .tipo-azienda { background: var(--ga-primary) !important; }
 .tipo-professionista { background: #15803d !important; }
 .tipo-dipendente { background: #7c3aed !important; }
+.tipo-studio { background: #0e7490 !important; }
+.tipo-privato { background: #64748b !important; }
 .badge-soft { background: #eef2f7; color: #334155; font-weight: 500; }
 
 /* ---------- Cronologia (sinistri, storico polizza) -------------------------- */

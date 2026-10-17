@@ -20,7 +20,7 @@
       <span class="stat-icon"><i class="bi bi-people"></i></span>
       <div class="stat-label">Clienti</div>
       <div class="stat-value">{{ stats.clienti }}</div>
-      <div class="small ga-muted">{{ stats.aziende }} aziende · {{ stats.professionisti }} prof. · {{ stats.dipendenti }} dip.</div>
+      <div class="small ga-muted">{% for t in stats.clienti_per_tipo if t.n %}{{ t.breve }}{% if not loop.last %} · {% endif %}{% else %}nessun cliente{% endfor %}</div>
       <a class="stretched-link" href="{{ url_for('clients.list_clients') }}" aria-label="Vai ai clienti"></a>
     </div></div>
   </div>

@@ -1,4 +1,4 @@
-"""Anagrafica clienti (aziende, professionisti, dipendenti) e analisi rischi."""
+"""Anagrafica clienti (aziende, studi, professionisti, dipendenti, privati) e analisi rischi."""
 import json
 import os
 from datetime import date, timedelta
@@ -17,7 +17,9 @@ from werkzeug.security import safe_join
 
 from ..export import csv_response
 from ..models import (
+    CAMPI_PER_TIPO,
     CLAIM_STATUSES,
+    CLIENT_TYPE_DESCRIZIONI,
     CLIENT_TYPES,
     DOCUMENT_CATEGORIES,
     FOLLOWUP_PRIORITIES,
@@ -33,9 +35,22 @@ from ..models import (
 )
 from ..backup import cartella_documenti
 from ..notifications import elimina_notifiche
+from ..professioni import (
+    AREE,
+    CONDIZIONI_PRIVATO,
+    FORME_GIURIDICHE,
+    INQUADRAMENTI,
+    PROFESSIONI,
+    PROFESSIONI_GENERICHE,
+    info_professione,
+    normalizza,
+    separa_voci,
+    trova_professione,
+    unisci_voci,
+)
 from ..risk_engine import analyze_client
 from ..security import audit
-from ..utils import DATA_MIN, clean, leggi_data, leggi_importo, paginate, parse_int
+from ..utils import DATA_MIN, clean, leggi_data, leggi_importo, paginate, parse_int, plurale
 from ..validators import (
     data_nascita_da_cf,
     valida_cap,
@@ -59,7 +74,15 @@ def _populate_from_form(client: Client, form) -> list[str]:
     client.codice_fiscale = (clean(form, "codice_fiscale", upper=True) or "").replace(" ", "") or None
     client.partita_iva = (clean(form, "partita_iva") or "").replace(" ", "").upper().removeprefix("IT") or None
     client.codice_ateco = clean(form, "codice_ateco")
+    forma = form.get("forma_giuridica")
+    client.forma_giuridica = forma if forma in FORME_GIURIDICHE.get(client.tipo, ()) else None
     client.professione = clean(form, "professione")
+    client.specializzazioni = unisci_voci(form.getlist("specializzazioni"), form.get("specializzazioni_altre"))
+    client.attivita_svolte = unisci_voci(form.getlist("attivita_svolte"), form.get("attivita_altre"))
+    client.albo_ordine = clean(form, "albo_ordine")
+    client.albo_numero = clean(form, "albo_numero", upper=True)
+    inquadramento = form.get("inquadramento")
+    client.inquadramento = inquadramento if inquadramento in dict(INQUADRAMENTI) else None
     client.datore_lavoro = clean(form, "datore_lavoro")
     client.settore = clean(form, "settore")
     client.indirizzo = clean(form, "indirizzo")
@@ -73,7 +96,12 @@ def _populate_from_form(client: Client, form) -> list[str]:
     client.numero_dipendenti = parse_int(dipendenti, minimo=0, massimo=1_000_000)
     if dipendenti and client.numero_dipendenti is None:
         errori.append("Numero dipendenti: indica un numero intero non negativo.")
-    client.fatturato_annuo = leggi_importo(form, "fatturato_annuo", "Fatturato annuo", errori, minimo=0)
+    professionisti = (form.get("numero_professionisti") or "").strip()
+    client.numero_professionisti = parse_int(professionisti, minimo=1, massimo=100_000)
+    if professionisti and client.numero_professionisti is None:
+        errori.append("Professionisti dello studio: indica un numero intero di almeno 1.")
+    etichetta_fatturato = "Volume d'affari" if client.tipo == "professionista" else "Fatturato annuo"
+    client.fatturato_annuo = leggi_importo(form, "fatturato_annuo", etichetta_fatturato, errori, minimo=0)
     client.descrizione_attivita = clean(form, "descrizione_attivita")
     client.note = clean(form, "note")
     # Compliance: date nel passato (nascita, consenso, questionario) e una
@@ -82,6 +110,10 @@ def _populate_from_form(client: Client, form) -> list[str]:
     client.data_nascita = leggi_data(
         form, "data_nascita", "Data di nascita", errori, minimo=DATA_MIN, massimo=oggi,
         msg_massimo=f"Data di nascita: {futura}",
+    )
+    client.albo_data_iscrizione = leggi_data(
+        form, "albo_data_iscrizione", "Data di iscrizione all'albo", errori, massimo=oggi,
+        msg_massimo=f"Data di iscrizione all'albo: {futura}",
     )
     client.data_consenso_privacy = leggi_data(
         form, "data_consenso_privacy", "Consenso privacy", errori, massimo=oggi,
@@ -100,11 +132,16 @@ def _populate_from_form(client: Client, form) -> list[str]:
         massimo=oggi + timedelta(days=365 * 20),
         msg_massimo="Scadenza documento: oltre 20 anni da oggi, controlla la data.",
     )
-    # Campi non pertinenti al tipo di cliente (nascosti nel modulo).
-    if client.tipo == "dipendente":
-        client.partita_iva = None
-    if client.tipo != "azienda":
-        client.codice_ateco = None
+    studio_id = (form.get("studio_id") or "").strip()
+    client.studio_id = parse_int(studio_id, minimo=1)
+    if studio_id and client.studio_id is None:
+        errori.append("Studio di appartenenza non valido.")
+    # Campi non pertinenti al tipo di cliente (nascosti nel modulo): un libero
+    # professionista non ha dipendenti né ragione sociale, un privato non ha
+    # partita IVA, e così via.
+    for campo, tipi in CAMPI_PER_TIPO.items():
+        if client.tipo not in tipi:
+            setattr(client, campo, None)
     if client.persona_fisica and not client.data_nascita:
         client.data_nascita = data_nascita_da_cf(client.codice_fiscale)
     return errori
@@ -113,7 +150,24 @@ def _populate_from_form(client: Client, form) -> list[str]:
 def _valida(client: Client, errori: list[str] | None = None) -> list[str]:
     errori = list(errori or [])
     if not client.ragione_sociale:
-        errori.append("La ragione sociale / il nominativo è obbligatorio.")
+        errori.append(
+            "Il nome e cognome è obbligatorio." if client.persona_fisica
+            else "La denominazione dello studio è obbligatoria." if client.tipo == "studio"
+            else "La ragione sociale è obbligatoria."
+        )
+    if client.tipo in ("professionista", "studio") and not client.professione:
+        errori.append(
+            "Indica la professione del libero professionista (es. Avvocato, Pediatra)."
+            if client.tipo == "professionista"
+            else "Indica la professione esercitata dallo studio (es. Avvocato, Pediatra)."
+        )
+    if client.studio_id is not None:
+        studio = db.session.get(Client, client.studio_id)
+        if studio is None or studio.tipo != "studio" or (client.id and studio.id == client.id):
+            errori.append("Studio di appartenenza non valido: scegli uno studio tra i clienti.")
+    if (client.albo_data_iscrizione and client.data_nascita
+            and client.albo_data_iscrizione <= client.data_nascita):
+        errori.append("La data di iscrizione all'albo è precedente alla data di nascita: controlla le date.")
     for errore in (
         valida_partita_iva(client.partita_iva),
         valida_codice_fiscale(client.codice_fiscale),
@@ -148,12 +202,46 @@ def _avvisa_duplicati(client: Client) -> None:
 
 
 def _form(client, nuovo):
+    professione = trova_professione(client.professione) if client.tipo in ("studio", "professionista") else None
+    voci = {}
+    for campo, testo in (("specializzazioni", client.specializzazioni), ("attivita", client.attivita_svolte)):
+        catalogo = getattr(professione, "specializzazioni" if campo == "specializzazioni" else "attivita", ())
+        voci[campo] = separa_voci(testo, catalogo)
+    studi = (
+        Client.query.filter(Client.tipo == "studio", Client.id != (client.id or 0))
+        .order_by(Client.ragione_sociale).all()
+    )
+    # Catalogo per lo script del modulo: riconosce la professione mentre la si
+    # scrive, con le stesse regole del server (alias già normalizzati).
+    catalogo_js = [
+        {
+            "chiave": p.chiave,
+            "area": p.area,
+            "generica": p.chiave in PROFESSIONI_GENERICHE,
+            "alias": [normalizza(a) for a in (p.nome, *p.alias)],
+            "albo": p.albo,
+            "info": info_professione(p),
+        }
+        for p in PROFESSIONI
+    ]
     return render_template(
         "clients/form.html",
         client=client,
         nuovo=nuovo,
         client_types=CLIENT_TYPES,
+        descrizioni_tipo=CLIENT_TYPE_DESCRIZIONI,
+        campi_tipo=CAMPI_PER_TIPO,
         id_document_types=ID_DOCUMENT_TYPES,
+        professioni=PROFESSIONI,
+        aree=AREE,
+        professione_riconosciuta=professione,
+        info_professione=info_professione(professione) if professione else "",
+        catalogo_js=catalogo_js,
+        voci=voci,
+        forme_giuridiche=FORME_GIURIDICHE,
+        inquadramenti=INQUADRAMENTI,
+        condizioni_privato=CONDIZIONI_PRIVATO,
+        studi=studi,
     )
 
 
@@ -170,6 +258,8 @@ def _query_clienti():
                 Client.codice_fiscale.ilike(like),
                 Client.citta.ilike(like),
                 Client.settore.ilike(like),
+                Client.professione.ilike(like),
+                Client.specializzazioni.ilike(like),
                 Client.referente.ilike(like),
                 Client.email.ilike(like),
             )
@@ -198,16 +288,21 @@ def export_clients():
     audit("export", "cliente", None, f"Esportati {len(clienti)} clienti", commit=True)
     return csv_response(
         "clienti",
-        ["Ragione sociale / Nominativo", "Tipo", "Referente", "Partita IVA", "Codice fiscale",
-         "Codice ATECO", "Professione / Mansione", "Datore di lavoro", "Settore", "Indirizzo", "CAP",
-         "Città", "Provincia", "Email", "PEC", "Telefono", "Dipendenti", "Fatturato", "Data di nascita",
-         "Consenso privacy", "Consenso marketing", "Questionario adeguatezza", "Scadenza documento",
-         "Polizze attive", "Premi attivi"],
+        ["Ragione sociale / Nominativo", "Tipo", "Forma giuridica", "Referente", "Partita IVA",
+         "Codice fiscale", "Codice ATECO", "Professione / Mansione / Condizione", "Specializzazioni",
+         "Attività svolte", "Inquadramento", "Albo / Ordine", "N. iscrizione albo", "Iscritto dal",
+         "Studio di appartenenza", "Professionisti dello studio", "Datore di lavoro", "Settore",
+         "Indirizzo", "CAP", "Città", "Provincia", "Email", "PEC", "Telefono", "Dipendenti",
+         "Fatturato / volume d'affari", "Data di nascita", "Consenso privacy", "Consenso marketing",
+         "Questionario adeguatezza", "Scadenza documento", "Polizze attive", "Premi attivi"],
         [
-            (c.ragione_sociale, c.tipo_label, c.referente, c.partita_iva, c.codice_fiscale,
-             c.codice_ateco, c.professione, c.datore_lavoro, c.settore, c.indirizzo, c.cap, c.citta,
-             c.provincia, c.email, c.pec, c.telefono, c.numero_dipendenti, c.fatturato_annuo,
-             c.data_nascita, c.data_consenso_privacy, c.consenso_marketing, c.data_adeguatezza,
+            (c.ragione_sociale, c.tipo_label, c.forma_giuridica, c.referente, c.partita_iva,
+             c.codice_fiscale, c.codice_ateco, c.professione, c.specializzazioni, c.attivita_svolte,
+             c.inquadramento_label, c.albo_ordine, c.albo_numero, c.albo_data_iscrizione,
+             c.studio.ragione_sociale if c.studio else None, c.numero_professionisti,
+             c.datore_lavoro, c.settore, c.indirizzo, c.cap, c.citta, c.provincia, c.email, c.pec,
+             c.telefono, c.numero_dipendenti, c.fatturato_annuo, c.data_nascita,
+             c.data_consenso_privacy, c.consenso_marketing, c.data_adeguatezza,
              c.documento_scadenza, len(c.polizze_attive), c.premi_attivi)
             for c in clienti
         ],
@@ -217,6 +312,11 @@ def export_clients():
 @bp.route("/nuovo", methods=["GET", "POST"])
 def new_client():
     client = Client(tipo=request.args.get("tipo") if request.args.get("tipo") in dict(CLIENT_TYPES) else "azienda")
+    # «Aggiungi professionista» dalla scheda di uno studio.
+    studio = db.session.get(Client, parse_int(request.args.get("studio"), minimo=1) or 0)
+    if studio is not None and studio.tipo == "studio" and client.tipo == "professionista":
+        client.studio_id = studio.id
+        client.professione = studio.professione
     if request.method == "POST":
         errori = _valida(client, _populate_from_form(client, request.form))
         if errori:
@@ -265,6 +365,7 @@ def render_detail(client: Client, form_polizza=None):
 def edit_client(client_id):
     client = db.get_or_404(Client, client_id)
     if request.method == "POST":
+        era_studio = client.tipo == "studio"
         with db.session.no_autoflush:
             errori = _valida(client, _populate_from_form(client, request.form))
             if errori:
@@ -275,6 +376,15 @@ def edit_client(client_id):
             db.session.rollback()
             return risposta, 400
         _avvisa_duplicati(client)
+        if era_studio and client.tipo != "studio" and client.professionisti:
+            scollegati = len(client.professionisti)
+            for professionista in list(client.professionisti):
+                professionista.studio_id = None
+            flash(
+                f"«{client.ragione_sociale}» non è più uno studio: "
+                f"{plurale(scollegati, 'professionista scollegato', 'professionisti scollegati')}.",
+                "info",
+            )
         audit("modifica", "cliente", client.id, f"Modificata l'anagrafica di «{client.ragione_sociale}»")
         db.session.commit()
         flash("Anagrafica aggiornata.", "success")

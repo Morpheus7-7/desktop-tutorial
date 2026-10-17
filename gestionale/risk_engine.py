@@ -1,7 +1,8 @@
 """Motore di analisi automatica dei rischi.
 
 Analizza la descrizione dell'attività di un cliente (più i dati
-strutturati dell'anagrafica: tipo, dipendenti, fatturato) e produce:
+strutturati dell'anagrafica: tipo, professione, specializzazioni, attività
+svolte, inquadramento, dipendenti, fatturato) e produce:
 
 - l'elenco dei pericoli rilevati, con severità e parole chiave trovate;
 - le coperture assicurative consigliate per ciascun pericolo;
@@ -18,6 +19,7 @@ import unicodedata
 from datetime import datetime
 
 from .models import BRANCH_LABELS
+from .professioni import Professione, normalizza, obblighi_di_legge
 
 # ----------------------------------------------------------------------
 # Regole: ogni regola descrive un pericolo, le parole chiave (radici,
@@ -240,6 +242,73 @@ BASELINE_BY_TYPE = {
             "coperture": ["Tutela legale professionale"],
         },
     ],
+    "studio": [
+        {
+            "id": "rc_professionale_base",
+            "nome": "RC professionale dello studio",
+            "descrizione": "Copre gli errori di tutti i professionisti, praticanti e collaboratori dello studio: la polizza deve essere intestata allo studio o alla STP, non solo ai singoli.",
+            "rami": ["rc_professionale"],
+            "coperture": ["RC professionale dello studio / della STP"],
+        },
+        {
+            "id": "multirischi_studio_base",
+            "nome": "Multirischi dell'ufficio",
+            "descrizione": "Incendio, furto ed elettronica per locali, arredi, computer e archivio dello studio.",
+            "rami": ["incendio", "furto", "guasti_macchine"],
+            "coperture": ["Multirischi ufficio: incendio, furto ed elettronica"],
+        },
+        {
+            "id": "cyber_base",
+            "nome": "Cyber e protezione dei dati",
+            "descrizione": "Lo studio custodisce dati riservati dei clienti (spesso sanitari o giudiziari): un ransomware o una violazione GDPR blocca il lavoro e genera richieste di risarcimento.",
+            "rami": ["cyber"],
+            "coperture": ["Cyber Risk con RC per violazione dei dati"],
+        },
+        {
+            "id": "tutela_legale_base",
+            "nome": "Tutela legale",
+            "descrizione": "Vertenze con clienti, dipendenti e fornitori; controlli fiscali.",
+            "rami": ["tutela_legale"],
+            "coperture": ["Tutela legale dello studio"],
+        },
+    ],
+    "privato": [
+        {
+            "id": "rc_capofamiglia_base",
+            "nome": "RC Capofamiglia",
+            "descrizione": "Danni involontari causati a terzi nella vita privata (anche da familiari e animali domestici).",
+            "rami": ["rc_capofamiglia"],
+            "coperture": ["RC della vita privata / capofamiglia"],
+        },
+        {
+            "id": "casa_base",
+            "nome": "Casa: fabbricato e contenuto",
+            "descrizione": "Incendio, acqua condotta ed eventi atmosferici sull'abitazione; con il mutuo la copertura incendio è di solito richiesta dalla banca.",
+            "rami": ["incendio", "furto"],
+            "coperture": ["Polizza casa: incendio, danni da acqua, furto del contenuto"],
+        },
+        {
+            "id": "malattia_base",
+            "nome": "Salute e rimborso spese mediche",
+            "descrizione": "Accesso rapido a visite e interventi senza liste d'attesa; con l'età il bisogno cresce.",
+            "rami": ["malattia"],
+            "coperture": ["Rimborso spese mediche / diaria da ricovero"],
+        },
+        {
+            "id": "infortuni_base",
+            "nome": "Infortuni nel tempo libero",
+            "descrizione": "Cadute in casa, sport e viaggi: senza tutela INAIL, un infortunio grave pesa interamente sulla famiglia.",
+            "rami": ["infortuni"],
+            "coperture": ["Infortuni con invalidità permanente e diaria"],
+        },
+        {
+            "id": "tutela_legale_base",
+            "nome": "Tutela legale privata",
+            "descrizione": "Spese legali per controversie condominiali, di consumo o con la P.A.",
+            "rami": ["tutela_legale"],
+            "coperture": ["Tutela legale della famiglia"],
+        },
+    ],
     "dipendente": [
         {
             "id": "infortuni_base",
@@ -278,6 +347,189 @@ BASELINE_BY_TYPE = {
         },
     ],
 }
+
+# ----------------------------------------------------------------------
+# Attività del professionista che richiedono estensioni o polizze dedicate
+# (spesso escluse dalla RC professionale base). Le parole chiave sono
+# confrontate con le attività svolte indicate in anagrafica.
+# ----------------------------------------------------------------------
+ATTIVITA_CONSIGLI = [
+    {
+        "id": "incarichi_giudiziari",
+        "keywords": ["curator", "commissario", "gestore della crisi", "delegato alle vendite", "custode",
+                     "amministratore giudiziario", "attestatore", "esperto della crisi", "liquidatore giudiziale"],
+        "nome": "Incarichi giudiziari e procedure concorsuali",
+        "descrizione": "Curatele, custodie, deleghe alle vendite e incarichi nella crisi d'impresa sono spesso esclusi dalla RC base: vanno estesi espressamente.",
+        "rami": ["rc_professionale"],
+        "coperture": ["Estensione della RC professionale agli incarichi giudiziari"],
+    },
+    {
+        "id": "sindaco_revisore",
+        "keywords": ["sindaco", "revisor", "organismo di vigilanza"],
+        "nome": "Incarichi di sindaco, revisore e OdV 231",
+        "descrizione": "La responsabilità verso la società e i terzi per gli incarichi di controllo richiede un'estensione o una polizza dedicata, con massimali adeguati alle società controllate.",
+        "rami": ["rc_professionale"],
+        "coperture": ["RC per incarichi di sindaco, revisore legale e componente dell'OdV"],
+    },
+    {
+        "id": "amministratore_societa",
+        "keywords": ["amministratore o liquidatore di societa"],
+        "nome": "Incarichi di amministratore di società",
+        "descrizione": "La RC professionale non copre la responsabilità di chi amministra una società: serve una D&O.",
+        "rami": ["do"],
+        "coperture": ["D&O per gli incarichi di amministratore o liquidatore"],
+    },
+    {
+        "id": "amministratore_condominio",
+        "keywords": ["amministratore di condominio"],
+        "professioni": ["amministratore_condominio"],
+        "nome": "Amministrazione di condomini",
+        "descrizione": "L'assemblea può subordinare la nomina a una polizza RC per gli atti compiuti nell'incarico, da adeguare se delibera lavori straordinari (art. 1129 c. 3 c.c.). Per avvocati e commercialisti va estesa la RC professionale.",
+        "rami": ["rc_professionale"],
+        "coperture": ["RC professionale dell'amministratore di condominio"],
+    },
+    {
+        "id": "attivita_invasiva",
+        "keywords": ["interventi chirurgici", "procedure invasive", "implantolog", "sedazione", "anestesia",
+                     "assistenza al parto", "parto a domicilio", "estrazioni e chirurgia", "rialzo del seno"],
+        "nome": "Attività chirurgica o invasiva",
+        "descrizione": "Chirurgia, anestesia e assistenza al parto portano ai massimali più alti (DM 232/2023, art. 4: 2 milioni per sinistro e 6 annui) e vanno dichiarate con esattezza, pena la riduzione dell'indennizzo.",
+        "rami": ["rc_professionale"],
+        "coperture": ["RC professionale per attività chirurgica / invasiva con massimali adeguati"],
+    },
+    {
+        "id": "medicina_estetica",
+        "keywords": ["medicina estetica", "chirurgia plastica", "estetica dentale", "trattamenti estetici"],
+        "nome": "Medicina estetica",
+        "descrizione": "Molte polizze escludono le prestazioni a fine estetico o le coprono solo con garanzia specifica.",
+        "rami": ["rc_professionale"],
+        "coperture": ["Garanzia specifica per la medicina estetica"],
+    },
+    {
+        "id": "telemedicina",
+        "keywords": ["telemedicina", "sedute online", "consulenze nutrizionali online", "vendita online",
+                     "trattamento di dati per conto", "teleriabilitazione", "telemonitoraggio", "servizi cloud"],
+        "nome": "Prestazioni a distanza e dati di terzi",
+        "descrizione": "Prestazioni online e gestione di dati altrui espongono a violazioni della privacy e ad attacchi informatici.",
+        "rami": ["cyber"],
+        "coperture": ["Cyber Risk con RC per violazione dei dati", "Estensione della RC alle prestazioni a distanza"],
+    },
+    {
+        "id": "cantiere",
+        "keywords": ["direzione lavori", "collaud", "coordinamento sicurezza", "opere pubbliche", "rspp"],
+        "nome": "Direzione lavori, collaudi e sicurezza",
+        "descrizione": "Direzione lavori, collaudi e coordinamento della sicurezza (CSP / CSE) vanno dichiarati: in caso di infortunio in cantiere il coordinatore è spesso chiamato in causa. Per le opere pubbliche il bando può chiedere coperture specifiche.",
+        "rami": ["rc_professionale"],
+        "coperture": ["RC professionale estesa a direzione lavori, collaudi e CSP / CSE",
+                      "Coperture richieste dai bandi di gara (D.Lgs. 36/2023)"],
+    },
+    {
+        "id": "asseverazioni",
+        "keywords": ["asseverazion"],
+        "nome": "Asseverazioni per bonus edilizi",
+        "descrizione": "La RC deve coprire le asseverazioni senza esclusioni, con un massimale specifico di almeno 500.000 € (e retroattività e ultrattività di almeno 5 anni se claims made), oppure serve una polizza dedicata (art. 119 c. 14 DL 34/2020).",
+        "rami": ["rc_professionale"],
+        "coperture": ["RC con garanzia asseverazioni da almeno 500.000 € o polizza dedicata"],
+    },
+    {
+        "id": "visto_conformita",
+        "keywords": ["visto di conformita"],
+        "nome": "Visto di conformità",
+        "descrizione": "Chi rilascia il visto di conformità deve avere una polizza dedicata con massimale di almeno 3.000.000 €, adeguato al numero di contribuenti assistiti (art. 22 DM 164/1999).",
+        "rami": ["rc_professionale"],
+        "coperture": ["Polizza dedicata al visto di conformità da almeno 3.000.000 €"],
+    },
+    {
+        "id": "farmacia",
+        "keywords": ["titolare o direttore di farmacia", "titolare di farmacia"],
+        "nome": "Locali e merci della farmacia",
+        "descrizione": "Farmaci e contanti in negozio: incendio, furto e rapina sono i rischi principali del titolare.",
+        "rami": ["incendio", "furto"],
+        "coperture": ["Multirischi della farmacia: incendio, furto e rapina"],
+    },
+    {
+        "id": "merci_campionari",
+        "keywords": ["deposito di merci", "campionari"],
+        "nome": "Merci e campionari in custodia",
+        "descrizione": "Merci della mandante in deposito e campionari in auto: furto e danneggiamento restano spesso a carico dell'agente.",
+        "rami": ["furto", "trasporti"],
+        "coperture": ["Furto e danni a merci e campionari, anche durante il trasporto"],
+    },
+]
+
+
+def _voce_raccomandazione(base: dict, **extra) -> dict:
+    voce = {
+        "id": base["id"],
+        "nome": base["nome"],
+        "descrizione": base["descrizione"],
+        "severita": "media",
+        "punteggio": 0,
+        "parole_chiave": [],
+        "rami": base["rami"],
+        "coperture_consigliate": base["coperture"],
+        "trattativa": trattativa_for(base["rami"]),
+        "baseline": True,
+        "obbligatoria": False,
+    }
+    voce.update(extra)
+    return voce
+
+
+def raccomandazioni_professione(
+    client_type: str,
+    professione: Professione | None,
+    inquadramento: str | None = None,
+    attivita: list[str] | None = None,
+    *,
+    specializzazioni: list[str] | None = None,
+    forma_giuridica: str | None = None,
+    revenue: float | None = None,
+    numero_professionisti: int | None = None,
+) -> tuple[list[dict], list[str]]:
+    """Obblighi di legge della professione, estensioni per le attività svolte e avvertenze."""
+    if client_type not in ("professionista", "studio") or professione is None:
+        return [], []
+    obblighi, avvertenze = obblighi_di_legge(
+        client_type, professione, inquadramento=inquadramento, forma_giuridica=forma_giuridica,
+        fatturato=revenue, numero_professionisti=numero_professionisti,
+        voci=list(specializzazioni or []) + list(attivita or []),
+    )
+    voci, usati = [], set()
+    for obbligo in obblighi:
+        coperture = [f"{obbligo['copertura']} ({obbligo['norma']})"]
+        if obbligo["nota_massimale"]:
+            coperture.append(obbligo["nota_massimale"][:1].upper() + obbligo["nota_massimale"][1:])
+        # Due obblighi sullo stesso ramo (colpa grave e RC per l'attività privata).
+        identificativo = f"obbligo_{obbligo['ramo']}"
+        while identificativo in usati:
+            identificativo += "_bis"
+        usati.add(identificativo)
+        voci.append(_voce_raccomandazione(
+            {"id": identificativo,
+             "nome": f"{obbligo['copertura']} — obbligatoria per legge",
+             "descrizione": obbligo["descrizione"] or "Obbligatoria per legge per questa professione.",
+             "rami": [obbligo["ramo"]], "coperture": coperture},
+            severita="alta", obbligatoria=True,
+        ))
+    if professione.gelli_bianco and client_type == "professionista":
+        voci.append(_voce_raccomandazione({
+            "id": "tutela_legale_sanitaria",
+            "nome": "Tutela legale con difesa penale",
+            "descrizione": "Per i sanitari il procedimento penale per lesioni colpose è frequente anche senza colpa: "
+                           "servono avvocato e perito di parte fin dalla prima contestazione.",
+            "rami": ["tutela_legale"],
+            "coperture": ["Tutela legale con difesa penale e perizie di parte"],
+        }))
+    testo_attivita = " | ".join(normalizza(a) for a in attivita or [])
+    for consiglio in ATTIVITA_CONSIGLI:
+        trovate = sorted({kw for kw in consiglio["keywords"] if normalizza(kw) in testo_attivita})
+        if trovate or professione.chiave in consiglio.get("professioni", ()):
+            voci.append(_voce_raccomandazione(
+                {**consiglio, "id": f"attivita_{consiglio['id']}"}, parole_chiave=trovate,
+            ))
+    return voci, avvertenze
+
 
 # ----------------------------------------------------------------------
 # Spunti di trattativa per ramo: pensiero laterale + esempio in terza
@@ -489,11 +741,20 @@ def analyze_risks(
     employees: int | None = None,
     revenue: float | None = None,
     active_branches: set[str] | None = None,
+    professione: Professione | None = None,
+    inquadramento: str | None = None,
+    attivita: list[str] | None = None,
+    specializzazioni: list[str] | None = None,
+    forma_giuridica: str | None = None,
+    numero_professionisti: int | None = None,
 ) -> dict:
     """Esegue l'analisi dei rischi e la gap analysis.
 
     ``active_branches`` è l'insieme dei rami delle polizze attive del
     cliente: serve a calcolare le coperture già presenti vs. scoperte.
+    ``professione`` (voce del catalogo), ``inquadramento``, ``attivita`` e gli
+    altri dati professionali aggiungono gli obblighi di legge (con i massimali
+    minimi) e le estensioni per le attività svolte.
     """
     text = _normalize(description)
     active_branches = active_branches or set()
@@ -510,7 +771,7 @@ def analyze_risks(
         if rule["id"] == "do" and (revenue or 0) >= 1_000_000:
             score += 1
             matched.append("fatturato ≥ 1 mln € in anagrafica")
-        if rule["id"] == "rc_professionale" and client_type == "professionista" and score:
+        if rule["id"] == "rc_professionale" and client_type in ("professionista", "studio") and score:
             score += 1
 
         if score > 0:
@@ -526,31 +787,40 @@ def analyze_risks(
                     "coperture_consigliate": rule["coperture"],
                     "trattativa": trattativa_for(rule["rami"]),
                     "baseline": False,
+                    "obbligatoria": False,
                 }
             )
 
     detected.sort(key=lambda r: -r["punteggio"])
 
+    # Obblighi di legge della professione in testa: assorbono il pericolo
+    # rilevato sullo stesso ramo (con le sue parole chiave) e le
+    # raccomandazioni generiche corrispondenti.
+    professionali, avvertenze = raccomandazioni_professione(
+        client_type, professione, inquadramento, attivita, specializzazioni=specializzazioni,
+        forma_giuridica=forma_giuridica, revenue=revenue, numero_professionisti=numero_professionisti,
+    )
+    rami_obbligatori = {r["rami"][0] for r in professionali if r["obbligatoria"]}
+    for voce in professionali:
+        if voce["obbligatoria"]:
+            for rilevato in [r for r in detected if r["rami"] == voce["rami"]]:
+                voce["parole_chiave"] = sorted(set(voce["parole_chiave"]) | set(rilevato["parole_chiave"]))
+                detected.remove(rilevato)
+    detected[:0] = [v for v in professionali if v["obbligatoria"]]
+
     # Raccomandazioni di base per il tipo di cliente (senza duplicare
     # pericoli già rilevati sugli stessi rami).
     detected_ids = {r["id"] for r in detected}
+    specifiche = [v for v in professionali if not v["obbligatoria"]]
+    rami_specifici = {ramo for v in specifiche for ramo in v["rami"]}
     for base in BASELINE_BY_TYPE.get(client_type, []):
         if base["id"].replace("_base", "") in detected_ids:
             continue
-        detected.append(
-            {
-                "id": base["id"],
-                "nome": base["nome"],
-                "descrizione": base["descrizione"],
-                "severita": "media",
-                "punteggio": 0,
-                "parole_chiave": [],
-                "rami": base["rami"],
-                "coperture_consigliate": base["coperture"],
-                "trattativa": trattativa_for(base["rami"]),
-                "baseline": True,
-            }
-        )
+        # Già coperta da un obbligo di legge o da un consiglio più specifico.
+        if set(base["rami"]) <= rami_obbligatori | (rami_specifici if base["id"] == "tutela_legale_base" else set()):
+            continue
+        detected.append(_voce_raccomandazione(base))
+    detected.extend(specifiche)
 
     # Gap analysis: rami consigliati vs. rami delle polizze attive.
     recommended_branches: dict[str, list[str]] = {}
@@ -576,11 +846,13 @@ def analyze_risks(
         "rischi": detected,
         "coperture_presenti": covered,
         "coperture_scoperte": uncovered,
+        "avvertenze": avvertenze,
         "sintesi": {
             "rischi_rilevati": len([r for r in detected if not r["baseline"]]),
             "raccomandazioni_base": len([r for r in detected if r["baseline"]]),
             "rami_scoperti": len(uncovered),
             "rami_coperti": len(covered),
+            "obblighi_di_legge": len([r for r in detected if r.get("obbligatoria")]),
         },
     }
 
@@ -588,13 +860,25 @@ def analyze_risks(
 def analyze_client(client, description: str | None = None) -> dict:
     """Analizza un cliente del gestionale usando anagrafica + polizze attive."""
     text = description if description is not None else (client.descrizione_attivita or "")
-    # Includiamo settore e professione: spesso la descrizione è breve.
-    full_text = " ".join(filter(None, [text, client.settore, client.professione]))
+    # Includiamo i dati dell'anagrafica: spesso la descrizione è breve.
+    full_text = " ".join(filter(None, [
+        text, client.settore, client.professione, client.specializzazioni, client.attivita_svolte,
+    ]))
     active = {p.ramo for p in client.polizze if p.stato in ("attiva", "in_rinnovo")}
+    # L'RC professionale dello studio copre anche i professionisti che vi lavorano.
+    if client.tipo == "professionista" and client.studio is not None:
+        if any(p.ramo == "rc_professionale" and p.stato in ("attiva", "in_rinnovo") for p in client.studio.polizze):
+            active.add("rc_professionale")
     return analyze_risks(
         full_text,
         client_type=client.tipo,
         employees=client.numero_dipendenti,
         revenue=client.fatturato_annuo,
         active_branches=active,
+        professione=client.professione_catalogo,
+        inquadramento=client.inquadramento,
+        attivita=client.attivita_elenco,
+        specializzazioni=client.specializzazioni_elenco,
+        forma_giuridica=client.forma_giuridica,
+        numero_professionisti=client.numero_professionisti,
     )

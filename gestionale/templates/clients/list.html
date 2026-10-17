@@ -42,7 +42,7 @@
             {% if c.compliance_problemi %}<i class="bi bi-exclamation-circle text-warning ms-1" title="{{ c.compliance_problemi | join(' · ') }}"></i>{% endif %}
             {% if c.referente %}<div class="small ga-muted">{{ c.referente }}</div>{% endif %}</td>
           <td><span class="badge {{ c.tipo_badge }}">{{ c.tipo_label }}</span></td>
-          <td class="small">{{ c.settore or c.professione or c.datore_lavoro or '—' }}</td>
+          <td class="small">{{ c.attivita_sintesi or '—' }}</td>
           <td class="small">{{ c.citta or '—' }}{% if c.provincia %} ({{ c.provincia }}){% endif %}</td>
           <td class="small tabular">{{ c.partita_iva or c.codice_fiscale or '—' }}</td>
           <td class="num">{{ c.polizze_attive | length }}</td>
