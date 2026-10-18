@@ -58,6 +58,13 @@ def test_riconosce_la_professione_scritta_a_mano():
         "Medico di base": "medico_base",
         "Medico di medicina generale": "medico_base",
         "Medico legale": "medico",
+        "Chirurgo pediatrico": "medico",
+        "Psichiatra psicoterapeuta": "medico",
+        "Medico nutrizionista": "medico",
+        "Ginecologo ostetrico": "medico",
+        "Tecnico sanitario di radiologia medica": "sanitario_tecnico",
+        "Studio notarile": "notaio",
+        "Farmacia comunale": "farmacista",
         "Medico chirurgo": "medico",
         "Ingegnere informatico": "ingegnere",
         "Ing. civile": "ingegnere",
@@ -71,6 +78,8 @@ def test_riconosce_la_professione_scritta_a_mano():
         trovata = trova_professione(testo)
         assert trovata is not None and trovata.chiave == chiave, testo
     assert trova_professione("Marketing manager") is None
+    assert trova_professione("Legale rappresentante") is None
+    assert trova_professione("x" * 2_000_000) is None  # niente rallentamenti con testi enormi
     assert trova_professione("") is None and trova_professione(None) is None
 
 
@@ -141,7 +150,7 @@ def test_professionista_non_salva_i_dati_da_azienda(client, app):
 
 def test_studio_professionale_e_una_societa(client, app):
     resp = client.post("/clienti/nuovo", data={
-        "tipo": "studio", "ragione_sociale": "Studio Pediatrico Bimbi Sani", "forma_giuridica": "STP S.r.l.",
+        "tipo": "studio", "ragione_sociale": "Studio Pediatrico Bimbi Sani", "forma_giuridica_studio": "STP S.r.l.",
         "professione": "Pediatra", "specializzazioni": ["Neonatologia"], "numero_professionisti": "4",
         "numero_dipendenti": "3", "fatturato_annuo": "600000", "referente": "Dott.ssa Bianchi",
         "inquadramento": "convenzionato", "data_nascita": "1980-01-01",
@@ -174,7 +183,7 @@ def test_professione_obbligatoria_per_professionista_e_studio(client, app):
 
 def test_privato_senza_partita_iva(client, app):
     client.post("/clienti/nuovo", data={
-        "tipo": "privato", "ragione_sociale": "Anna Russo", "professione": "Pensionato",
+        "tipo": "privato", "ragione_sociale": "Anna Russo", "condizione": "Pensionato",
         "partita_iva": "00743110157", "codice_fiscale": "RSSMRA80A01H501U", "numero_dipendenti": "2",
     })
     with app.app_context():
@@ -338,9 +347,12 @@ def test_obblighi_di_notai_stp_studi_associati_e_veterinari(app):
     struttura, _ = obblighi_di_legge("studio", PER_CHIAVE["pediatra"],
                                      forma_giuridica="Struttura sanitaria privata autorizzata")
     assert "art. 10 c. 1" in struttura[0]["norma"]
-    # Il veterinario non è soggetto alla Gelli-Bianco: niente colpa grave anche da dipendente.
-    veterinario, _ = obblighi_di_legge("professionista", PER_CHIAVE["veterinario"], inquadramento="dipendente_pubblico")
+    # Il veterinario non è soggetto alla Gelli-Bianco: RC del DPR 137/2012 in proprio, nessuna colpa grave
+    # obbligatoria da dipendente.
+    veterinario, _ = obblighi_di_legge("professionista", PER_CHIAVE["veterinario"], inquadramento="libero_professionista")
     assert [o["copertura"] for o in veterinario] == ["RC professionale"] and "DPR 137/2012" in veterinario[0]["norma"]
+    dipendente, avvisi = obblighi_di_legge("professionista", PER_CHIAVE["veterinario"], inquadramento="dipendente_pubblico")
+    assert dipendente == [] and avvisi
     # Professioni senza obbligo: solo l'avvertenza.
     revisore, avvisi = obblighi_di_legge("professionista", PER_CHIAVE["revisore_legale"])
     assert revisore == [] and "D.Lgs. 39/2010" in avvisi[0]
@@ -356,12 +368,14 @@ def test_analisi_avvocato_con_obblighi_e_incarichi():
         attivita=["Curatore o commissario giudiziale", "Contenzioso giudiziale"], revenue=50_000,
     )
     ids = [r["id"] for r in res["rischi"]]
-    assert ids[:2] == ["obbligo_rc_professionale", "obbligo_infortuni"]
+    # L'infortuni dei collaboratori è obbligatoria solo se ne ha: resta un consiglio da verificare.
+    assert ids[0] == "obbligo_rc_professionale" and "obbligo_infortuni" in ids[1:]
+    assert not next(r for r in res["rischi"] if r["id"] == "obbligo_infortuni")["obbligatoria"]
     # Il pericolo generico sullo stesso ramo è assorbito dall'obbligo (con le parole chiave).
     assert "rc_professionale" not in ids and "rc_professionale_base" not in ids
     assert res["rischi"][0]["parole_chiave"] and res["rischi"][0]["obbligatoria"]
     assert "attivita_incarichi_giudiziari" in ids
-    assert res["sintesi"]["obblighi_di_legge"] == 2
+    assert res["sintesi"]["obblighi_di_legge"] == 1
     assert any("500.000 €" in c for c in res["rischi"][0]["coperture_consigliate"])
 
 
@@ -432,3 +446,99 @@ def test_elenco_ricerca_esportazione_e_cruscotto(client, app):
     cruscotto = client.get("/").get_data(as_text=True)
     assert "1 studio · 1 prof. · 1 privato" in cruscotto
     assert client.get("/clienti/?tipo=studio").get_data(as_text=True).count("Studio Legale Ferri") >= 1
+
+
+# ----------------------------------------------------------------------
+# Correzioni della revisione
+# ----------------------------------------------------------------------
+def test_migrazione_sposta_nelle_note_i_dati_non_pertinenti(app):
+    with app.app_context():
+        db.session.execute(text(
+            "INSERT INTO clients (tipo, ragione_sociale, referente, numero_dipendenti, note, consenso_marketing) "
+            "VALUES ('professionista', 'Dott. Rossi', 'Segretaria Anna', 4, 'Cliente storico', 0), "
+            "('dipendente', 'Marco Verdi', 'Moglie Laura', NULL, NULL, 0)"
+        ))
+        db.session.commit()
+        _migra_settore_professionisti()
+        rossi = Client.query.filter_by(ragione_sociale="Dott. Rossi").one()
+        assert rossi.referente is None and rossi.numero_dipendenti is None
+        assert rossi.note == "Cliente storico\nReferente (dato precedente): Segretaria Anna\nDipendenti (dato precedente): 4"
+        assert Client.query.filter_by(ragione_sociale="Marco Verdi").one().note == "Referente (dato precedente): Moglie Laura"
+        _migra_settore_professionisti()  # idempotente
+        assert db.session.get(Client, rossi.id).note.count("Segretaria Anna") == 1
+
+
+def test_polizza_scaduta_o_sospesa_non_soddisfa_l_obbligo(app):
+    cid = _crea(app, tipo="professionista", ragione_sociale="Avv. Neri", professione="Avvocato", fatturato_annuo=100_000)
+    _polizza(app, cid, "rc_professionale", massimale=2_000_000)
+    with app.app_context():
+        p = Policy.query.one()
+        p.data_decorrenza, p.data_scadenza = OGGI - timedelta(days=380), OGGI - timedelta(days=15)
+        db.session.add(Policy(client_id=cid, compagnia="AIG", numero_polizza="NUOVA", ramo="rc_professionale",
+                              premio_annuo=900, frazionamento="annuale", massimale=300_000, stato="attiva",
+                              data_decorrenza=OGGI - timedelta(days=14), data_scadenza=add_months(OGGI - timedelta(days=14), 12)))
+        db.session.commit()
+        rc = db.session.get(Client, cid).obblighi_assicurativi[0]
+        assert rc["in_portafoglio"] == "proprio" and rc["massimale_polizza"] == 300_000 and rc["massimale_insufficiente"]
+        Policy.query.filter_by(numero_polizza="NUOVA").delete()
+        db.session.commit()
+        assert db.session.get(Client, cid).obblighi_assicurativi[0]["in_portafoglio"] == "scaduta"
+
+
+def test_colpa_grave_non_coperta_dalla_polizza_della_struttura(app):
+    sid = _crea(app, tipo="studio", ragione_sociale="Clinica S.r.l.", professione="Medico chirurgo",
+                forma_giuridica="Struttura sanitaria privata autorizzata")
+    pid = _crea(app, tipo="professionista", ragione_sociale="Dott. Cuore", professione="Cardiologo",
+                inquadramento="dipendente_privato", studio_id=sid)
+    _polizza(app, sid, "rc_professionale")
+    with app.app_context():
+        assert db.session.get(Client, pid).obblighi_assicurativi[0]["in_portafoglio"] is None
+        res = analyze_client(db.session.get(Client, pid), description="Cardiologo")
+        assert "rc_professionale" not in {c["ramo"] for c in res["coperture_presenti"]}
+        struttura = {o["ramo"] for o in db.session.get(Client, sid).obblighi_assicurativi}
+        assert struttura == {"rc_professionale", "rct_rco"}
+
+
+def test_obblighi_corretti_dalla_revisione():
+    from gestionale.professioni import obblighi_di_legge
+
+    # Ingegnere dipendente: nessun obbligo DPR 137/2012, solo un'avvertenza.
+    obblighi, avvisi = obblighi_di_legge("professionista", PER_CHIAVE["ingegnere"], inquadramento="dipendente_pubblico")
+    assert obblighi == [] and avvisi
+    # Agenzia immobiliare in forma societaria: l'obbligo resta alla società.
+    agenzia, avvisi = obblighi_di_legge("studio", PER_CHIAVE["agente_immobiliare"], forma_giuridica="S.r.l. (non STP)")
+    assert agenzia and "39/1989" in agenzia[0]["norma"] and not avvisi
+    # STP sanitaria: avvertenza sul regime di struttura.
+    _, avvisi = obblighi_di_legge("studio", PER_CHIAVE["pediatra"], forma_giuridica="STP S.r.l.")
+    assert any("struttura" in a for a in avvisi)
+    # Studio legale senza numero di professionisti: minimo non dato per certo.
+    rc = obblighi_di_legge("studio", PER_CHIAVE["avvocato"], fatturato=300_000)[0][0]
+    assert rc["massimale_minimo"] is None
+    # La sola specializzazione in ginecologia e ostetricia non porta alla classe più alta.
+    gin = obblighi_di_legge("professionista", PER_CHIAVE["medico"], voci=["Ginecologia e ostetricia"])[0][0]
+    assert gin["massimale_minimo"] == 1_000_000
+
+
+def test_modulo_senza_javascript_salva_i_campi_del_tipo(client, app):
+    """Senza JavaScript il modulo invia anche i campi nascosti: conta quello del tipo."""
+    client.post("/clienti/nuovo", data={
+        "tipo": "dipendente", "ragione_sociale": "Luca Bassi", "professione": "", "mansione": "Magazziniere",
+        "condizione": "", "settore": "", "settore_dipendente": "Logistica",
+        "forma_giuridica": "", "forma_giuridica_studio": "",
+    })
+    client.post("/clienti/nuovo", data={
+        "tipo": "studio", "ragione_sociale": "Studio Uno", "professione": "Avvocato", "mansione": "",
+        "forma_giuridica": "", "forma_giuridica_studio": "Società tra avvocati (STA)",
+    })
+    with app.app_context():
+        luca = Client.query.filter_by(ragione_sociale="Luca Bassi").one()
+        assert (luca.professione, luca.settore) == ("Magazziniere", "Logistica")
+        assert Client.query.filter_by(ragione_sociale="Studio Uno").one().forma_giuridica == "Società tra avvocati (STA)"
+
+
+def test_testi_troppo_lunghi_vengono_limitati(client, app):
+    client.post("/clienti/nuovo", data={"tipo": "professionista", "ragione_sociale": "Avv. Lungo",
+                                        "professione": "Avvocato " + "x" * 5000, "albo_numero": "9" * 500})
+    with app.app_context():
+        c = Client.query.one()
+        assert len(c.professione) <= 120 and len(c.albo_numero) <= 40

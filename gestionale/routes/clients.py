@@ -63,6 +63,12 @@ from ..validators import (
 bp = Blueprint("clients", __name__, url_prefix="/clienti")
 
 
+def _testo(form, nome: str, lunghezza: int, upper: bool = False) -> str | None:
+    """Testo ripulito e limitato alla lunghezza della colonna."""
+    valore = clean(form, nome, upper=upper)
+    return valore[:lunghezza].strip() if valore else None
+
+
 def _populate_from_form(client: Client, form) -> list[str]:
     """Copia i campi del form nel cliente e restituisce gli errori su date e importi."""
     errori: list[str] = []
@@ -70,21 +76,27 @@ def _populate_from_form(client: Client, form) -> list[str]:
     tipo = form.get("tipo")
     client.tipo = tipo if tipo in dict(CLIENT_TYPES) else "azienda"
     client.ragione_sociale = (form.get("ragione_sociale") or "").strip()
-    client.referente = clean(form, "referente")
+    client.referente = _testo(form, "referente", 120)
     client.codice_fiscale = (clean(form, "codice_fiscale", upper=True) or "").replace(" ", "") or None
     client.partita_iva = (clean(form, "partita_iva") or "").replace(" ", "").upper().removeprefix("IT") or None
     client.codice_ateco = clean(form, "codice_ateco")
-    forma = form.get("forma_giuridica")
+    # Campi con un nome per tipo (mansione del dipendente, condizione del
+    # privato…): senza JavaScript il modulo li invia tutti e conta quello del tipo.
+    forma = form.get("forma_giuridica_studio" if client.tipo == "studio" else "forma_giuridica")
+    if forma is None:
+        forma = form.get("forma_giuridica")
     client.forma_giuridica = forma if forma in FORME_GIURIDICHE.get(client.tipo, ()) else None
-    client.professione = clean(form, "professione")
+    nome_professione = {"dipendente": "mansione", "privato": "condizione"}.get(client.tipo, "professione")
+    client.professione = _testo(form, nome_professione if nome_professione in form else "professione", 120)
     client.specializzazioni = unisci_voci(form.getlist("specializzazioni"), form.get("specializzazioni_altre"))
     client.attivita_svolte = unisci_voci(form.getlist("attivita_svolte"), form.get("attivita_altre"))
-    client.albo_ordine = clean(form, "albo_ordine")
-    client.albo_numero = clean(form, "albo_numero", upper=True)
+    client.albo_ordine = _testo(form, "albo_ordine", 150)
+    client.albo_numero = _testo(form, "albo_numero", 40, upper=True)
     inquadramento = form.get("inquadramento")
     client.inquadramento = inquadramento if inquadramento in dict(INQUADRAMENTI) else None
-    client.datore_lavoro = clean(form, "datore_lavoro")
-    client.settore = clean(form, "settore")
+    client.datore_lavoro = _testo(form, "datore_lavoro", 200)
+    nome_settore = "settore_dipendente" if client.tipo == "dipendente" and "settore_dipendente" in form else "settore"
+    client.settore = _testo(form, nome_settore, 120)
     client.indirizzo = clean(form, "indirizzo")
     client.citta = clean(form, "citta")
     client.cap = clean(form, "cap")
@@ -217,7 +229,8 @@ def _form(client, nuovo):
         {
             "chiave": p.chiave,
             "area": p.area,
-            "generica": p.chiave in PROFESSIONI_GENERICHE,
+            "alias_generici": list(PROFESSIONI_GENERICHE.get(p.chiave, {}).get("alias", ())),
+            "cede_a": list(PROFESSIONI_GENERICHE.get(p.chiave, {}).get("cede_a", ())),
             "alias": [normalizza(a) for a in (p.nome, *p.alias)],
             "albo": p.albo,
             "info": info_professione(p),

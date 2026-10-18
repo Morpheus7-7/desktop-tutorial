@@ -48,7 +48,7 @@
         {% for t in ('azienda', 'studio') %}
         <div {{ tipi(t) }}>
           <label class="form-label" for="cf-forma-{{ t }}">Forma giuridica</label>
-          <select class="form-select" id="cf-forma-{{ t }}" name="forma_giuridica">
+          <select class="form-select" id="cf-forma-{{ t }}" name="{{ 'forma_giuridica_studio' if t == 'studio' else 'forma_giuridica' }}">
             <option value="">—</option>
             {% for forma in forme_giuridiche[t] %}<option value="{{ forma }}" {% if client.forma_giuridica == forma %}selected{% endif %}>{{ forma }}</option>{% endfor %}
           </select>
@@ -79,7 +79,7 @@
       </div>
       <div class="col-md-3" {{ tipi('dipendente') }}>
         <label class="form-label" for="cf-mansione">Mansione</label>
-        <input id="cf-mansione" type="text" class="form-control" name="professione" placeholder="es. Capo officina" value="{{ client.professione or '' }}">
+        <input id="cf-mansione" type="text" class="form-control" name="mansione" maxlength="120" placeholder="es. Capo officina" value="{{ client.professione or '' }}">
       </div>
       <div class="col-md-3" {{ tipi('datore_lavoro') }}>
         <label class="form-label" for="clients-form-datore-lavoro">Datore di lavoro</label>
@@ -87,11 +87,11 @@
       </div>
       <div class="col-md-3" {{ tipi('dipendente') }}>
         <label class="form-label" for="cf-settore-dipendente">Settore del datore di lavoro</label>
-        <input id="cf-settore-dipendente" type="text" class="form-control" name="settore" placeholder="es. Metalmeccanico" value="{{ client.settore or '' }}">
+        <input id="cf-settore-dipendente" type="text" class="form-control" name="settore_dipendente" maxlength="120" placeholder="es. Metalmeccanico" value="{{ client.settore or '' }}">
       </div>
       <div class="col-md-4" {{ tipi('privato') }}>
         <label class="form-label" for="cf-condizione">Condizione</label>
-        <input id="cf-condizione" type="text" class="form-control" name="professione" list="elenco-condizioni" placeholder="es. Pensionato" value="{{ client.professione or '' }}">
+        <input id="cf-condizione" type="text" class="form-control" name="condizione" maxlength="120" list="elenco-condizioni" placeholder="es. Pensionato" value="{{ client.professione or '' }}">
         <datalist id="elenco-condizioni">{% for c in condizioni_privato %}<option value="{{ c }}">{% endfor %}</datalist>
       </div>
     </div>

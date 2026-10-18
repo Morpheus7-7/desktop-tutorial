@@ -103,7 +103,7 @@
       </div>
       <div class="col-lg-4">
         {% macro chip(elenco) -%}
-          {% if elenco %}{% for v in elenco %}<span class="badge badge-soft me-1 mb-1">{{ v }}</span>{% endfor %}{% else %}—{% endif %}
+          {% if elenco %}{% for v in elenco %}<span class="badge badge-soft text-wrap text-start me-1 mb-1">{{ v }}</span>{% endfor %}{% else %}—{% endif %}
         {%- endmacro %}
         {% if client.tipo in ('professionista', 'studio') %}
         <h2 class="section-title">{{ 'Lo studio' if client.tipo == 'studio' else 'Attività professionale' }}</h2>
@@ -198,7 +198,7 @@
         {% set obblighi = client.obblighi_assicurativi %}
         {% set avvertenze = client.avvertenze_assicurative %}
         {% if obblighi or avvertenze %}
-        {% set scoperti = obblighi | rejectattr('in_portafoglio') | list %}
+        {% set scoperti = obblighi | rejectattr('coperto') | rejectattr('condizionale') | list %}
         {% set sotto_minimo = obblighi | selectattr('massimale_insufficiente') | list %}
         <div class="card mt-3 {{ 'border-warning' if scoperti or sotto_minimo else 'border-success' }}">
           <div class="card-header"><i class="bi bi-bank me-1" aria-hidden="true"></i> Assicurazioni obbligatorie per legge</div>
@@ -209,9 +209,13 @@
                 <span class="fw-semibold">{{ o.copertura }}</span>
                 {% if o.in_portafoglio == 'proprio' %}<span class="text-success text-nowrap"><i class="bi bi-check-circle" aria-hidden="true"></i> in portafoglio</span>
                 {% elif o.in_portafoglio == 'studio' %}<span class="text-success text-nowrap"><i class="bi bi-check-circle" aria-hidden="true"></i> polizza dello studio</span>
+                {% elif o.in_portafoglio == 'sospesa' %}<span class="text-danger text-nowrap"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> copertura sospesa</span>
+                {% elif o.in_portafoglio == 'scaduta' %}<span class="text-danger text-nowrap"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> polizza scaduta</span>
+                {% elif o.condizionale %}<span class="ga-muted text-nowrap"><i class="bi bi-question-circle" aria-hidden="true"></i> da verificare</span>
                 {% else %}<span class="text-warning text-nowrap"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> non in portafoglio</span>{% endif %}
               </div>
               <div class="ga-muted">{{ o.norma }}</div>
+              {% if o.condizionale %}<div class="mt-1 fst-italic">Obbligatoria {{ o.condizionale }}.</div>{% endif %}
               {% if o.descrizione %}<div class="mt-1">{{ o.descrizione }}</div>{% endif %}
               {% if o.nota_massimale %}<div class="mt-1"><i class="bi bi-rulers" aria-hidden="true"></i> {{ o.nota_massimale[:1] | upper }}{{ o.nota_massimale[1:] }}.</div>{% endif %}
               {% if o.massimale_insufficiente %}

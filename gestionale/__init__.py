@@ -137,20 +137,42 @@ def _ensure_schema() -> None:
 
 
 def _migra_settore_professionisti() -> None:
-    """Il «settore» dei liberi professionisti diventa una specializzazione.
+    """Allinea i clienti delle versioni precedenti ai campi del loro tipo.
 
-    Il professionista ora ha specializzazioni (civilista, pediatria…) e non un
-    settore come le aziende: il valore già inserito non va perso.
+    Il «settore» dei liberi professionisti diventa una specializzazione; gli
+    altri dati non più pertinenti al tipo (es. referente e dipendenti di un
+    professionista) passano nelle note, così non si perdono e non falsano
+    analisi ed esportazioni.
     """
+    from .models import CAMPI_PER_TIPO, CLIENT_TYPES
+
     if "clients" not in set(inspect(db.engine).get_table_names()):
         return
-    risultato = db.session.execute(text(
+    db.session.execute(text(
         "UPDATE clients SET specializzazioni = settore, settore = NULL "
         "WHERE tipo = 'professionista' AND settore IS NOT NULL AND TRIM(settore) != '' "
         "AND (specializzazioni IS NULL OR TRIM(specializzazioni) = '')"
     ))
-    if risultato.rowcount:
-        db.session.commit()
+    etichette = {"referente": "Referente", "numero_dipendenti": "Dipendenti", "partita_iva": "Partita IVA",
+                 "codice_ateco": "Codice ATECO", "settore": "Settore", "professione": "Professione",
+                 "datore_lavoro": "Datore di lavoro", "fatturato_annuo": "Fatturato", "data_nascita": "Data di nascita"}
+    tipi = [t for t, _ in CLIENT_TYPES]
+    for campo, etichetta in etichette.items():
+        esclusi = [t for t in tipi if t not in CAMPI_PER_TIPO[campo]]
+        if not esclusi:
+            continue
+        segnaposti = ", ".join(f":t{i}" for i in range(len(esclusi)))
+        parametri = {f"t{i}": t for i, t in enumerate(esclusi)}
+        righe = db.session.execute(text(
+            f"SELECT id, {campo}, note FROM clients WHERE tipo IN ({segnaposti}) AND {campo} IS NOT NULL"
+        ), parametri).all()
+        for cliente_id, valore, note in righe:
+            if campo != "data_nascita" and str(valore).strip():
+                riga = f"{etichetta} (dato precedente): {valore}"
+                note = f"{note}\n{riga}" if note else riga
+            db.session.execute(text(f"UPDATE clients SET {campo} = NULL, note = :note WHERE id = :id"),
+                               {"note": note, "id": cliente_id})
+    db.session.commit()
 
 
 _CHIAVE_POLIZZA_VECCHIA = re.compile(r"^polizza:(\d+):(\d+|scaduta)$")

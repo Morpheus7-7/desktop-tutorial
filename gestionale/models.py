@@ -432,14 +432,30 @@ class Client(db.Model):
         l'RC dipende dall'inquadramento (L. 24/2017, art. 10).
         """
         obblighi, _ = self._obblighi_di_legge()
+        # Valide: in vigore o già emesse con decorrenza futura. Scadute da
+        # rinnovare o sospese per mancato pagamento non soddisfano l'obbligo.
+        valide = ("in_vigore", "non_in_vigore", "disdetta_inviata", "tacito_da_registrare")
         proprie = [p for p in self.polizze if p.attiva]
         dello_studio = [p for p in self.studio.polizze if p.attiva] if self.tipo == "professionista" and self.studio else []
         for obbligo in obblighi:
             mie = [p for p in proprie if p.ramo == obbligo["ramo"]]
-            studio = [p for p in dello_studio if p.ramo == obbligo["ramo"]]
-            # "proprio" | "studio" (polizza dello studio di appartenenza) | None
-            obbligo["in_portafoglio"] = "proprio" if mie else "studio" if studio else None
-            massimali = [p.massimale for p in (mie or studio) if p.massimale]
+            # La colpa grave è personale: la polizza dello studio non la copre.
+            studio = [] if obbligo["personale"] else [p for p in dello_studio if p.ramo == obbligo["ramo"]]
+            mie_valide = [p for p in mie if p.stato_effettivo in valide]
+            studio_valide = [p for p in studio if p.stato_effettivo in valide]
+            # "proprio" | "studio" | "sospesa" | "scaduta" | None
+            if mie_valide:
+                obbligo["in_portafoglio"] = "proprio"
+            elif studio_valide:
+                obbligo["in_portafoglio"] = "studio"
+            elif any(p.stato_effettivo == "sospesa" for p in mie + studio):
+                obbligo["in_portafoglio"] = "sospesa"
+            elif mie or studio:
+                obbligo["in_portafoglio"] = "scaduta"
+            else:
+                obbligo["in_portafoglio"] = None
+            obbligo["coperto"] = obbligo["in_portafoglio"] in ("proprio", "studio")
+            massimali = [p.massimale for p in (mie_valide or studio_valide) if p.massimale]
             obbligo["massimale_polizza"] = max(massimali) if massimali else None
             obbligo["massimale_insufficiente"] = bool(
                 obbligo["massimale_minimo"] and obbligo["massimale_polizza"]

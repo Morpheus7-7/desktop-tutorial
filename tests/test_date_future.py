@@ -869,7 +869,7 @@ def test_dipendente_mantiene_la_mansione(client, app):
     pagina = client.get("/clienti/nuovo").get_data(as_text=True)
     assert re.search(r'data-tipi="dipendente"[^>]*>\s*<label class="form-label" for="cf-mansione">Mansione', pagina)
     client.post("/clienti/nuovo", data={"tipo": "dipendente", "ragione_sociale": "Marco Verdi",
-                                        "professione": "Capo officina", "datore_lavoro": "Acme S.p.A."})
+                                        "mansione": "Capo officina", "datore_lavoro": "Acme S.p.A."})
     with app.app_context():
         c = Client.query.filter_by(ragione_sociale="Marco Verdi").one()
         assert (c.professione, c.datore_lavoro) == ("Capo officina", "Acme S.p.A.")

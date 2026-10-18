@@ -86,9 +86,9 @@
       const escapeRegExp = function (s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
       // Stesse regole del server (professioni.trova_professione): vince la
       // professione nominata per prima, a parità l'alias più lungo; il medico
-      // generico cede alla specialità della stessa area («Medico pediatra»).
+      // nominato in modo generico cede alla specialità medica («Medico pediatra»).
       const trovaProfessione = function (testo) {
-        const n = normalizza(testo);
+        const n = normalizza((testo || '').slice(0, 200));
         if (!n) return null;
         const candidati = [];
         catalogo.forEach(function (p, indice) {
@@ -97,16 +97,16 @@
             if (!a) return;
             const m = new RegExp('(^|[^a-z0-9])' + escapeRegExp(a)).exec(n);
             if (!m) return;
-            const voto = [m.index + m[1].length, -a.length];
+            const voto = [m.index + m[1].length, -a.length, a];
             if (!migliore || voto[0] < migliore[0] || (voto[0] === migliore[0] && voto[1] < migliore[1])) migliore = voto;
           });
-          if (migliore) candidati.push([migliore[0], migliore[1], indice, p]);
+          if (migliore) candidati.push([migliore[0], migliore[1], indice, p, migliore[2]]);
         });
         if (!candidati.length) return null;
         candidati.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]; });
         let scelta = candidati[0][3];
-        if (scelta.generica) {
-          const specifica = candidati.find(function (c) { return c[3].area === scelta.area && !c[3].generica; });
+        if (scelta.alias_generici.indexOf(candidati[0][4]) !== -1) {
+          const specifica = candidati.find(function (c) { return scelta.cede_a.indexOf(c[3].chiave) !== -1; });
           if (specifica) scelta = specifica[3];
         }
         return scelta;

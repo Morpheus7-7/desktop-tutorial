@@ -393,7 +393,8 @@ ATTIVITA_CONSIGLI = [
         "keywords": ["interventi chirurgici", "procedure invasive", "implantolog", "sedazione", "anestesia",
                      "assistenza al parto", "parto a domicilio", "estrazioni e chirurgia", "rialzo del seno"],
         "nome": "Attività chirurgica o invasiva",
-        "descrizione": "Chirurgia, anestesia e assistenza al parto portano ai massimali più alti (DM 232/2023, art. 4: 2 milioni per sinistro e 6 annui) e vanno dichiarate con esattezza, pena la riduzione dell'indennizzo.",
+        "descrizione": "Chirurgia, anestesia e prestazioni invasive vanno dichiarate con esattezza, pena la riduzione dell'indennizzo, e richiedono massimali adeguati.",
+        "descrizione_sanitari": "Chirurgia, anestesia e prestazioni invasive vanno dichiarate con esattezza, pena la riduzione dell'indennizzo. Per attività chirurgica, ortopedica, anestesiologica o di parto il minimo di legge sale a 2 milioni per sinistro e 6 annui (DM 232/2023, art. 4).",
         "rami": ["rc_professionale"],
         "coperture": ["RC professionale per attività chirurgica / invasiva con massimali adeguati"],
     },
@@ -497,6 +498,7 @@ def raccomandazioni_professione(
     )
     voci, usati = [], set()
     for obbligo in obblighi:
+        condizionale = obbligo.get("condizionale")
         coperture = [f"{obbligo['copertura']} ({obbligo['norma']})"]
         if obbligo["nota_massimale"]:
             coperture.append(obbligo["nota_massimale"][:1].upper() + obbligo["nota_massimale"][1:])
@@ -507,10 +509,11 @@ def raccomandazioni_professione(
         usati.add(identificativo)
         voci.append(_voce_raccomandazione(
             {"id": identificativo,
-             "nome": f"{obbligo['copertura']} — obbligatoria per legge",
+             "nome": f"{obbligo['copertura']} — obbligatoria " + (condizionale if condizionale else "per legge"),
              "descrizione": obbligo["descrizione"] or "Obbligatoria per legge per questa professione.",
              "rami": [obbligo["ramo"]], "coperture": coperture},
-            severita="alta", obbligatoria=True,
+            # Un obbligo condizionato (es. solo con collaboratori) resta un consiglio da verificare.
+            severita="media" if condizionale else "alta", obbligatoria=not condizionale,
         ))
     if professione.gelli_bianco and client_type == "professionista":
         voci.append(_voce_raccomandazione({
@@ -525,8 +528,10 @@ def raccomandazioni_professione(
     for consiglio in ATTIVITA_CONSIGLI:
         trovate = sorted({kw for kw in consiglio["keywords"] if normalizza(kw) in testo_attivita})
         if trovate or professione.chiave in consiglio.get("professioni", ()):
+            descrizione = consiglio.get("descrizione_sanitari") if professione.gelli_bianco else None
             voci.append(_voce_raccomandazione(
-                {**consiglio, "id": f"attivita_{consiglio['id']}"}, parole_chiave=trovate,
+                {**consiglio, "id": f"attivita_{consiglio['id']}", "descrizione": descrizione or consiglio["descrizione"]},
+                parole_chiave=trovate,
             ))
     return voci, avvertenze
 
@@ -865,8 +870,10 @@ def analyze_client(client, description: str | None = None) -> dict:
         text, client.settore, client.professione, client.specializzazioni, client.attivita_svolte,
     ]))
     active = {p.ramo for p in client.polizze if p.stato in ("attiva", "in_rinnovo")}
-    # L'RC professionale dello studio copre anche i professionisti che vi lavorano.
-    if client.tipo == "professionista" and client.studio is not None:
+    # L'RC professionale dello studio copre anche i professionisti che vi
+    # lavorano, ma non la colpa grave personale di chi opera in una struttura.
+    if (client.tipo == "professionista" and client.studio is not None
+            and client.inquadramento not in ("dipendente_pubblico", "dipendente_privato", "misto", "convenzionato")):
         if any(p.ramo == "rc_professionale" and p.stato in ("attiva", "in_rinnovo") for p in client.studio.polizze):
             active.add("rc_professionale")
     return analyze_risks(

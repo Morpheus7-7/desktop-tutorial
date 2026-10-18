@@ -103,8 +103,12 @@ FORME_GIURIDICHE = {"azienda": FORME_GIURIDICHE_AZIENDA, "studio": FORME_GIURIDI
 # Condizioni tipiche di chi non ha un'attività lavorativa in corso.
 CONDIZIONI_PRIVATO = ["Pensionato", "Studente", "Casalinga / casalingo", "In cerca di occupazione", "Benestante"]
 
-# Professioni «ombrello» che cedono alla specialità indicata nel testo.
-PROFESSIONI_GENERICHE = {"medico"}
+# Professioni «ombrello»: se nominate con un alias generico («medico») cedono
+# a una specialità medica citata dopo («Medico pediatra» → pediatra), mai a
+# un'altra professione sanitaria («Medico nutrizionista» resta medico).
+PROFESSIONI_GENERICHE = {
+    "medico": {"alias": ("medic",), "cede_a": ("pediatra", "medico_base", "odontoiatra", "veterinario")},
+}
 
 _DPR_137 = "DL 138/2011, art. 3 c. 5 lett. e); DPR 137/2012, art. 5"
 _GELLI = "L. 24/2017 (Gelli-Bianco), art. 10; DM 232/2023"
@@ -129,11 +133,11 @@ def trova_professione(testo: str | None) -> Professione | None:
 
     Vince la professione nominata per prima («Ingegnere informatico» →
     ingegnere; a parità di posizione, l'alias più lungo: «Medico di base»).
-    Una professione generica come il medico cede alla specialità della stessa
-    area citata dopo: «Medico pediatra» → pediatra, «Medico veterinario» →
-    veterinario.
+    Il medico nominato in modo generico cede alla specialità medica citata
+    dopo: «Medico pediatra» → pediatra, ma «Chirurgo pediatrico» resta medico.
     """
-    n = normalizza(testo)
+    # Bastano i primi caratteri: un testo enorme non deve rallentare le pagine.
+    n = normalizza((testo or "")[:200])
     if not n:
         return None
     candidati = []
@@ -142,19 +146,17 @@ def trova_professione(testo: str | None) -> Professione | None:
         for alias in (p.nome, *p.alias):
             a = normalizza(alias)
             trovato = re.search(r"(?<![a-z0-9])" + re.escape(a), n) if a else None
-            if trovato and (migliore is None or (trovato.start(), -len(a)) < migliore):
-                migliore = (trovato.start(), -len(a))
+            if trovato and (migliore is None or (trovato.start(), -len(a)) < migliore[:2]):
+                migliore = (trovato.start(), -len(a), a)
         if migliore:
-            candidati.append((*migliore, indice, p))
+            candidati.append((migliore[0], migliore[1], indice, p, migliore[2]))
     if not candidati:
         return None
     candidati.sort(key=lambda c: c[:3])
-    scelta = candidati[0][3]
-    if scelta.chiave in PROFESSIONI_GENERICHE:
-        scelta = next(
-            (c[3] for c in candidati if c[3].area == scelta.area and c[3].chiave not in PROFESSIONI_GENERICHE),
-            scelta,
-        )
+    scelta, alias_scelto = candidati[0][3], candidati[0][4]
+    generica = PROFESSIONI_GENERICHE.get(scelta.chiave)
+    if generica and alias_scelto in generica["alias"]:
+        scelta = next((c[3] for c in candidati if c[3].chiave in generica["cede_a"]), scelta)
     return scelta
 
 
@@ -180,10 +182,14 @@ def _euro(importo: float) -> str:
     return f"{importo:,.0f} €".replace(",", ".")
 
 
-def _obbligo(ramo, copertura, norma, descrizione="", minimo=None, nota_massimale="") -> dict:
+def _obbligo(ramo, copertura, norma, descrizione="", minimo=None, nota_massimale="", *,
+             personale=False, condizionale="") -> dict:
+    """``personale``: la polizza dello studio non basta (es. colpa grave del sanitario).
+    ``condizionale``: obbligo solo a una condizione da verificare, spiegata nel testo."""
     return {
         "ramo": ramo, "copertura": copertura, "norma": norma, "descrizione": descrizione,
         "massimale_minimo": minimo, "nota_massimale": nota_massimale,
+        "personale": personale, "condizionale": condizionale,
     }
 
 
@@ -201,6 +207,9 @@ def _massimale_studio_legale(fatturato: float | None, professionisti: int | None
     """Massimale minimo dell'avvocatura in forma associata (DM 22/09/2016, art. 3)."""
     if professionisti is not None and professionisti > 10:
         minimo, annuo = 5_000_000, 10_000_000
+    elif professionisti is None:
+        return None, ("minimo da 1.000.000 € (fino a 10 professionisti) a 5.000.000 € per sinistro (oltre 10) "
+                      "(DM 22/09/2016, art. 3): indica il numero di professionisti e il fatturato per calcolarlo")
     elif fatturato is None:
         return None, ("minimo da 1.000.000 € a 5.000.000 € per sinistro secondo professionisti e fatturato "
                       "(DM 22/09/2016, art. 3): indica il fatturato per calcolarlo")
@@ -242,12 +251,21 @@ def obblighi_di_legge(
         if professione.gelli_bianco and o.ramo == "rc_professionale":
             elenco.extend(_obblighi_sanitario(professione, inquadramento, voci))
             continue
-        minimo, nota = (None, "")
+        if o.norma == _DPR_137 and inquadramento in INQUADRAMENTI_DIPENDENTE:
+            # L'obbligo del DPR 137/2012 riguarda chi esercita la libera professione.
+            avvertenze.append(
+                "Da dipendente l'obbligo di RC professionale non si applica (vale per chi esercita in proprio): "
+                "se svolge anche incarichi privati la RC è obbligatoria; altrimenti valuta una polizza per colpa grave."
+            )
+            continue
+        minimo, nota, condizione = (None, "", "")
         if professione.chiave == "avvocato" and o.ramo == "rc_professionale":
             minimo, nota = _massimale_avvocato(fatturato)
+        elif professione.chiave == "avvocato" and o.ramo == "infortuni":
+            condizione = "solo se ha collaboratori, dipendenti o praticanti"
         elif professione.chiave == "notaio":
             nota = "copertura complessiva minima 3.000.000 € per sinistro e per anno (DM 19/10/2012, art. 2)"
-        elenco.append(_obbligo(o.ramo, o.copertura, o.norma, o.descrizione, minimo, nota))
+        elenco.append(_obbligo(o.ramo, o.copertura, o.norma, o.descrizione, minimo, nota, condizionale=condizione))
     return elenco, avvertenze
 
 
@@ -269,6 +287,7 @@ def _obblighi_sanitario(professione, inquadramento, voci) -> list[dict]:
             None,
             "massimale pari ai limiti della rivalsa: il triplo della retribuzione lorda, del corrispettivo "
             "convenzionale o del reddito professionale (L. 24/2017, art. 9; DM 232/2023, art. 4 c. 3)",
+            personale=True,
         ))
     if inquadramento in INQUADRAMENTI_DIPENDENTE:
         return elenco
@@ -306,19 +325,35 @@ def _obblighi_studio(professione, forma, fatturato, professionisti, avvertenze) 
                      "L. 247/2012, art. 12 c. 2; DM 22/09/2016, art. 4",
                      "Per chi non è coperto dall'INAIL, anche come sostituto o collaboratore esterno occasionale."),
         ]
+    if professione.chiave in ("agente_immobiliare", "intermediario_assicurativo"):
+        # L'obbligo vale anche quando l'attività è svolta in forma societaria.
+        return [_obbligo(o.ramo, f"{o.copertura} della società", o.norma, o.descrizione) for o in professione.obblighi]
+    struttura_sanitaria = professione.gelli_bianco and forma == "Struttura sanitaria privata autorizzata"
     if forma and forma.startswith("STP"):
+        if professione.gelli_bianco:
+            avvertenze.append(
+                "Una STP che rende prestazioni sanitarie a terzi può essere una struttura ai sensi della L. 24/2017 "
+                "(art. 10 c. 1) e del DM 232/2023: verifica anche l'obbligo di RC verso terzi e verso i prestatori d'opera."
+            )
         return [_obbligo(
             "rc_professionale", "RC professionale della società", "L. 183/2011, art. 10 c. 4 lett. c-bis); DM 34/2013",
             "L'atto costitutivo della STP deve prevedere la polizza per i danni causati ai clienti dai soci "
             "professionisti.",
         )]
-    if professione.gelli_bianco and forma == "Struttura sanitaria privata autorizzata":
-        return [_obbligo(
-            "rc_professionale", "RC della struttura sanitaria", "L. 24/2017, art. 10 c. 1; DM 232/2023",
-            "La struttura risponde verso i pazienti anche per l'operato dei professionisti di cui si avvale "
-            "(art. 7) e deve assicurarsi verso terzi e verso i prestatori d'opera.",
-        )]
-    if professione.obblighi:
+    if struttura_sanitaria:
+        nota = "massimali minimi per le strutture fissati dal DM 232/2023 (art. 4 c. 1), più alti per chirurgia, ortopedia, anestesia e parto"
+        return [
+            _obbligo(
+                "rc_professionale", "RC della struttura sanitaria verso terzi", "L. 24/2017, art. 10 c. 1; DM 232/2023",
+                "La struttura risponde verso i pazienti anche per l'operato dei professionisti di cui si avvale "
+                "(art. 7), compresi i danni causati dal personale.", None, nota,
+            ),
+            _obbligo(
+                "rct_rco", "RC verso i prestatori d'opera", "L. 24/2017, art. 10 c. 1",
+                "La struttura deve assicurarsi anche per la responsabilità civile verso i prestatori d'opera.",
+            ),
+        ]
+    if professione.obblighi and forma in (None, "", "Studio associato"):
         avvertenze.append(
             "Nello studio associato l'obbligo di RC resta in capo ai singoli professionisti: verifica le loro "
             "polizze e proponi una RC dello studio per i danni imputabili alla struttura."
@@ -376,7 +411,7 @@ PROFESSIONI: tuple[Professione, ...] = (
     # --- Area legale ----------------------------------------------------
     Professione(
         "avvocato", "Avvocato", "legale", "Ordine degli Avvocati",
-        ("avvocat", "avv.", "legale", "civilista", "penalista", "giuslavorista", "amministrativista",
+        ("avvocat", "avv.", "studio legale", "civilista", "penalista", "giuslavorista", "amministrativista",
          "matrimonialista", "cassazionista"),
         ("Civilista", "Penalista", "Amministrativista", "Giuslavorista", "Tributarista", "Famiglia e minori",
          "Commerciale e societario", "Crisi d'impresa e procedure concorsuali", "Bancario e finanziario",
@@ -400,7 +435,7 @@ PROFESSIONI: tuple[Professione, ...] = (
     ),
     Professione(
         "notaio", "Notaio", "legale", "Consiglio notarile distrettuale",
-        ("notai", "notaro"),
+        ("notai", "notaro", "notaril"),
         ("Immobiliare", "Societario e operazioni straordinarie", "Successioni e donazioni",
          "Famiglia e convenzioni matrimoniali", "Mutui e finanziamenti", "Volontaria giurisdizione",
          "Terzo settore e fondazioni"),
@@ -431,12 +466,12 @@ PROFESSIONI: tuple[Professione, ...] = (
          "Telemedicina", "Medico competente (D.Lgs. 81/2008)"),
         "Studio medico",
         (_RC_SANITARIA,), gelli_bianco=True,
-        rischio_alto=("chirurg", "ortoped", "anestesi", "ostetricia", "assistenza al parto"),
+        rischio_alto=("chirurg", "ortoped", "anestesi", "assistenza al parto"),
     ),
     Professione(
         "medico_base", "Medico di medicina generale", "sanitaria", "Ordine dei Medici Chirurghi e degli Odontoiatri",
         ("medicina generale", "medico di base", "medico di famiglia", "medico generico", "mmg",
-         "medico di assistenza primaria", "guardia medica"),
+         "medico di assistenza primaria", "guardia medica", "continuita assistenziale"),
         ("Assistenza primaria", "Continuità assistenziale", "Emergenza territoriale 118",
          "Cure palliative e domiciliari", "Medicina turistica", "Medicina penitenziaria", "Medicina dei servizi"),
         ("Visite ambulatoriali", "Visite domiciliari", "Certificati di malattia e idoneità",
@@ -487,7 +522,7 @@ PROFESSIONI: tuple[Professione, ...] = (
     ),
     Professione(
         "farmacista", "Farmacista", "sanitaria", "Ordine dei Farmacisti",
-        ("farmacist", "titolare di farmacia", "parafarmacia"),
+        ("farmacist", "farmacia", "titolare di farmacia", "parafarmacia"),
         ("Farmacia territoriale", "Farmacia ospedaliera", "Galenica", "Farmacia dei servizi", "Dermocosmesi",
          "Fitoterapia", "Omeopatia", "Nutrizione e integratori", "Farmaci veterinari", "Parafarmacia"),
         ("Titolare o direttore di farmacia", "Farmacista collaboratore", "Preparazioni galeniche",
@@ -548,7 +583,9 @@ PROFESSIONI: tuple[Professione, ...] = (
     Professione(
         "sanitario_tecnico", "Professionista sanitario tecnico o della riabilitazione", "sanitaria",
         "Ordine TSRM e PSTRP",
-        ("logopedist", "dietist", "igienista dentale", "podolog", "ortottist", "tecnico di radiologia", "tsrm",
+        ("logopedist", "dietist", "igienista dentale", "podolog", "ortottist", "tecnico di radiologia",
+         "tecnico sanitario di radiologia", "tecnico radiolog", "tecnico della riabilitazione psichiatrica",
+         "tecnico di neurofisiopatologia", "assistente di oftalmologia", "tsrm",
          "tecnico di laboratorio", "audioprotesist", "tecnico ortopedico", "terapista occupazionale",
          "neuropsicomotricist", "tnpee", "educatore professionale", "tecnico della prevenzione",
          "assistente sanitari", "osteopat"),
