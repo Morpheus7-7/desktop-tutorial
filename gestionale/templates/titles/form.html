@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Modifica titolo — Gestionale Assicurativo{% endblock %}
+{% block content %}
+{% set v = valori or {} %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=titolo.client_id) }}">{{ titolo.cliente.ragione_sociale }}</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('policies.detail', policy_id=titolo.policy_id) }}">Polizza {{ titolo.polizza.numero_polizza }}</a></li>
+  <li class="breadcrumb-item active">Titolo del {{ titolo.data_effetto | data_it }}</li>
+</ol></nav>
+<div class="row"><div class="col-lg-8">
+<form method="post" class="card">
+  {{ csrf_field() }}
+  <div class="card-header">Modifica titolo — {{ titolo.stato_label }}</div>
+  <div class="card-body row g-3">
+    {% set tipo_sel = v.get('tipo', titolo.tipo) %}
+    <div class="col-md-4">
+      <label class="form-label" for="t-tipo">Tipo</label>
+      <select class="form-select" name="tipo" id="t-tipo">
+        {% for val, l in title_types %}<option value="{{ val }}" {% if tipo_sel == val %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="t-effetto">Data effetto (scadenza rata) *</label>
+      <input type="date" class="form-control" name="data_effetto" id="t-effetto" required min="1900-01-01" max="2100-12-31"
+             value="{{ v.get('data_effetto', titolo.data_effetto.isoformat()) }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="t-fine">Copertura fino al</label>
+      <input type="date" class="form-control" name="data_fine_copertura" id="t-fine" min="1900-01-01" max="2100-12-31"
+             value="{{ v.get('data_fine_copertura', titolo.data_fine_copertura.isoformat() if titolo.data_fine_copertura else '') }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="t-premio">Premio lordo (€) *</label>
+      <input class="form-control" name="premio_lordo" id="t-premio" required inputmode="decimal"
+             value="{{ v.get('premio_lordo', titolo.premio_lordo | num_input) }}">
+      <div class="form-text">Importi negativi solo per le appendici di rimborso.</div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="t-provv">Provvigione (€)</label>
+      <input class="form-control" name="provvigione" id="t-provv" inputmode="decimal"
+             value="{{ v.get('provvigione', titolo.provvigione | num_input) }}">
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="t-note">Note</label>
+      <textarea class="form-control" name="note" id="t-note" rows="2">{{ v.get('note', titolo.note or '') }}</textarea>
+    </div>
+  </div>
+  <div class="card-footer d-flex gap-2">
+    <button class="btn btn-primary"><i class="bi bi-check-lg" aria-hidden="true"></i> Salva</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('policies.detail', policy_id=titolo.policy_id) }}#titoli">Annulla</a>
+  </div>
+</form>
+</div></div>
+{% endblock %}

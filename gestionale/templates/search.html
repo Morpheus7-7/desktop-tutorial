@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Ricerca — Gestionale Assicurativo{% endblock %}
 {% block content %}
-<h1 class="h3 mb-4"><i class="bi bi-search me-2"></i>Risultati per «{{ q }}»</h1>
+<h1 class="page-title mb-3"><i class="bi bi-search me-2"></i>Risultati per «{{ q }}»</h1>
 
 {% if not q %}
 <p class="text-muted">Digita un termine nella barra di ricerca in alto.</p>
@@ -14,6 +14,7 @@
   </div>
   <div class="card-body p-0">
     {% if clienti %}
+    <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr><th>Cliente</th><th>Tipo</th><th>Settore / Prof.</th><th>Città</th><th>P.IVA / CF</th></tr></thead>
       <tbody>
@@ -21,30 +22,32 @@
         <tr>
           <td><a href="{{ url_for('clients.detail', client_id=c.id) }}" class="fw-semibold">{{ c.ragione_sociale }}</a></td>
           <td><span class="badge {{ c.tipo_badge }}">{{ c.tipo_label }}</span></td>
-          <td class="small">{{ c.settore or c.professione or c.datore_lavoro or '—' }}</td>
+          <td class="small">{{ c.attivita_sintesi or '—' }}</td>
           <td class="small">{{ c.citta or '—' }}</td>
           <td class="small">{{ c.partita_iva or c.codice_fiscale or '—' }}</td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}<p class="text-muted p-3 mb-0">Nessun cliente trovato.</p>{% endif %}
   </div>
 </div>
 
-<div class="card">
+<div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span><i class="bi bi-file-earmark-text me-1"></i> Polizze</span>
     <span class="badge bg-secondary">{{ polizze | length }}</span>
   </div>
   <div class="card-body p-0">
     {% if polizze %}
+    <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr><th>Numero</th><th>Cliente</th><th>Compagnia</th><th>Ramo</th><th>Scadenza</th><th>Stato</th></tr></thead>
       <tbody>
       {% for p in polizze %}
         <tr>
-          <td class="fw-semibold">{{ p.numero_polizza }}</td>
+          <td><a class="fw-semibold" href="{{ url_for('policies.detail', policy_id=p.id) }}">{{ p.numero_polizza }}</a></td>
           <td><a href="{{ url_for('clients.detail', client_id=p.client_id) }}">{{ p.cliente.ragione_sociale }}</a></td>
           <td>{{ p.compagnia }}</td>
           <td class="small">{{ p.ramo_label }}</td>
@@ -54,7 +57,35 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}<p class="text-muted p-3 mb-0">Nessuna polizza trovata.</p>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-exclamation-octagon me-1"></i> Sinistri</span>
+    <span class="badge bg-secondary">{{ sinistri | length }}</span>
+  </div>
+  <div class="card-body p-0">
+    {% if sinistri %}
+    <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Numero</th><th>Cliente</th><th>Evento</th><th>Controparte</th><th>Stato</th></tr></thead>
+      <tbody>
+      {% for s in sinistri %}
+        <tr>
+          <td><a class="fw-semibold" href="{{ url_for('claims.detail', claim_id=s.id) }}">{{ s.numero }}</a>{% if s.numero_compagnia %}<div class="small ga-muted">{{ s.numero_compagnia }}</div>{% endif %}</td>
+          <td><a href="{{ url_for('clients.detail', client_id=s.client_id) }}">{{ s.cliente.ragione_sociale }}</a></td>
+          <td>{{ s.data_evento | data_it }}</td>
+          <td class="small">{{ s.controparte or '—' }}</td>
+          <td><span class="badge {{ s.stato_badge }}">{{ s.stato_label }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<p class="text-muted p-3 mb-0">Nessun sinistro trovato.</p>{% endif %}
   </div>
 </div>
 

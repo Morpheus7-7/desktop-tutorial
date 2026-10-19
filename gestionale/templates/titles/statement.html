@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Estratto conto compagnie — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title"><i class="bi bi-building me-2" aria-hidden="true"></i>Estratto conto compagnie</h1>
+    <div class="page-subtitle">Incassi dal {{ dal | data_it }} al {{ al | data_it }}: premi, provvigioni trattenute e netto da rimettere</div>
+  </div>
+  <button type="button" class="btn btn-outline-secondary no-print" data-print><i class="bi bi-printer" aria-hidden="true"></i> Stampa</button>
+</div>
+{% include "titles/_nav.html" %}
+
+<form class="filter-bar row g-2 align-items-end" method="get">
+  <div class="col-6 col-md-4"><label class="form-label small" for="ec-dal">Incassi dal</label><input type="date" class="form-control form-control-sm" id="ec-dal" name="dal" value="{{ dal.isoformat() }}" min="1900-01-01" max="2100-12-31"></div>
+  <div class="col-6 col-md-4"><label class="form-label small" for="ec-al">al</label><input type="date" class="form-control form-control-sm" id="ec-al" name="al" value="{{ al.isoformat() }}" min="1900-01-01" max="2100-12-31"></div>
+  <div class="col-md-4"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-funnel" aria-hidden="true"></i> Aggiorna</button></div>
+</form>
+
+{% if totali.arretrato_precedente > 0.005 %}
+<div class="alert alert-warning d-flex gap-2 align-items-start">
+  <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+  <div>Ci sono incassi dei periodi precedenti non ancora rimessi per {{ totali.arretrato_precedente | euro }}:
+    sono compresi nella colonna «Da rimettere» e nella rimessa.</div>
+</div>
+{% endif %}
+
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <caption class="visually-hidden">Riepilogo per compagnia</caption>
+      <thead><tr>
+        <th scope="col">Compagnia</th><th scope="col" class="num">Titoli nel periodo</th><th scope="col" class="num">Premi incassati</th>
+        <th scope="col" class="num">Provvigioni</th><th scope="col" class="num">Netto</th><th scope="col" class="num">Già rimesso</th>
+        <th scope="col" class="num">Arretrato periodi prec.</th><th scope="col" class="num">Da rimettere</th><th scope="col"><span class="visually-hidden">Azioni</span></th>
+      </tr></thead>
+      <tbody>
+      {% for r in righe %}
+        <tr>
+          <td class="fw-semibold"><a href="{{ url_for('titles.statement', dal=dal.isoformat(), al=al.isoformat(), compagnia=r.compagnia) }}">{{ r.compagnia }}</a></td>
+          <td class="num">{{ r.numero }}</td>
+          <td class="num">{{ r.premi | euro }}</td>
+          <td class="num text-success">{{ r.provvigioni | euro }}</td>
+          <td class="num">{{ r.netto | euro }}</td>
+          <td class="num ga-muted">{{ r.rimesso | euro }}</td>
+          <td class="num {% if r.arretrato_precedente > 0.005 %}text-warning-emphasis fw-semibold{% else %}ga-muted{% endif %}">{{ r.arretrato_precedente | euro }}</td>
+          <td class="num fw-semibold {% if r.da_rimettere > 0.005 %}text-danger{% endif %}">{{ r.da_rimettere | euro }}</td>
+          <td class="text-end">
+            {% if r.ids and puo_modificare %}
+            <form method="post" action="{{ url_for('titles.register_remittance') }}" class="d-flex gap-1 justify-content-end no-print"
+                  data-confirm="Registrare la rimessa a {{ r.compagnia }} di {{ r.da_rimettere | euro }} ({{ plurale(r.ids | length, 'titolo', 'titoli') }})?">
+              {{ csrf_field() }}
+              <input type="hidden" name="dal" value="{{ dal.isoformat() }}">
+              <input type="hidden" name="al" value="{{ al.isoformat() }}">
+              <input type="hidden" name="compagnia" value="{{ r.compagnia }}">
+              {% for i in r.ids %}<input type="hidden" name="ids" value="{{ i }}">{% endfor %}
+              <input type="date" class="form-control form-control-sm" name="data_rimessa" value="{{ oggi.isoformat() }}" max="{{ oggi.isoformat() }}" required style="max-width: 9.5rem;" aria-label="Data della rimessa a {{ r.compagnia }}">
+              <button class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-send-check" aria-hidden="true"></i> Rimessa</button>
+            </form>
+            {% elif r.ids %}<span class="badge bg-warning text-dark">da rimettere</span>
+            {% elif r.numero %}<span class="badge bg-success">rimesso</span>{% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9" class="text-muted p-4">Nessun incasso nel periodo selezionato e nessun importo da rimettere.</td></tr>
+      {% endfor %}
+      </tbody>
+      {% if righe %}
+      <tfoot><tr class="table-totals"><td>Totale</td><td class="num">{{ totali.numero }}</td><td class="num">{{ totali.premi | euro }}</td><td class="num">{{ totali.provvigioni | euro }}</td><td class="num">{{ totali.netto | euro }}</td><td class="num">{{ totali.rimesso | euro }}</td><td class="num">{{ totali.arretrato_precedente | euro }}</td><td class="num">{{ totali.da_rimettere | euro }}</td><td></td></tr></tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% if dettaglio %}
+<div class="card mb-4">
+  <div class="card-header">Dettaglio titoli incassati nel periodo — {{ dettaglio }}</div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead><tr><th scope="col">Incasso</th><th scope="col">Cliente</th><th scope="col">Polizza</th><th scope="col">Effetto</th><th scope="col" class="num">Premio</th><th scope="col" class="num">Provvigione</th><th scope="col" class="num">Netto</th><th scope="col">Rimessa</th></tr></thead>
+      <tbody>
+      {% for t in titoli_dettaglio %}
+        <tr>
+          <td class="small">{{ t.data_incasso | data_it }}</td>
+          <td class="small">{{ t.cliente.ragione_sociale }}</td>
+          <td class="small">{{ t.polizza.numero_polizza }}</td>
+          <td class="small">{{ t.data_effetto | data_it }}</td>
+          <td class="num small">{{ t.premio_lordo | euro }}</td>
+          <td class="num small">{{ t.provvigione | euro }}</td>
+          <td class="num small">{{ t.netto | euro }}</td>
+          <td class="small">{{ t.data_rimessa | data_it if t.data_rimessa else '—' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="text-muted p-3">Nessun titolo incassato nel periodo per questa compagnia.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if rimesse_recenti %}
+<div class="card">
+  <div class="card-header">Ultime rimesse registrate</div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 align-middle">
+      <thead><tr><th scope="col">Data</th><th scope="col">Compagnia</th><th scope="col" class="num">Titoli</th><th scope="col" class="num">Netto</th><th scope="col"><span class="visually-hidden">Azioni</span></th></tr></thead>
+      <tbody>
+      {% for r in rimesse_recenti %}
+        <tr>
+          <td class="small">{{ r.data | data_it }}</td>
+          <td class="small">{{ r.compagnia }}</td>
+          <td class="num small">{{ r.numero }}</td>
+          <td class="num small">{{ r.netto | euro }}</td>
+          <td class="text-end">
+            {% if is_admin %}
+            <form method="post" action="{{ url_for('titles.undo_remittance') }}" class="d-inline no-print"
+                  data-confirm="Annullare la rimessa a {{ r.compagnia }} del {{ r.data | data_it }}? I titoli torneranno da rimettere.">
+              {{ csrf_field() }}
+              <input type="hidden" name="compagnia" value="{{ r.compagnia }}">
+              <input type="hidden" name="data_rimessa" value="{{ r.data.isoformat() }}">
+              <button class="btn btn-sm btn-outline-warning"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Annulla rimessa</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

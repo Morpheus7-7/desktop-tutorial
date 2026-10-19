@@ -1,130 +1,249 @@
 {% extends "base.html" %}
+{% import "_macros.html" as m with context %}
 {% block title %}Dashboard — Gestionale Assicurativo{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h1 class="h3 mb-0"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h1>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <div class="page-subtitle">Buongiorno{% if utente and utente.nome %} {{ utente.nome.split(' ')[0] }}{% endif %}, ecco la situazione al {{ oggi | data_it }}</div>
+  </div>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{{ url_for('main.analytics') }}"><i class="bi bi-bar-chart-line"></i> Statistiche</a>
-    <a class="btn btn-primary" href="{{ url_for('clients.new_client') }}"><i class="bi bi-person-plus"></i> Nuovo cliente</a>
+    {% if puo_modificare %}<a class="btn btn-primary" href="{{ url_for('clients.new_client') }}"><i class="bi bi-person-plus"></i> Nuovo cliente</a>{% endif %}
   </div>
 </div>
 
-<div class="row g-3 mb-4">
-  <div class="col-6 col-lg-3 col-xl">
-    <div class="card stat-card accent-primary h-100"><div class="card-body">
-      <i class="bi bi-people stat-icon"></i>
-      <div class="text-muted small">Clienti</div>
-      <div class="display-6">{{ stats.clienti }}</div>
-      <div class="small text-muted">{{ stats.aziende }} az · {{ stats.professionisti }} prof · {{ stats.dipendenti }} dip</div>
+<!-- Portafoglio -->
+<div class="row g-3 mb-3">
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100"><div class="card-body">
+      <span class="stat-icon"><i class="bi bi-people"></i></span>
+      <div class="stat-label">Clienti</div>
+      <div class="stat-value">{{ stats.clienti }}</div>
+      <div class="small ga-muted">{% for t in stats.clienti_per_tipo if t.n %}{{ t.breve }}{% if not loop.last %} · {% endif %}{% else %}nessun cliente{% endfor %}</div>
+      <a class="stretched-link" href="{{ url_for('clients.list_clients') }}" aria-label="Vai ai clienti"></a>
     </div></div>
   </div>
-  <div class="col-6 col-lg-3 col-xl">
+  <div class="col-6 col-xl-3">
     <div class="card stat-card accent-info h-100"><div class="card-body">
-      <i class="bi bi-file-earmark-text stat-icon"></i>
-      <div class="text-muted small">Polizze attive</div>
-      <div class="display-6">{{ stats.polizze_attive }}</div>
-      <div class="small text-muted">{{ stats.premi_totali | euro }} premi</div>
+      <span class="stat-icon"><i class="bi bi-file-earmark-text"></i></span>
+      <div class="stat-label">Premi in portafoglio</div>
+      <div class="stat-value small-value">{{ stats.premi_totali | euro }}</div>
+      <div class="small ga-muted">{{ plurale(stats.polizze_attive, 'polizza attiva', 'polizze attive') }}{% if stats.polizze_non_in_vigore %} · {{ stats.polizze_non_in_vigore }} non ancora in vigore{% endif %}</div>
+      <a class="stretched-link" href="{{ url_for('policies.list_policies', stato='vigenti') }}" aria-label="Vai alle polizze attive e in rinnovo"></a>
     </div></div>
   </div>
-  <div class="col-6 col-lg-3 col-xl">
+  <div class="col-6 col-xl-3">
     <div class="card stat-card accent-success h-100"><div class="card-body">
-      <i class="bi bi-wallet2 stat-icon"></i>
-      <div class="text-muted small">Provvigioni stimate</div>
-      <div class="h4 mt-2 mb-0">{{ stats.provvigioni_totali | euro }}</div>
+      <span class="stat-icon"><i class="bi bi-wallet2"></i></span>
+      <div class="stat-label">Provvigioni annue stimate</div>
+      <div class="stat-value small-value">{{ stats.provvigioni_totali | euro }}</div>
+      <div class="small ga-muted">trattative: {{ stats.opportunita_aperte }} aperte · {{ stats.pipeline_valore | euro }}</div>
     </div></div>
   </div>
-  <div class="col-6 col-lg-3 col-xl">
-    <div class="card stat-card accent-warning h-100"><div class="card-body">
-      <i class="bi bi-funnel stat-icon"></i>
-      <div class="text-muted small">Pipeline</div>
-      <div class="display-6">{{ stats.opportunita_aperte }}</div>
-      <div class="small text-muted">{{ stats.pipeline_valore | euro }} stimati</div>
-    </div></div>
-  </div>
-  <div class="col-6 col-lg-3 col-xl">
-    <div class="card stat-card {% if stats.scadenze_30gg %}accent-warning{% endif %} h-100"><div class="card-body">
-      <i class="bi bi-calendar-event stat-icon"></i>
-      <div class="text-muted small">Scadenze 30 gg</div>
-      <div class="display-6 {% if stats.scadenze_30gg %}text-warning{% endif %}">{{ stats.scadenze_30gg }}</div>
-      {% if stats.polizze_scadute %}<div class="small text-danger">{{ stats.polizze_scadute }} già scadute</div>{% endif %}
-    </div></div>
-  </div>
-  <div class="col-6 col-lg-3 col-xl">
-    <div class="card stat-card {% if stats.followup_in_ritardo %}accent-danger{% endif %} h-100"><div class="card-body">
-      <i class="bi bi-check2-square stat-icon"></i>
-      <div class="text-muted small">Follow-up aperti</div>
-      <div class="display-6">{{ stats.followup_aperti }}</div>
-      {% if stats.followup_in_ritardo %}<div class="small text-danger">{{ stats.followup_in_ritardo }} in ritardo</div>{% endif %}
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card accent-success h-100"><div class="card-body">
+      <span class="stat-icon"><i class="bi bi-cash-stack"></i></span>
+      <div class="stat-label">Incassato nel mese</div>
+      <div class="stat-value small-value">{{ stats.incassato_mese | euro }}</div>
+      <div class="small ga-muted">{{ plurale(stats.incassi_mese, 'titolo incassato', 'titoli incassati') }}</div>
+      <a class="stretched-link" href="{{ url_for('titles.cash_sheet') }}" aria-label="Vai al foglio cassa"></a>
     </div></div>
   </div>
 </div>
+
+<!-- Attenzione -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card accent-warning {% if stats.scadenze_30gg or stats.polizze_scadute %}stat-warn{% endif %} h-100"><div class="card-body">
+      <span class="stat-icon"><i class="bi bi-calendar-event"></i></span>
+      <div class="stat-label">Polizze in scadenza (30 gg)</div>
+      <div class="stat-value">{{ stats.scadenze_30gg }}</div>
+      {% if stats.polizze_scadute %}<div class="small text-danger">{{ stats.polizze_scadute }} {{ 'già scaduta' if stats.polizze_scadute == 1 else 'già scadute' }} da rinnovare</div>{% else %}<div class="small ga-muted">nessuna scaduta</div>{% endif %}
+      {% if stats.termini_disdetta_30gg %}<div class="small text-warning-emphasis">{{ plurale(stats.termini_disdetta_30gg, 'termine', 'termini') }} di disdetta in arrivo</div>{% endif %}
+      <a class="stretched-link" href="{{ url_for('main.scadenzario', giorni=30) }}" aria-label="Vai allo scadenzario"></a>
+    </div></div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card {% if stats.titoli_arretrati %}accent-danger stat-alert{% else %}accent-warning{% endif %} h-100"><div class="card-body">
+      <span class="stat-icon"><i class="bi bi-hourglass-split"></i></span>
+      <div class="stat-label">Titoli arretrati</div>
+      <div class="stat-value">{{ stats.titoli_arretrati }}</div>
+      <div class="small {% if stats.titoli_arretrati %}text-danger{% else %}ga-muted{% endif %}">{{ stats.importo_arretrati | euro }} non {{ 'incassato' if stats.titoli_arretrati == 1 else 'incassati' }}</div>
+      <a class="stretched-link" href="{{ url_for('titles.portfolio', vista='arretrati') }}" aria-label="Vai ai titoli arretrati"></a>
+    </div></div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card {% if stats.sinistri_da_denunciare %}accent-danger stat-alert{% else %}accent-info{% endif %} h-100"><div class="card-body">
+      <span class="stat-icon"><i class="bi bi-exclamation-octagon"></i></span>
+      <div class="stat-label">Sinistri aperti</div>
+      <div class="stat-value">{{ stats.sinistri_aperti }}</div>
+      {% if stats.sinistri_da_denunciare %}<div class="small text-danger">{{ stats.sinistri_da_denunciare }} da denunciare</div>{% else %}<div class="small ga-muted">tutti denunciati</div>{% endif %}
+      <a class="stretched-link" href="{{ url_for('claims.list_claims') }}" aria-label="Vai ai sinistri"></a>
+    </div></div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card {% if stats.followup_in_ritardo %}accent-danger stat-alert{% endif %} h-100"><div class="card-body">
+      <span class="stat-icon"><i class="bi bi-check2-square"></i></span>
+      <div class="stat-label">Follow-up aperti</div>
+      <div class="stat-value">{{ stats.followup_aperti }}</div>
+      {% if stats.followup_in_ritardo %}<div class="small text-danger">{{ stats.followup_in_ritardo }} in ritardo</div>{% else %}<div class="small ga-muted">nessuno in ritardo</div>{% endif %}
+      <a class="stretched-link" href="{{ url_for('followups.list_followups') }}" aria-label="Vai ai follow-up"></a>
+    </div></div>
+  </div>
+</div>
+
+{% if sincronizzazione and sincronizzazione.da_caricare %}
+<div class="alert alert-info d-flex align-items-center gap-2 py-2 small">
+  <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+  <span>Ci sono dati salvati da «{{ sincronizzazione.pacchetto.pc }}» il {{ sincronizzazione.pacchetto.creato | dataora_it }} non ancora caricati su questo PC.</span>
+  <a class="ms-auto btn btn-sm btn-primary" href="{{ url_for('sincronizzazione.pagina') }}">Sincronizza</a>
+</div>
+{% endif %}
+{% if stats.clienti_senza_privacy %}
+<div class="alert alert-secondary d-flex align-items-center gap-2 py-2 small">
+  <i class="bi bi-shield-lock"></i>
+  <span>{% if stats.clienti_senza_privacy == 1 %}1 cliente senza consenso privacy registrato: completane l'anagrafica.{% else %}{{ stats.clienti_senza_privacy }} clienti senza consenso privacy registrato: completane l'anagrafica.{% endif %}</span>
+</div>
+{% endif %}
 
 <div class="row g-4">
-  <div class="col-lg-6">
+  <div class="col-xl-6">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-calendar-event me-1"></i> Prossime scadenze polizze (60 gg)</span>
         <a class="small" href="{{ url_for('main.scadenzario') }}">Scadenzario</a>
       </div>
-      <div class="card-body p-0">
+      <div class="table-responsive">
         {% if prossime_scadenze %}
-        <table class="table table-sm mb-0">
-          <thead><tr><th>Cliente</th><th>Polizza</th><th>Ramo</th><th>Scadenza</th></tr></thead>
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>Cliente</th><th>Polizza</th><th>Scadenza</th><th class="num">Premio</th></tr></thead>
           <tbody>
           {% for p in prossime_scadenze %}
             <tr class="urgenza-{{ p.urgenza_scadenza }}">
               <td><a href="{{ url_for('clients.detail', client_id=p.client_id) }}">{{ p.cliente.ragione_sociale }}</a></td>
-              <td>{{ p.numero_polizza }}</td>
-              <td class="small">{{ p.ramo_label }}</td>
-              <td>{{ p.data_scadenza | data_it }}
-                {% if p.giorni_alla_scadenza < 0 %}<span class="badge bg-danger">scaduta</span>
-                {% else %}<span class="badge bg-secondary">{{ p.giorni_alla_scadenza }} gg</span>{% endif %}
+              <td class="small"><a href="{{ url_for('policies.detail', policy_id=p.id) }}">{{ p.numero_polizza }}</a><div class="ga-muted">{{ p.ramo_label }}</div></td>
+              <td class="text-nowrap">{{ p.data_scadenza | data_it }}
+                <span class="badge bg-secondary">{{ p.giorni_alla_scadenza | giorni }}</span>
+                {% if p.termine_disdetta and not p.disdetta_inviata and p.giorni_al_termine_disdetta is not none and p.giorni_al_termine_disdetta >= 0 %}<div class="small ga-muted">disdetta entro il {{ p.termine_disdetta | data_it }}</div>{% endif %}
               </td>
+              <td class="num small">{{ p.premio_annuo | euro }}</td>
             </tr>
           {% endfor %}
           </tbody>
         </table>
         {% else %}
-        <p class="text-muted p-3 mb-0">Nessuna polizza in scadenza nei prossimi 60 giorni.</p>
+        <p class="ga-muted p-3 mb-0">Nessuna polizza in scadenza nei prossimi 60 giorni.</p>
+        {% endif %}
+      </div>
+      {% if prossimi_eventi %}
+      <div class="card-body border-top py-2">
+        <div class="small fw-semibold mb-1">Altre scadenze nei prossimi 30 giorni</div>
+        <ul class="list-unstyled mb-0 small">
+          {% for e in prossimi_eventi %}
+          <li class="d-flex gap-2 align-items-start py-1">
+            <span class="badge {{ e.badge }} text-nowrap">{{ e.data | data_it }}</span>
+            <a href="{{ e.link }}">{{ e.titolo }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cash-coin me-1"></i> Titoli da incassare (arretrati e 30 gg)</span>
+        <a class="small" href="{{ url_for('titles.portfolio') }}">Portafoglio titoli</a>
+      </div>
+      <div class="table-responsive">
+        {% if titoli_urgenti %}
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>Cliente</th><th>Polizza</th><th>Effetto</th><th class="num">Premio</th><th></th></tr></thead>
+          <tbody>
+          {% for t in titoli_urgenti %}
+            <tr class="{% if t.copertura_sospesa %}urgenza-scaduta{% elif t.arretrato %}urgenza-critica{% endif %}">
+              <td><a href="{{ url_for('clients.detail', client_id=t.client_id) }}">{{ t.cliente.ragione_sociale }}</a></td>
+              <td class="small"><a href="{{ url_for('policies.detail', policy_id=t.policy_id) }}">{{ t.polizza.numero_polizza }}</a></td>
+              <td class="text-nowrap small">{{ t.data_effetto | data_it }}<div>{{ m.stato_titolo(t) }}</div></td>
+              <td class="num small">{{ t.premio_lordo | euro }}</td>
+              <td class="text-end text-nowrap">{{ m.azioni_titolo(t, url_for('main.dashboard')) }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="ga-muted p-3 mb-0">Nessun titolo da incassare nei prossimi 30 giorni.</p>
         {% endif %}
       </div>
     </div>
   </div>
 
-  <div class="col-lg-6">
+  <div class="col-xl-6">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-check2-square me-1"></i> Follow-up in programma</span>
         <a class="small" href="{{ url_for('followups.list_followups') }}">Tutti</a>
       </div>
-      <div class="card-body p-0">
+      <div class="table-responsive">
         {% if prossimi_followup %}
-        <table class="table table-sm mb-0">
+        <table class="table table-sm mb-0 align-middle">
           <thead><tr><th>Cliente</th><th>Attività</th><th>Data</th><th></th></tr></thead>
           <tbody>
           {% for f in prossimi_followup %}
             <tr {% if f.in_ritardo %}class="urgenza-scaduta"{% endif %}>
               <td><a href="{{ url_for('clients.detail', client_id=f.client_id) }}">{{ f.cliente.ragione_sociale }}</a></td>
-              <td>{{ f.titolo }} <span class="badge bg-light text-dark">{{ f.tipo_label }}</span></td>
-              <td>{{ f.data_scadenza | data_it }}{% if f.in_ritardo %} <span class="badge bg-danger">ritardo</span>{% endif %}</td>
+              <td>{{ f.titolo }} <span class="badge badge-soft">{{ f.tipo_label }}</span></td>
+              <td class="text-nowrap">{{ f.data_scadenza | data_it }}{% if f.in_ritardo %} <span class="badge bg-danger">ritardo</span>{% endif %}</td>
               <td class="text-end">
+                {% if puo_modificare %}
                 <form method="post" action="{{ url_for('followups.complete', followup_id=f.id) }}" class="d-inline">
-                  <input type="hidden" name="da_lista" value="1">
-                  <button class="btn btn-sm btn-outline-success" title="Completa"><i class="bi bi-check-lg"></i></button>
+                  {{ csrf_field() }}
+                  <input type="hidden" name="next" value="{{ url_for('main.dashboard') }}">
+                  <button class="btn btn-sm btn-outline-success" title="Completa" aria-label="Completa il follow-up {{ f.titolo }}"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
                 </form>
+                {% endif %}
               </td>
             </tr>
           {% endfor %}
           </tbody>
         </table>
         {% else %}
-        <p class="text-muted p-3 mb-0">Nessun follow-up aperto.</p>
+        <p class="ga-muted p-3 mb-0">Nessun follow-up aperto.</p>
         {% endif %}
       </div>
     </div>
   </div>
 
-  <div class="col-lg-6">
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-exclamation-octagon me-1"></i> Sinistri aperti</span>
+        <a class="small" href="{{ url_for('claims.list_claims') }}">Tutti</a>
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for s in ultimi_sinistri %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <a href="{{ url_for('claims.detail', claim_id=s.id) }}" class="fw-semibold text-decoration-none">{{ s.numero }}</a>
+            <span class="small ga-muted">· {{ s.cliente.ragione_sociale }} · {{ s.tipologia_label }}</span>
+            <div class="small ga-muted">evento {{ s.data_evento | data_it }} · {{ 'aperto oggi' if s.giorni_apertura == 0 else 'aperto da ' ~ plurale(s.giorni_apertura, 'giorno', 'giorni') }}</div>
+          </div>
+          <span class="text-end">
+            <span class="badge {{ s.stato_badge }}">{{ s.stato_label }}</span>
+            {% if not s.data_denuncia %}<div><span class="badge bg-danger">da denunciare</span></div>{% endif %}
+          </span>
+        </li>
+        {% else %}
+        <li class="list-group-item ga-muted">Nessun sinistro aperto.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-funnel me-1"></i> Opportunità aperte</span>
@@ -134,20 +253,20 @@
         {% for o in opportunita_recenti %}
         <li class="list-group-item d-flex justify-content-between align-items-center">
           <div>
-            <a href="{{ url_for('clients.detail', client_id=o.client_id) }}" class="text-decoration-none fw-semibold">{{ o.titolo }}</a>
-            <div class="small text-muted">{{ o.cliente.ragione_sociale }} · {{ o.fase_label }}</div>
+            <a href="{{ url_for('clients.detail', client_id=o.client_id) }}#opportunita" class="text-decoration-none fw-semibold">{{ o.titolo }}</a>
+            <div class="small ga-muted">{{ o.cliente.ragione_sociale }} · {{ o.fase_label }}</div>
           </div>
-          {% if o.premio_stimato %}<span class="badge bg-light text-dark">{{ o.premio_stimato | euro }}</span>{% endif %}
+          {% if o.premio_stimato %}<span class="badge badge-soft tabular">{{ o.premio_stimato | euro }}</span>{% endif %}
         </li>
         {% else %}
-        <li class="list-group-item text-muted">Nessuna opportunità aperta.
-          <a href="{{ url_for('opportunities.new_opportunity') }}">Creane una</a>.</li>
+        <li class="list-group-item ga-muted">Nessuna opportunità aperta.
+          {% if puo_modificare %}<a href="{{ url_for('opportunities.new_opportunity') }}">Creane una</a>.{% endif %}</li>
         {% endfor %}
       </ul>
     </div>
   </div>
 
-  <div class="col-lg-6">
+  <div class="col-xl-6">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-bell me-1"></i> Notifiche recenti</span>
@@ -160,14 +279,16 @@
           <div>
             {% if n.link %}<a href="{{ n.link }}" class="text-decoration-none">{{ n.messaggio }}</a>
             {% else %}{{ n.messaggio }}{% endif %}
-            <div class="small text-muted">{{ n.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+            <div class="small ga-muted">{{ n.created_at | dataora_it }}</div>
           </div>
         </li>
         {% else %}
-        <li class="list-group-item text-muted">Nessuna notifica da leggere.</li>
+        <li class="list-group-item ga-muted">Nessuna notifica da leggere.</li>
         {% endfor %}
       </ul>
     </div>
   </div>
 </div>
+
+{{ m.modali_titoli(payment_methods) }}
 {% endblock %}

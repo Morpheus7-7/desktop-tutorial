@@ -1,2 +1,4 @@
 -r requirements.txt
 pyinstaller>=6.3
+# Finestra propria del programma (su Windows usa WebView2, già presente in Windows 10/11).
+pywebview>=5.0

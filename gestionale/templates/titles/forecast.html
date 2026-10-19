@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Previsione incassi — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title"><i class="bi bi-graph-up-arrow me-2" aria-hidden="true"></i>Previsione incassi</h1>
+    <div class="page-subtitle">Prossimi {{ dati.mesi }} mesi: rate già emesse da incassare e quietanze stimate dei rinnovi{% if compagnia %} · {{ compagnia }}{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2 no-print">
+    <a class="btn btn-outline-secondary" href="{{ url_for('titles.forecast_csv', mesi=dati.mesi, compagnia=compagnia) }}"><i class="bi bi-filetype-csv" aria-hidden="true"></i> Esporta</a>
+    <button type="button" class="btn btn-outline-secondary" data-print><i class="bi bi-printer" aria-hidden="true"></i> Stampa</button>
+  </div>
+</div>
+{% include "titles/_nav.html" %}
+
+<form class="filter-bar row g-2 align-items-end" method="get">
+  <div class="col-6 col-md-3"><label class="form-label small" for="pv-mesi">Orizzonte</label>
+    <select class="form-select form-select-sm" id="pv-mesi" name="mesi" data-autosubmit>
+      {% for m in mesi_scelta %}<option value="{{ m }}" {% if dati.mesi == m %}selected{% endif %}>{{ m }} mesi</option>{% endfor %}
+    </select></div>
+  <div class="col-6 col-md-5"><label class="form-label small" for="pv-comp">Compagnia</label>
+    <select class="form-select form-select-sm" id="pv-comp" name="compagnia" data-autosubmit><option value="">Tutte</option>
+      {% for c in compagnie %}<option {% if compagnia == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></div>
+  <div class="col-md-4"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-funnel" aria-hidden="true"></i> Aggiorna</button></div>
+</form>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card stat-card accent-danger h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span>
+    <div class="stat-label">Arretrati da recuperare</div><div class="stat-value small-value">{{ dati.arretrati | euro }}</div>
+    <div class="small ga-muted">Rate scadute non incassate</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat-card h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-receipt" aria-hidden="true"></i></span>
+    <div class="stat-label">Rate già emesse</div><div class="stat-value small-value">{{ dati.totale_emessi | euro }}</div>
+    <div class="small ga-muted">Titoli da incassare con effetto futuro</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat-card accent-warning h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-calendar2-range" aria-hidden="true"></i></span>
+    <div class="stat-label">Quietanze stimate</div><div class="stat-value small-value">{{ dati.totale_stimati | euro }}</div>
+    <div class="small ga-muted">Rinnovi e annualità non ancora emesse</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card stat-card accent-success h-100"><div class="card-body">
+    <span class="stat-icon"><i class="bi bi-wallet2" aria-hidden="true"></i></span>
+    <div class="stat-label">Provvigioni attese</div><div class="stat-value small-value">{{ dati.totale_provvigioni | euro }}</div>
+  </div></div></div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex flex-wrap gap-3 align-items-center">
+    <span>Incassi attesi per mese</span>
+    <span class="small ga-muted"><span class="legend-dot legend-emessi" aria-hidden="true"></span> emesse</span>
+    <span class="small ga-muted"><span class="legend-dot legend-stimati" aria-hidden="true"></span> stimate</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <caption class="visually-hidden">Incassi attesi per mese</caption>
+      <thead><tr><th scope="col">Mese</th><th scope="col" class="w-50 d-none d-md-table-cell"><span class="visually-hidden">Grafico</span></th><th scope="col" class="num">Emesse</th><th scope="col" class="num">Stimate</th><th scope="col" class="num">Totale</th><th scope="col" class="num">Netto compagnie</th></tr></thead>
+      <tbody>
+      {% for v in dati.colonne %}
+        <tr>
+          <th scope="row" class="fw-semibold">{{ v.label }}</th>
+          <td class="d-none d-md-table-cell">
+            <div class="hbar-track d-flex" aria-hidden="true">
+              <div class="hbar-fill" style="width: {{ ((100 * v.emessi / dati.massimo) | round(1)) if dati.massimo else 0 }}%;"></div>
+              <div class="hbar-fill hbar-fill-alt" style="width: {{ ((100 * v.stimati / dati.massimo) | round(1)) if dati.massimo else 0 }}%;"></div>
+            </div>
+          </td>
+          <td class="num">{{ v.emessi | euro }}{% if v.numero_emessi %} <span class="small ga-muted">({{ v.numero_emessi }})</span>{% endif %}</td>
+          <td class="num">{{ v.stimati | euro }}{% if v.numero_stimati %} <span class="small ga-muted">({{ v.numero_stimati }})</span>{% endif %}</td>
+          <td class="num fw-semibold">{{ v.totale | euro }}</td>
+          <td class="num ga-muted">{{ v.netto | euro }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr class="table-totals"><td>Totale</td><td class="d-none d-md-table-cell"></td><td class="num">{{ dati.totale_emessi | euro }}</td><td class="num">{{ dati.totale_stimati | euro }}</td><td class="num">{{ (dati.totale_emessi + dati.totale_stimati) | euro }}</td><td class="num">{{ (dati.totale_emessi + dati.totale_stimati - dati.totale_provvigioni) | euro }}</td></tr></tfoot>
+    </table>
+  </div>
+  <div class="card-footer small ga-muted">
+    Le quietanze stimate riguardano le polizze attive o in rinnovo non disdette: sono calcolate con il premio annuo e il
+    frazionamento attuali, ipotizzando il rinnovo alla scadenza. Le polizze disdette, sospese o scadute non sono incluse.
+  </div>
+</div>
+{% endblock %}

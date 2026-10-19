@@ -1,13 +1,21 @@
 {% extends "base.html" %}
+{% import "_macros.html" as m with context %}
 {% block title %}Documenti — Gestionale Assicurativo{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h1 class="h3 mb-0"><i class="bi bi-folder2-open me-2"></i>Archivio documenti</h1>
+  <div>
+    <h1 class="page-title"><i class="bi bi-folder2-open me-2"></i>Archivio documenti</h1>
+    <div class="page-subtitle">{{ pagination.total }} documenti</div>
+  </div>
 </div>
 
-<form class="row g-2 mb-3" method="get">
+<form class="filter-bar row g-2" method="get">
+  <div class="col-md-5 d-flex gap-1">
+    <input class="form-control form-control-sm" name="q" value="{{ q }}" placeholder="Nome file o cliente…" aria-label="Cerca">
+    <button class="btn btn-sm btn-primary" aria-label="Cerca" title="Cerca"><i class="bi bi-search" aria-hidden="true"></i></button>
+  </div>
   <div class="col-md-4">
-    <select class="form-select" name="categoria" onchange="this.form.submit()">
+    <select class="form-select form-select-sm" name="categoria" data-autosubmit aria-label="Categoria">
       <option value="">Tutte le categorie</option>
       {% for value, label in document_categories %}
       <option value="{{ value }}" {% if categoria == value %}selected{% endif %}>{{ label }}</option>
@@ -19,8 +27,9 @@
 <div class="card">
   <div class="card-body p-0">
     {% if documenti %}
+    <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
-      <thead><tr><th>Documento</th><th>Cliente</th><th>Categoria</th><th>Polizza</th><th>Dim.</th><th>Caricato il</th><th></th></tr></thead>
+      <thead><tr><th>Documento</th><th>Cliente</th><th>Categoria</th><th>Collegato a</th><th>Dim.</th><th>Caricato il</th><th></th></tr></thead>
       <tbody>
       {% for d in documenti %}
         <tr>
@@ -29,21 +38,31 @@
           </td>
           <td><a href="{{ url_for('clients.detail', client_id=d.client_id) }}">{{ d.cliente.ragione_sociale }}</a></td>
           <td><span class="badge bg-light text-dark">{{ d.categoria_label }}</span></td>
-          <td class="small">{% if d.polizza %}{{ d.polizza.numero_polizza }}{% else %}—{% endif %}</td>
+          <td class="small">
+            {% if d.polizza %}<a href="{{ url_for('policies.detail', policy_id=d.policy_id) }}">{{ d.polizza.numero_polizza }}</a>{% endif %}
+            {% if d.sinistro %}<div><a href="{{ url_for('claims.detail', claim_id=d.claim_id) }}">{{ d.sinistro.numero }}</a></div>{% endif %}
+            {% if not d.polizza and not d.sinistro %}—{% endif %}
+          </td>
           <td class="small text-nowrap">{{ d.dimensione_leggibile if d.dimensione else '—' }}</td>
-          <td class="small">{{ d.uploaded_at.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td class="small">{{ d.uploaded_at | dataora_it }}</td>
           <td class="text-end text-nowrap">
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}"><i class="bi bi-download"></i></a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}"
+               aria-label="Scarica {{ d.original_name }}" title="Scarica"><i class="bi bi-download" aria-hidden="true"></i></a>
+            {% if puo_modificare %}
             <form class="d-inline" method="post" action="{{ url_for('documents.delete', document_id=d.id) }}"
-                  onsubmit="return confirm('Eliminare il documento {{ d.original_name }}?');">
+                  data-confirm="Eliminare il documento {{ d.original_name }}?">
+              {{ csrf_field() }}
               <input type="hidden" name="da_archivio" value="1">
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-sm btn-outline-danger" aria-label="Elimina {{ d.original_name }}" title="Elimina"><i class="bi bi-trash" aria-hidden="true"></i></button>
             </form>
+            {% endif %}
           </td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
+    </div>
+    {{ m.paginazione(pagination) }}
     {% else %}
     <p class="text-muted p-4 mb-0">Nessun documento. I documenti si caricano dalla scheda del cliente.</p>
     {% endif %}

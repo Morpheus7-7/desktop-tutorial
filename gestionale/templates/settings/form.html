@@ -1,18 +1,68 @@
 {% extends "base.html" %}
 {% block title %}Impostazioni — Gestionale Assicurativo{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-  <h1 class="h3 mb-0"><i class="bi bi-gear me-2"></i>Impostazioni</h1>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="page-title"><i class="bi bi-gear me-2"></i>Impostazioni</h1>
+    <div class="page-subtitle">Dati dello studio, notifiche via email, automatismi e backup</div>
+  </div>
 </div>
 
+{% if not scheduler_attivo %}
+<div class="alert alert-warning small">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  <strong>Controlli automatici non attivi:</strong> in questa sessione l'invio automatico delle email e il
+  backup giornaliero non partono. Avvia il gestionale con l'eseguibile o con <code>python run_desktop.py</code>
+  (con <code>flask run</code> lo scheduler non viene avviato).
+</div>
+{% endif %}
+
+<ul class="nav nav-tabs mb-0" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-studio"><i class="bi bi-building"></i> Studio</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-email"><i class="bi bi-envelope-at"></i> Notifiche via email</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-automatismi"><i class="bi bi-magic"></i> Automatismi</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-backup"><i class="bi bi-database-check"></i> Backup</button></li>
+</ul>
+<div class="tab-content bg-white border border-top-0 rounded-bottom p-3 p-md-4">
+
+<div class="tab-pane fade show active" id="tab-studio">
+  <form method="post" action="{{ url_for('settings.save_studio') }}" class="row g-3" style="max-width: 900px;">
+    {{ csrf_field() }}
+    <div class="col-12 small ga-muted">Questi dati compaiono nell'intestazione delle stampe (report, foglio cassa, estratti conto).</div>
+    <div class="col-md-8">
+      <label class="form-label" for="settings-form-studio-nome">Ragione sociale dello studio / agenzia</label>
+      <input id="settings-form-studio-nome" class="form-control" name="studio_nome" value="{{ s.studio_nome or '' }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="settings-form-studio-rui">Iscrizione RUI</label>
+      <input id="settings-form-studio-rui" class="form-control text-uppercase" name="studio_rui" value="{{ s.studio_rui or '' }}" placeholder="A000123456">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="settings-form-studio-piva">Partita IVA</label>
+      <input id="settings-form-studio-piva" class="form-control" name="studio_piva" value="{{ s.studio_piva or '' }}">
+    </div>
+    <div class="col-md-8">
+      <label class="form-label" for="settings-form-studio-indirizzo">Indirizzo</label>
+      <input id="settings-form-studio-indirizzo" class="form-control" name="studio_indirizzo" value="{{ s.studio_indirizzo or '' }}">
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="settings-form-studio-contatti">Contatti (telefono, email, PEC)</label>
+      <input id="settings-form-studio-contatti" class="form-control" name="studio_contatti" value="{{ s.studio_contatti or '' }}">
+    </div>
+    <div class="col-12"><button class="btn btn-primary"><i class="bi bi-save"></i> Salva dati studio</button></div>
+  </form>
+</div>
+
+<div class="tab-pane fade" id="tab-email">
 <div class="row g-4">
   <div class="col-lg-8">
     <div class="card">
-      <div class="card-header bg-white">
+      <div class="card-header">
         <strong><i class="bi bi-envelope-at me-1"></i> Notifiche via email</strong>
       </div>
       <div class="card-body">
         <form method="post" action="{{ url_for('settings.save') }}">
+          {{ csrf_field() }}
           <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" role="switch" id="email_attive"
                    name="email_attive" {% if s.email_attive %}checked{% endif %}>
@@ -23,47 +73,49 @@
 
           <div class="row g-3">
             <div class="col-md-8">
-              <label class="form-label">Server SMTP</label>
-              <input class="form-control" name="smtp_host" value="{{ s.smtp_host or '' }}"
+              <label class="form-label" for="settings-form-smtp-host">Server SMTP</label>
+              <input id="settings-form-smtp-host" class="form-control" name="smtp_host" value="{{ s.smtp_host or '' }}"
                      placeholder="es. smtp.gmail.com">
             </div>
             <div class="col-md-4">
-              <label class="form-label">Porta</label>
-              <input class="form-control" name="smtp_port" type="number" value="{{ s.smtp_port or 587 }}">
+              <label class="form-label" for="smtp_port">Porta</label>
+              <input class="form-control" id="smtp_port" name="smtp_port" type="number" min="1" max="65535"
+                     value="{{ s.smtp_port or 587 }}">
             </div>
             <div class="col-md-6">
-              <label class="form-label">Sicurezza</label>
-              <select class="form-select" name="smtp_security">
+              <label class="form-label" for="settings-form-smtp-security">Sicurezza</label>
+              <select id="settings-form-smtp-security" class="form-select" name="smtp_security">
                 {% for val, lab in security_choices %}
                 <option value="{{ val }}" {% if s.smtp_security == val %}selected{% endif %}>{{ lab }}</option>
                 {% endfor %}
               </select>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Controllo automatico ogni (minuti)</label>
-              <input class="form-control" name="intervallo_minuti" type="number" min="1"
+              <label class="form-label" for="intervallo_minuti">Controllo automatico ogni (minuti)</label>
+              <input class="form-control" id="intervallo_minuti" name="intervallo_minuti" type="number" min="1" max="1440"
                      value="{{ s.intervallo_minuti or 30 }}">
+              <div class="form-text">Da 1 a 1440 minuti (una volta al giorno).</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Utente SMTP</label>
-              <input class="form-control" name="smtp_user" value="{{ s.smtp_user or '' }}"
+              <label class="form-label" for="settings-form-smtp-user">Utente SMTP</label>
+              <input id="settings-form-smtp-user" class="form-control" name="smtp_user" value="{{ s.smtp_user or '' }}"
                      placeholder="di solito il tuo indirizzo email" autocomplete="username">
             </div>
             <div class="col-md-6">
-              <label class="form-label">Password SMTP</label>
-              <input class="form-control" name="smtp_password" type="password"
+              <label class="form-label" for="settings-form-smtp-password">Password SMTP</label>
+              <input id="settings-form-smtp-password" class="form-control" name="smtp_password" type="password"
                      placeholder="{% if s.smtp_password %}•••••••• (invariata){% else %}password o app password{% endif %}"
                      autocomplete="new-password">
               <div class="form-text">Lascia vuoto per non modificare la password già salvata.</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label">Mittente (From)</label>
-              <input class="form-control" name="mail_from" value="{{ s.mail_from or '' }}"
+              <label class="form-label" for="settings-form-mail-from">Mittente (From)</label>
+              <input id="settings-form-mail-from" class="form-control" name="mail_from" value="{{ s.mail_from or '' }}"
                      placeholder="es. gestionale@tuostudio.it">
             </div>
             <div class="col-md-6">
-              <label class="form-label">Destinatari</label>
-              <input class="form-control" name="mail_to" value="{{ s.mail_to or '' }}"
+              <label class="form-label" for="settings-form-mail-to">Destinatari</label>
+              <input id="settings-form-mail-to" class="form-control" name="mail_to" value="{{ s.mail_to or '' }}"
                      placeholder="uno o più indirizzi separati da virgola">
             </div>
           </div>
@@ -83,10 +135,11 @@
 
   <div class="col-lg-4">
     <div class="card mb-4">
-      <div class="card-header bg-white"><strong><i class="bi bi-send me-1"></i> Invio manuale</strong></div>
+      <div class="card-header"><strong><i class="bi bi-send me-1"></i> Invio manuale</strong></div>
       <div class="card-body">
         <p class="mb-2">Notifiche in attesa di invio: <span class="badge bg-{{ 'warning text-dark' if pending else 'secondary' }}">{{ pending }}</span></p>
         <form method="post" action="{{ url_for('settings.send_now') }}">
+          {{ csrf_field() }}
           <button class="btn btn-outline-primary w-100" {% if not pending %}disabled{% endif %}>
             <i class="bi bi-envelope-arrow-up"></i> Invia ora il riepilogo
           </button>
@@ -95,7 +148,7 @@
     </div>
 
     <div class="card">
-      <div class="card-header bg-white"><strong><i class="bi bi-info-circle me-1"></i> Stato configurazione</strong></div>
+      <div class="card-header"><strong><i class="bi bi-info-circle me-1"></i> Stato configurazione</strong></div>
       <div class="card-body small">
         <ul class="list-unstyled mb-2">
           <li>Email automatiche:
@@ -120,5 +173,182 @@
       </div>
     </div>
   </div>
+</div>
+</div>
+
+<div class="tab-pane fade" id="tab-automatismi">
+  <form method="post" action="{{ url_for('settings.save_automatismi') }}" style="max-width: 900px;">
+    {{ csrf_field() }}
+    <p class="small ga-muted">
+      Gli automatismi girano a ogni accesso e a ogni controllo automatico. Ogni operazione eseguita compare nel
+      <strong>registro attività</strong> (utente «sistema») e genera una notifica informativa.
+    </p>
+
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" role="switch" id="rinnovo_tacito_automatico"
+                 name="rinnovo_tacito_automatico" aria-describedby="aiuto-rinnovo"
+                 {% if s.rinnovo_tacito_automatico %}checked{% endif %}>
+          <label class="form-check-label fw-semibold" for="rinnovo_tacito_automatico">Rinnovo tacito automatico</label>
+        </div>
+        <div class="form-text" id="aiuto-rinnovo">
+          Quando la scadenza è passata, le polizze <strong>con tacito rinnovo</strong> e <strong>senza disdetta</strong>
+          registrata vengono prorogate di un'annualità. Si applica solo alle scadenze degli ultimi 60 giorni: le
+          polizze ferme da più tempo vanno verificate a mano. Se la polizza gestisce i titoli, viene emessa anche la
+          quietanza della nuova annualità e i follow-up di rinnovo aperti vengono chiusi.
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body row g-3 align-items-start">
+        <div class="col-md-8">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="emissione_quietanze_automatica"
+                   name="emissione_quietanze_automatica" aria-describedby="aiuto-quietanze"
+                   {% if s.emissione_quietanze_automatica %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="emissione_quietanze_automatica">Emissione automatica delle quietanze</label>
+          </div>
+          <div class="form-text" id="aiuto-quietanze">
+            Per le polizze che gestiscono i titoli nel gestionale (poliennali comprese), le rate della
+            <strong>annualità successiva</strong> vengono emesse il numero di giorni indicato <strong>prima
+            dell'anniversario</strong>. Non si applica alle polizze disdette.
+          </div>
+        </div>
+        <div class="col-md-4">
+          {% set c = campi_interi['anticipo_quietanze_giorni'] %}
+          <label class="form-label small" for="anticipo_quietanze_giorni">Anticipo (giorni)</label>
+          <input class="form-control" type="number" id="anticipo_quietanze_giorni" name="anticipo_quietanze_giorni"
+                 min="{{ c[1] }}" max="{{ c[2] }}" value="{{ s.anticipo_quietanze_giorni if s.anticipo_quietanze_giorni is not none else c[3] }}">
+          <div class="form-text">Da {{ c[1] }} a {{ c[2] }} giorni.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body row g-3 align-items-start">
+        <div class="col-md-8">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="scadenza_automatica"
+                   name="scadenza_automatica" aria-describedby="aiuto-scadenza"
+                   {% if s.scadenza_automatica %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="scadenza_automatica">Scadenza automatica delle polizze non rinnovate</label>
+          </div>
+          <div class="form-text" id="aiuto-scadenza">
+            Le polizze <strong>senza tacito rinnovo</strong> non rinnovate vengono impostate come
+            <strong>«scaduta»</strong> trascorsi i giorni di tolleranza dalla scadenza (quelle con disdetta
+            registrata passano subito a «disdetta»). Le rate successive non ancora incassate vengono stornate.
+          </div>
+        </div>
+        <div class="col-md-4">
+          {% set c = campi_interi['tolleranza_scadenza_giorni'] %}
+          <label class="form-label small" for="tolleranza_scadenza_giorni">Tolleranza (giorni)</label>
+          <input class="form-control" type="number" id="tolleranza_scadenza_giorni" name="tolleranza_scadenza_giorni"
+                 min="{{ c[1] }}" max="{{ c[2] }}" value="{{ s.tolleranza_scadenza_giorni if s.tolleranza_scadenza_giorni is not none else c[3] }}">
+          <div class="form-text">Da {{ c[1] }} a {{ c[2] }} giorni.</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary"><i class="bi bi-save"></i> Salva automatismi</button>
+  </form>
+</div>
+
+<div class="tab-pane fade" id="tab-backup">
+  {% if not backup_supportato %}
+  <div class="alert alert-info mb-0">Il backup integrato è disponibile solo con il database SQLite predefinito. Con un database esterno usa gli strumenti di backup del server.</div>
+  {% else %}
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-download me-1"></i> Backup manuale</div>
+        <div class="card-body">
+          <p class="small ga-muted">Scarica un archivio ZIP con il database e tutti i documenti caricati. Conservalo su un disco esterno o in cloud.</p>
+          <div class="d-flex gap-2 flex-wrap">
+            <form method="post" action="{{ url_for('settings.download_backup') }}">
+              {{ csrf_field() }}
+              <button class="btn btn-primary"><i class="bi bi-file-earmark-zip"></i> Scarica backup completo</button>
+            </form>
+            <form method="post" action="{{ url_for('settings.run_backup') }}">
+              {{ csrf_field() }}
+              <button class="btn btn-outline-secondary"><i class="bi bi-hdd"></i> Salva ora nella cartella backup</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-clock-history me-1"></i> Backup automatico</div>
+        <div class="card-body">
+          <form method="post" action="{{ url_for('settings.backup_options') }}" class="row g-2 align-items-end">
+            {{ csrf_field() }}
+            <div class="col-12">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="backup_automatico" name="backup_automatico" {% if s.backup_automatico %}checked{% endif %}>
+                <label class="form-check-label" for="backup_automatico">Esegui un backup automatico ogni giorno</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small" for="backup_conservati">Backup da conservare</label>
+              <input class="form-control" type="number" min="1" max="365" id="backup_conservati" name="backup_conservati" value="{{ s.backup_conservati or 14 }}">
+            </div>
+            <div class="col-md-6"><button class="btn btn-outline-primary w-100"><i class="bi bi-save"></i> Salva</button></div>
+          </form>
+          <p class="small ga-muted mt-3 mb-0">
+            Il backup automatico viene eseguito al primo controllo di ogni giornata.<br>
+            Ultimo backup automatico: <strong>{{ s.ultimo_backup_at | dataora_it if s.ultimo_backup_at else 'mai' }}</strong><br>
+            Cartella: <code>{{ backup_cartella }}</code>
+          </p>
+          {% if backup_futuro %}
+          <div class="alert alert-warning small mt-2 mb-0">
+            La data dell'ultimo backup è nel futuro: probabilmente l'orologio del computer è stato corretto.
+            Il prossimo backup automatico verrà eseguito comunque e la data tornerà corretta.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-archive me-1"></i> Backup salvati</div>
+        <ul class="list-group list-group-flush small">
+          {% for b in backup_elenco %}
+          <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+            <span class="text-break"><i class="bi bi-file-earmark-zip me-1"></i>{{ b.nome }}
+              {% if b.pre_ripristino %}<span class="badge bg-warning text-dark">copia pre-ripristino</span>{% endif %}
+              <span class="ga-muted">· {{ (b.dimensione / 1048576) | round(1) }} MB</span></span>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('settings.backup_file', nome=b.nome) }}"
+               aria-label="Scarica {{ b.nome }}" title="Scarica"><i class="bi bi-download" aria-hidden="true"></i></a>
+          </li>
+          {% else %}
+          <li class="list-group-item ga-muted">Nessun backup ancora salvato nella cartella.</li>
+          {% endfor %}
+        </ul>
+        <div class="card-footer small ga-muted">
+          Le <em>copie pre-ripristino</em> contengono i dati com'erano prima di un ripristino: si conservano le
+          ultime {{ pre_ripristino_conservati }}, a parte rispetto ai backup giornalieri.
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card h-100 border-danger">
+        <div class="card-header text-danger"><i class="bi bi-arrow-counterclockwise me-1"></i> Ripristino da backup</div>
+        <div class="card-body">
+          <p class="small ga-muted">Sostituisce <strong>tutti i dati attuali</strong> con quelli del backup. Prima del ripristino viene comunque salvata una copia di sicurezza dello stato attuale (elencata tra i backup salvati). Vengono accettati solo archivi creati dal gestionale, con almeno un amministratore attivo. Dopo il ripristino tutti gli utenti vengono disconnessi e dovrai accedere con le credenziali contenute nel backup.</p>
+          <form method="post" action="{{ url_for('settings.restore_backup') }}" enctype="multipart/form-data" class="row g-2">
+            {{ csrf_field() }}
+            <div class="col-12"><input class="form-control" type="file" name="archivio" accept=".zip" required aria-label="Archivio di backup (.zip)"></div>
+            <div class="col-md-7"><input class="form-control" name="conferma" placeholder="Scrivi RIPRISTINA per confermare" required autocomplete="off" aria-label="Conferma del ripristino"></div>
+            <div class="col-md-5"><button class="btn btn-danger w-100"><i class="bi bi-arrow-counterclockwise"></i> Ripristina</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
 </div>
 {% endblock %}

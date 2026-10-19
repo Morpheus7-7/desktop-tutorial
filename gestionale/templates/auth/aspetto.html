@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Aspetto — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <h1 class="page-title mb-1"><i class="bi bi-palette me-2" aria-hidden="true"></i>Aspetto</h1>
+    <p class="page-subtitle mb-3">Colori e modalità del programma: la scelta vale solo per il tuo utente.</p>
+    <form method="post" class="card">
+      {{ csrf_field() }}
+      <div class="card-body">
+        <fieldset class="mb-4">
+          <legend class="section-title">Tema di colore</legend>
+          <div class="row g-3">
+            {% for chiave, nome, scuro, chiaro in temi %}
+            <div class="col-6 col-md-4">
+              <input type="radio" class="btn-check" name="tema" id="tema-{{ chiave }}" value="{{ chiave }}"
+                     {% if (g.user.tema or 'blu') == chiave %}checked{% endif %}>
+              <label class="tema-scelta d-block" for="tema-{{ chiave }}">
+                <span class="tema-anteprima" aria-hidden="true">
+                  <span style="background: {{ scuro }}"></span><span style="background: linear-gradient(135deg, {{ chiaro }} 0 35%, var(--ga-bg) 35%)"></span>
+                </span>
+                <span class="d-block small fw-semibold mt-1">{{ nome }}</span>
+              </label>
+            </div>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend class="section-title">Modalità</legend>
+          <div class="d-flex flex-wrap gap-2">
+            {% for chiave, nome in aspetti %}
+            <input type="radio" class="btn-check" name="aspetto" id="aspetto-{{ chiave }}" value="{{ chiave }}"
+                   {% if (g.user.aspetto or 'auto') == chiave %}checked{% endif %}>
+            <label class="btn btn-outline-primary" for="aspetto-{{ chiave }}">
+              <i class="bi {{ {'auto': 'bi-circle-half', 'chiaro': 'bi-sun', 'scuro': 'bi-moon-stars'}[chiave] }} me-1" aria-hidden="true"></i>{{ nome }}
+            </label>
+            {% endfor %}
+          </div>
+          <div class="form-text">«Come Windows» passa da chiaro a scuro insieme al sistema.</div>
+        </fieldset>
+      </div>
+      <div class="card-footer"><button class="btn btn-primary"><i class="bi bi-check-lg" aria-hidden="true"></i> Salva</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

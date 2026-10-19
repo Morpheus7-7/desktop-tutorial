@@ -1,43 +1,14 @@
 """Test del gestionale assicurativo."""
-import os
-import tempfile
 from datetime import date, timedelta
 
-import pytest
-
-from gestionale import create_app
 from gestionale.models import (
     Client,
     FollowUp,
     Notification,
     Policy,
     RiskAnalysis,
-    db,
 )
 from gestionale.risk_engine import analyze_risks
-
-
-@pytest.fixture
-def app():
-    db_fd, db_path = tempfile.mkstemp(suffix=".db")
-    upload_dir = tempfile.mkdtemp()
-    app = create_app(
-        {
-            "TESTING": True,
-            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}",
-            "UPLOAD_FOLDER": upload_dir,
-            "WTF_CSRF_ENABLED": False,
-            "SECRET_KEY": "test",
-        }
-    )
-    yield app
-    os.close(db_fd)
-    os.unlink(db_path)
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
 
 
 # ----------------------------------------------------------------------
@@ -192,7 +163,7 @@ def test_document_upload_and_download(client, app):
 
     client.post(
         "/clienti/nuovo",
-        data={"tipo": "professionista", "ragione_sociale": "Doc Test",
+        data={"tipo": "professionista", "ragione_sociale": "Doc Test", "professione": "Avvocato",
               "analizza_subito": ""},
         follow_redirects=True,
     )

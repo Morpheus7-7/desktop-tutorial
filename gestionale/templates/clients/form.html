@@ -1,118 +1,293 @@
 {% extends "base.html" %}
-{% block title %}{% if client %}Modifica cliente{% else %}Nuovo cliente{% endif %} — Gestionale Assicurativo{% endblock %}
+{% block title %}{% if not nuovo %}Modifica cliente{% else %}Nuovo cliente{% endif %} — Gestionale Assicurativo{% endblock %}
+{#- Campi mostrati solo per alcuni tipi di cliente: data-tipi guida lo script,
+    «hidden» evita che compaiano prima che lo script parta. -#}
+{% macro tipi(elenco) -%}
+  {%- set ammessi = (campi_tipo[elenco] if elenco in campi_tipo else elenco.split()) -%}
+  data-tipi="{{ ammessi | sort | join(' ') }}"{% if client.tipo not in ammessi %} hidden{% endif %}
+{%- endmacro %}
+{#- Testo che cambia con il tipo di cliente (etichette, titoli, legende). -#}
+{% macro testo(predefinito) -%}
+  data-testo="{{ predefinito }}"{% for t, v in kwargs.items() %} data-testo-{{ t }}="{{ v }}"{% endfor %}>{{ kwargs.get(client.tipo, predefinito) }}
+{%- endmacro %}
+{% macro segnaposto(predefinito) -%}
+  placeholder="{{ kwargs.get(client.tipo, predefinito) }}" data-placeholder="{{ predefinito }}"{% for t, v in kwargs.items() %} data-placeholder-{{ t }}="{{ v }}"{% endfor %}
+{%- endmacro %}
 {% block content %}
-<h1 class="h3 mb-4">
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('clients.list_clients') }}">Clienti</a></li>
+  {% if not nuovo %}<li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.ragione_sociale }}</a></li>{% endif %}
+  <li class="breadcrumb-item active">{{ 'Nuovo cliente' if nuovo else 'Modifica' }}</li>
+</ol></nav>
+<h1 class="page-title mb-3">
   <i class="bi bi-person-plus me-2"></i>
-  {% if client %}Modifica “{{ client.ragione_sociale }}”{% else %}Nuovo cliente{% endif %}
+  {% if not nuovo %}Modifica «{{ client.ragione_sociale }}»{% else %}Nuovo cliente{% endif %}
 </h1>
 
-<form method="post" class="card">
+<form method="post" class="card" id="modulo-cliente" action="{{ url_for('clients.new_client') if nuovo else url_for('clients.edit_client', client_id=client.id) }}">
+  {{ csrf_field() }}
   <div class="card-body">
-    <h2 class="h6 text-uppercase text-muted">Dati anagrafici</h2>
+    <h2 class="section-title">Dati anagrafici</h2>
     <div class="row g-3 mb-4">
-      <div class="col-md-3">
-        <label class="form-label">Tipo cliente *</label>
-        <select class="form-select" name="tipo" id="tipo-cliente">
+      <div class="col-md-4">
+        <label class="form-label" for="tipo-cliente">Tipo cliente *</label>
+        <select class="form-select" name="tipo" id="tipo-cliente" aria-describedby="descrizione-tipo">
           {% for value, label in client_types %}
-          <option value="{{ value }}" {% if client and client.tipo == value %}selected{% endif %}>{{ label }}</option>
+          <option value="{{ value }}" {% if client.tipo == value %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
+        <div class="form-text" id="descrizione-tipo" {{ testo(descrizioni_tipo.azienda, **descrizioni_tipo) }}</div>
       </div>
       <div class="col-md-5">
-        <label class="form-label" id="label-nome">Ragione sociale / Nominativo *</label>
-        <input type="text" class="form-control" name="ragione_sociale" required
-               value="{{ client.ragione_sociale if client else '' }}">
+        <label class="form-label" for="cf-ragione-sociale" id="label-nome" {{ testo('Ragione sociale *', studio='Denominazione dello studio *', professionista='Nome e cognome *', dipendente='Nome e cognome *', privato='Nome e cognome *') }}</label>
+        <input type="text" class="form-control" id="cf-ragione-sociale" name="ragione_sociale" required maxlength="200"
+               {{ segnaposto('es. Rossi Arredamenti S.r.l.', studio='es. Studio legale associato Ferri & Conti', professionista='es. Giulia Ferri', dipendente='es. Marco Verdi', privato='es. Anna Russo') }}
+               value="{{ client.ragione_sociale or '' }}">
       </div>
-      <div class="col-md-4">
-        <label class="form-label">Referente</label>
-        <input type="text" class="form-control" name="referente" value="{{ client.referente or '' if client else '' }}">
+      <div class="col-md-3" {{ tipi('forma_giuridica') }}>
+        {% for t in ('azienda', 'studio') %}
+        <div {{ tipi(t) }}>
+          <label class="form-label" for="cf-forma-{{ t }}">Forma giuridica</label>
+          <select class="form-select" id="cf-forma-{{ t }}" name="{{ 'forma_giuridica_studio' if t == 'studio' else 'forma_giuridica' }}">
+            <option value="">—</option>
+            {% for forma in forme_giuridiche[t] %}<option value="{{ forma }}" {% if client.forma_giuridica == forma %}selected{% endif %}>{{ forma }}</option>{% endfor %}
+          </select>
+        </div>
+        {% endfor %}
       </div>
-      <div class="col-md-3 campo-azienda">
-        <label class="form-label">Partita IVA</label>
-        <input type="text" class="form-control" name="partita_iva" maxlength="11" value="{{ client.partita_iva or '' if client else '' }}">
+      <div class="col-md-4" {{ tipi('referente') }}>
+        <label class="form-label" for="clients-form-referente" {{ testo('Referente', studio='Referente / legale rappresentante') }}</label>
+        <input id="clients-form-referente" type="text" class="form-control" name="referente" value="{{ client.referente or '' }}">
+      </div>
+      <div class="col-md-3" {{ tipi('partita_iva') }}>
+        <label class="form-label" for="clients-form-partita-iva">Partita IVA</label>
+        <input id="clients-form-partita-iva" type="text" class="form-control" name="partita_iva" maxlength="13" inputmode="numeric" value="{{ client.partita_iva or '' }}">
       </div>
       <div class="col-md-3">
-        <label class="form-label">Codice fiscale</label>
-        <input type="text" class="form-control" name="codice_fiscale" maxlength="16" value="{{ client.codice_fiscale or '' if client else '' }}">
+        <label class="form-label" for="clients-form-codice-fiscale">Codice fiscale</label>
+        <input id="clients-form-codice-fiscale" type="text" class="form-control text-uppercase" name="codice_fiscale" maxlength="16" value="{{ client.codice_fiscale or '' }}">
       </div>
-      <div class="col-md-3 campo-azienda">
-        <label class="form-label">Codice ATECO</label>
-        <input type="text" class="form-control" name="codice_ateco" placeholder="es. 62.01" value="{{ client.codice_ateco or '' if client else '' }}">
+      <div class="col-md-2" {{ tipi('codice_ateco') }}>
+        <label class="form-label" for="clients-form-codice-ateco">Codice ATECO</label>
+        <input id="clients-form-codice-ateco" type="text" class="form-control" name="codice_ateco"
+               {{ segnaposto('es. 62.01', studio='es. 69.10.10') }} value="{{ client.codice_ateco or '' }}">
       </div>
-      <div class="col-md-3 campo-professionista">
-        <label class="form-label">Professione</label>
-        <input type="text" class="form-control" name="professione" placeholder="es. Ingegnere civile" value="{{ client.professione or '' if client else '' }}">
+      <div class="col-md-3" {{ tipi('data_nascita') }}>
+        <label class="form-label" for="clients-form-data-nascita">Data di nascita</label>
+        <input id="clients-form-data-nascita" type="date" class="form-control" name="data_nascita" value="{{ client.data_nascita.isoformat() if client.data_nascita else '' }}">
+        <div class="form-text">Ricavata dal codice fiscale se vuota.</div>
       </div>
-      <div class="col-md-3 campo-dipendente">
-        <label class="form-label">Datore di lavoro</label>
-        <input type="text" class="form-control" name="datore_lavoro" placeholder="es. Acme S.p.A." value="{{ client.datore_lavoro or '' if client else '' }}">
+      <div class="col-md-3" {{ tipi('dipendente') }}>
+        <label class="form-label" for="cf-mansione">Mansione</label>
+        <input id="cf-mansione" type="text" class="form-control" name="mansione" maxlength="120" placeholder="es. Capo officina" value="{{ client.professione or '' }}">
+      </div>
+      <div class="col-md-3" {{ tipi('datore_lavoro') }}>
+        <label class="form-label" for="clients-form-datore-lavoro">Datore di lavoro</label>
+        <input id="clients-form-datore-lavoro" type="text" class="form-control" name="datore_lavoro" placeholder="es. Acme S.p.A." value="{{ client.datore_lavoro or '' }}">
+      </div>
+      <div class="col-md-3" {{ tipi('dipendente') }}>
+        <label class="form-label" for="cf-settore-dipendente">Settore del datore di lavoro</label>
+        <input id="cf-settore-dipendente" type="text" class="form-control" name="settore_dipendente" maxlength="120" placeholder="es. Metalmeccanico" value="{{ client.settore or '' }}">
+      </div>
+      <div class="col-md-4" {{ tipi('privato') }}>
+        <label class="form-label" for="cf-condizione">Condizione</label>
+        <input id="cf-condizione" type="text" class="form-control" name="condizione" maxlength="120" list="elenco-condizioni" placeholder="es. Pensionato" value="{{ client.professione or '' }}">
+        <datalist id="elenco-condizioni">{% for c in condizioni_privato %}<option value="{{ c }}">{% endfor %}</datalist>
       </div>
     </div>
 
-    <h2 class="h6 text-uppercase text-muted">Contatti e sede</h2>
+    {# ---------------- Attività professionale (professionista e studio) ---------------- #}
+    <div {{ tipi('studio professionista') }}>
+      <h2 class="section-title" {{ testo('Attività professionale', studio='Lo studio e i suoi professionisti') }}</h2>
+      <div class="row g-3 mb-4">
+        <div class="col-md-5">
+          <label class="form-label" for="cf-professione" {{ testo('Professione *', studio='Professione esercitata dallo studio *') }}</label>
+          <input id="cf-professione" type="text" class="form-control" name="professione" list="elenco-professioni" required
+                 autocomplete="off" aria-describedby="info-professione" maxlength="120"
+                 {{ segnaposto('es. Avvocato, Pediatra, Ingegnere', studio='es. Avvocato (studio legale), Pediatra (studio pediatrico)') }}
+                 data-catalogo='{{ catalogo_js | tojson }}' value="{{ client.professione or '' }}">
+          <datalist id="elenco-professioni">
+            {% for p in professioni %}<option value="{{ p.nome }}">{{ aree[p.area] }}</option>{% endfor %}
+          </datalist>
+          <div class="form-text" id="info-professione">{{ info_professione }}</div>
+        </div>
+        <div class="col-md-4" {{ tipi('inquadramento') }}>
+          <label class="form-label" for="cf-inquadramento">Inquadramento</label>
+          <select id="cf-inquadramento" class="form-select" name="inquadramento" aria-describedby="aiuto-inquadramento">
+            <option value="">—</option>
+            {% for v, l in inquadramenti %}<option value="{{ v }}" {% if client.inquadramento == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+          </select>
+          <div class="form-text" id="aiuto-inquadramento">Convenzionato: medico di base, pediatra di libera scelta. Per i sanitari decide l'RC dovuta: professionale o per colpa grave (L. 24/2017).</div>
+        </div>
+        <div class="col-md-3" {{ tipi('studio_id') }}>
+          <label class="form-label" for="cf-studio">Studio di appartenenza</label>
+          {% if studi %}
+          <select id="cf-studio" class="form-select" name="studio_id">
+            <option value="">Nessuno</option>
+            {% for s in studi %}<option value="{{ s.id }}" {% if client.studio_id == s.id %}selected{% endif %}>{{ s.ragione_sociale }}</option>{% endfor %}
+          </select>
+          {% else %}
+          <p class="form-text mt-0 mb-0">Nessuno studio tra i clienti. Se fa parte di uno studio, registra prima lo studio come cliente di tipo «Studio professionale».</p>
+          {% endif %}
+        </div>
+        <div class="col-md-3" {{ tipi('numero_professionisti') }}>
+          <label class="form-label" for="cf-numero-professionisti">Professionisti / soci</label>
+          <input id="cf-numero-professionisti" type="number" min="1" class="form-control" name="numero_professionisti"
+                 value="{{ client.numero_professionisti if client.numero_professionisti is not none else '' }}">
+        </div>
+
+        <div class="col-12" id="voci-professione">
+          {% for p in professioni %}
+          {% set riconosciuta = professione_riconosciuta is not none and p.chiave == professione_riconosciuta.chiave %}
+          <div class="gruppo-professione" data-professione="{{ p.chiave }}" {% if not riconosciuta %}hidden{% endif %}>
+            {% for campo, nome, elenco, etichetta, etichetta_studio in (
+                 ('specializzazioni', 'specializzazioni', p.specializzazioni, 'Specializzazioni', 'Aree di attività dello studio'),
+                 ('attivita', 'attivita_svolte', p.attivita, 'Attività svolte', 'Attività svolte dallo studio')) %}
+            <fieldset class="mb-3">
+              <legend class="form-label fs-6 mb-2" {{ testo(etichetta, studio=etichetta_studio) }}</legend>
+              <div class="d-flex flex-wrap gap-2">
+                {% for voce in elenco %}
+                {% set id_voce = campo ~ '-' ~ p.chiave ~ '-' ~ loop.index %}
+                <input type="checkbox" class="btn-check" name="{{ nome }}" value="{{ voce }}" id="{{ id_voce }}" autocomplete="off"
+                       {% if riconosciuta and (voce | normalizza) in voci[campo][0] %}checked{% endif %}>
+                <label class="btn btn-sm btn-outline-primary" for="{{ id_voce }}">{{ voce }}</label>
+                {% endfor %}
+              </div>
+            </fieldset>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="cf-specializzazioni-altre" {{ testo('Altre specializzazioni', studio='Altre aree di attività') }}</label>
+          <input id="cf-specializzazioni-altre" type="text" class="form-control" name="specializzazioni_altre"
+                 placeholder="separate da virgola" value="{{ voci.specializzazioni[1] }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="cf-attivita-altre">Altre attività svolte</label>
+          <input id="cf-attivita-altre" type="text" class="form-control" name="attivita_altre"
+                 placeholder="separate da virgola" value="{{ voci.attivita[1] }}">
+        </div>
+        <div class="col-md-5">
+          <label class="form-label" for="cf-albo" {{ testo('Albo / ordine di iscrizione', studio="Iscrizione all'albo (sezione speciale STP)") }}</label>
+          <input id="cf-albo" type="text" class="form-control" name="albo_ordine" maxlength="150"
+                 placeholder="{{ (professione_riconosciuta.albo ~ ' di …') if professione_riconosciuta and professione_riconosciuta.albo else 'es. Ordine degli Avvocati di Milano' }}"
+                 value="{{ client.albo_ordine or '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="cf-albo-numero">Numero di iscrizione</label>
+          <input id="cf-albo-numero" type="text" class="form-control text-uppercase" name="albo_numero" maxlength="40" value="{{ client.albo_numero or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="cf-albo-data">Iscritto dal</label>
+          <input id="cf-albo-data" type="date" class="form-control" name="albo_data_iscrizione" value="{{ client.albo_data_iscrizione.isoformat() if client.albo_data_iscrizione else '' }}">
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section-title" {{ testo('Contatti e indirizzo', azienda='Contatti e sede', studio='Contatti e sede dello studio') }}</h2>
     <div class="row g-3 mb-4">
       <div class="col-md-5">
-        <label class="form-label">Indirizzo</label>
-        <input type="text" class="form-control" name="indirizzo" value="{{ client.indirizzo or '' if client else '' }}">
+        <label class="form-label" for="clients-form-indirizzo">Indirizzo</label>
+        <input id="clients-form-indirizzo" type="text" class="form-control" name="indirizzo" value="{{ client.indirizzo or '' }}">
       </div>
       <div class="col-md-3">
-        <label class="form-label">Città</label>
-        <input type="text" class="form-control" name="citta" value="{{ client.citta or '' if client else '' }}">
+        <label class="form-label" for="clients-form-citta">Città</label>
+        <input id="clients-form-citta" type="text" class="form-control" name="citta" value="{{ client.citta or '' }}">
       </div>
       <div class="col-md-2">
-        <label class="form-label">CAP</label>
-        <input type="text" class="form-control" name="cap" maxlength="5" value="{{ client.cap or '' if client else '' }}">
+        <label class="form-label" for="clients-form-cap">CAP</label>
+        <input id="clients-form-cap" type="text" class="form-control" name="cap" maxlength="5" inputmode="numeric" value="{{ client.cap or '' }}">
       </div>
       <div class="col-md-2">
-        <label class="form-label">Provincia</label>
-        <input type="text" class="form-control" name="provincia" maxlength="2" placeholder="MI" value="{{ client.provincia or '' if client else '' }}">
+        <label class="form-label" for="clients-form-provincia">Provincia</label>
+        <input id="clients-form-provincia" type="text" class="form-control text-uppercase" name="provincia" maxlength="2" placeholder="MI" value="{{ client.provincia or '' }}">
       </div>
       <div class="col-md-4">
-        <label class="form-label">Email</label>
-        <input type="email" class="form-control" name="email" value="{{ client.email or '' if client else '' }}">
+        <label class="form-label" for="clients-form-email">Email</label>
+        <input id="clients-form-email" type="email" class="form-control" name="email" value="{{ client.email or '' }}">
       </div>
       <div class="col-md-4">
-        <label class="form-label">PEC</label>
-        <input type="email" class="form-control" name="pec" value="{{ client.pec or '' if client else '' }}">
+        <label class="form-label" for="clients-form-pec">PEC</label>
+        <input id="clients-form-pec" type="email" class="form-control" name="pec" value="{{ client.pec or '' }}">
       </div>
       <div class="col-md-4">
-        <label class="form-label">Telefono</label>
-        <input type="text" class="form-control" name="telefono" value="{{ client.telefono or '' if client else '' }}">
+        <label class="form-label" for="clients-form-telefono">Telefono</label>
+        <input id="clients-form-telefono" type="text" class="form-control" name="telefono" value="{{ client.telefono or '' }}">
       </div>
     </div>
 
-    <h2 class="h6 text-uppercase text-muted">Attività</h2>
+    <h2 class="section-title" {{ testo('Descrizione e note', azienda="Attività e dimensioni dell'impresa", studio='Dimensioni dello studio e descrizione', professionista="Volume d'affari e descrizione") }}</h2>
     <div class="row g-3">
-      <div class="col-md-4">
-        <label class="form-label">Settore</label>
-        <input type="text" class="form-control" name="settore" placeholder="es. Metalmeccanico, Edilizia, Studio legale…"
-               value="{{ client.settore or '' if client else '' }}">
+      <div class="col-md-4" {{ tipi('azienda') }}>
+        <label class="form-label" for="clients-form-settore">Settore</label>
+        <input id="clients-form-settore" type="text" class="form-control" name="settore" placeholder="es. Metalmeccanico, Edilizia, Ristorazione…"
+               value="{{ client.settore or '' }}">
       </div>
-      <div class="col-md-4 campo-impresa">
-        <label class="form-label">Numero dipendenti</label>
-        <input type="number" min="0" class="form-control" name="numero_dipendenti"
-               value="{{ client.numero_dipendenti if client and client.numero_dipendenti is not none else '' }}">
+      <div class="col-md-4" {{ tipi('numero_dipendenti') }}>
+        <label class="form-label" for="clients-form-numero-dipendenti" {{ testo('Numero dipendenti', studio='Dipendenti e collaboratori') }}</label>
+        <input id="clients-form-numero-dipendenti" type="number" min="0" class="form-control" name="numero_dipendenti"
+               value="{{ client.numero_dipendenti if client.numero_dipendenti is not none else '' }}">
       </div>
-      <div class="col-md-4 campo-impresa">
-        <label class="form-label">Fatturato annuo (€)</label>
-        <input type="text" class="form-control" name="fatturato_annuo"
-               value="{{ client.fatturato_annuo if client and client.fatturato_annuo is not none else '' }}">
+      <div class="col-md-4" {{ tipi('fatturato_annuo') }}>
+        <label class="form-label" for="clients-form-fatturato-annuo" {{ testo('Fatturato annuo (€)', professionista="Volume d'affari annuo (€)") }}</label>
+        <input id="clients-form-fatturato-annuo" type="text" class="form-control" name="fatturato_annuo" inputmode="decimal"
+               value="{{ client.fatturato_annuo | num_input }}">
+        <div class="form-text" {{ tipi('professionista') }}>Facoltativo: molte compagnie lo usano per calcolare il premio dell'RC professionale.</div>
       </div>
       <div class="col-12">
-        <label class="form-label">
-          Descrizione dell'attività
+        <label class="form-label" for="clients-form-descrizione-attivita">
+          <span {{ testo("Descrizione dell'attività", dipendente='Descrizione della persona e del lavoro', privato='Descrizione della persona e delle abitudini') }}</span>
           <span class="text-muted small">— usata dall'analisi automatica dei rischi: più è dettagliata, migliore è il risultato</span>
         </label>
-        <textarea class="form-control" name="descrizione_attivita" rows="5"
-                  placeholder="Es.: Falegnameria con capannone di 800 mq e magazzino legname. 6 dipendenti, uso di vernici e solventi. Produzione di mobili su misura venduti anche online, consegne con furgone aziendale…">{{ client.descrizione_attivita or '' if client else '' }}</textarea>
+        <textarea id="clients-form-descrizione-attivita" class="form-control" name="descrizione_attivita" rows="5"
+                  {{ segnaposto("Es.: Falegnameria con capannone di 800 mq e magazzino legname. 6 dipendenti, uso di vernici e solventi. Produzione di mobili su misura venduti anche online, consegne con furgone aziendale…",
+                     studio="Es.: Studio legale associato con 4 avvocati e 2 praticanti: contenzioso civile e del lavoro, recupero crediti per banche. Sede in affitto di 200 mq, archivio digitale in cloud…",
+                     professionista="Es.: Avvocata civilista, segue contenzioso condominiale e successioni; curatrice fallimentare per il tribunale. Lavora da sola, archivio in cloud, trasferte in auto…",
+                     dipendente="Es.: Capo officina in un'azienda metalmeccanica, usa il carrello elevatore. Sposato con due figli, mutuo sulla casa, va in moto nel tempo libero…",
+                     privato="Es.: Pensionata, vive in una casa di proprietà con giardino; ha un cane e viaggia spesso all'estero…") }}>{{ client.descrizione_attivita or '' }}</textarea>
       </div>
       <div class="col-12">
-        <label class="form-label">Note interne</label>
-        <textarea class="form-control" name="note" rows="2">{{ client.note or '' if client else '' }}</textarea>
+        <label class="form-label" for="clients-form-note">Note interne</label>
+        <textarea id="clients-form-note" class="form-control" name="note" rows="2">{{ client.note or '' }}</textarea>
       </div>
-      {% if not client %}
+    </div>
+
+    <h2 class="section-title mt-4">Privacy, adeguatezza e identificazione</h2>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label" for="clients-form-data-consenso-privacy">Consenso privacy (GDPR) del</label>
+        <input id="clients-form-data-consenso-privacy" type="date" class="form-control" name="data_consenso_privacy" value="{{ client.data_consenso_privacy.isoformat() if client.data_consenso_privacy else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="clients-form-data-adeguatezza">Questionario di adeguatezza del</label>
+        <input id="clients-form-data-adeguatezza" type="date" class="form-control" name="data_adeguatezza" value="{{ client.data_adeguatezza.isoformat() if client.data_adeguatezza else '' }}">
+        <div class="form-text">Demands &amp; needs (IVASS Reg. 40/2018).</div>
+      </div>
+      <div class="col-md-6 d-flex align-items-center">
+        <div class="form-check mt-3">
+          <input class="form-check-input" type="checkbox" name="consenso_marketing" id="consenso_marketing" {% if client.consenso_marketing %}checked{% endif %}>
+          <label class="form-check-label" for="consenso_marketing">Consenso a comunicazioni commerciali</label>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="clients-form-documento-tipo" {{ testo("Documento d'identità", azienda='Documento del legale rappresentante', studio='Documento del legale rappresentante') }}</label>
+        <select id="clients-form-documento-tipo" class="form-select" name="documento_tipo">
+          <option value="">—</option>
+          {% for v, l in id_document_types %}<option value="{{ v }}" {% if client.documento_tipo == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="clients-form-documento-numero">Numero documento</label>
+        <input id="clients-form-documento-numero" type="text" class="form-control text-uppercase" name="documento_numero" value="{{ client.documento_numero or '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="clients-form-documento-scadenza">Scadenza documento</label>
+        <input id="clients-form-documento-scadenza" type="date" class="form-control" name="documento_scadenza" value="{{ client.documento_scadenza.isoformat() if client.documento_scadenza else '' }}">
+      </div>
+      {% if nuovo %}
       <div class="col-12 form-check ms-2">
-        <input class="form-check-input" type="checkbox" name="analizza_subito" id="analizza_subito" checked>
+        <input class="form-check-input" type="checkbox" name="analizza_subito" id="analizza_subito" {% if request.method == 'GET' or request.form.get('analizza_subito') %}checked{% endif %}>
         <label class="form-check-label" for="analizza_subito">
           Esegui subito l'analisi automatica dei rischi dopo il salvataggio
         </label>
@@ -123,35 +298,7 @@
   <div class="card-footer d-flex gap-2">
     <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Salva</button>
     <a class="btn btn-outline-secondary"
-       href="{{ url_for('clients.detail', client_id=client.id) if client else url_for('clients.list_clients') }}">Annulla</a>
+       href="{{ url_for('clients.list_clients') if nuovo else url_for('clients.detail', client_id=client.id) }}">Annulla</a>
   </div>
 </form>
-{% endblock %}
-{% block scripts %}
-<script>
-  // Mostra solo i campi pertinenti al tipo di cliente selezionato.
-  (function () {
-    const select = document.getElementById('tipo-cliente');
-    const nomeLabel = document.getElementById('label-nome');
-    function aggiorna() {
-      const tipo = select.value;
-      const regole = {
-        'campo-azienda': tipo === 'azienda',
-        'campo-professionista': tipo === 'professionista',
-        'campo-dipendente': tipo === 'dipendente',
-        'campo-impresa': tipo === 'azienda' || tipo === 'professionista',
-      };
-      for (const [cls, mostra] of Object.entries(regole)) {
-        document.querySelectorAll('.' + cls).forEach(function (el) {
-          el.style.display = mostra ? '' : 'none';
-        });
-      }
-      nomeLabel.textContent = tipo === 'azienda'
-        ? 'Ragione sociale *'
-        : (tipo === 'dipendente' ? 'Nome e cognome *' : 'Nominativo *');
-    }
-    select.addEventListener('change', aggiorna);
-    aggiorna();
-  })();
-</script>
 {% endblock %}

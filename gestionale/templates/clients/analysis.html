@@ -6,13 +6,13 @@
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="{{ url_for('clients.list_clients') }}">Clienti</a></li>
     <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.ragione_sociale }}</a></li>
-    <li class="breadcrumb-item active">Analisi rischi del {{ analysis.created_at.strftime('%d/%m/%Y %H:%M') }}</li>
+    <li class="breadcrumb-item active">Analisi rischi del {{ analysis.created_at | dataora_it }}</li>
   </ol>
 </nav>
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-  <h1 class="h3 mb-0"><i class="bi bi-clipboard2-pulse me-2"></i>Report analisi dei rischi</h1>
-  <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+  <h1 class="page-title"><i class="bi bi-clipboard2-pulse me-2"></i>Report analisi dei rischi</h1>
+  <button type="button" class="btn btn-outline-secondary" data-print><i class="bi bi-printer"></i> Stampa</button>
 </div>
 
 <div class="row g-3 mb-4">
@@ -47,15 +47,23 @@
   <div class="card-body"><p class="mb-0 fst-italic">{{ analysis.input_text }}</p></div>
 </div>
 
+{% if r.avvertenze %}
+<div class="alert alert-info small">
+  {% for a in r.avvertenze %}<div><i class="bi bi-info-circle me-1" aria-hidden="true"></i>{{ a }}</div>{% endfor %}
+</div>
+{% endif %}
+
 <h2 class="h5 mb-3">Pericoli individuati e coperture consigliate</h2>
 <div class="row g-3 mb-4">
   {% for rischio in r.rischi %}
   <div class="col-lg-6">
-    <div class="card h-100 severita-{{ 'baseline' if rischio.baseline else rischio.severita }}">
+    <div class="card h-100 severita-{{ 'alta' if rischio.obbligatoria else ('baseline' if rischio.baseline else rischio.severita) }}">
       <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start">
+        <div class="d-flex justify-content-between align-items-start gap-2">
           <h3 class="h6 mb-1">{{ rischio.nome }}</h3>
-          {% if rischio.baseline %}
+          {% if rischio.obbligatoria %}
+          <span class="badge bg-danger text-nowrap">obbligatoria per legge</span>
+          {% elif rischio.baseline %}
           <span class="badge bg-primary">raccomandazione di base</span>
           {% else %}
           <span class="badge {% if rischio.severita == 'alta' %}bg-danger{% elif rischio.severita == 'media' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
@@ -109,7 +117,9 @@
               <strong>{{ gap.nome_ramo }}</strong>
               <div class="small text-muted">Per: {{ gap.rischi | join(', ') }}</div>
             </div>
+            {% if puo_modificare %}
             <form method="post" action="{{ url_for('opportunities.from_gap', client_id=client.id) }}" class="no-print">
+              {{ csrf_field() }}
               <input type="hidden" name="ramo" value="{{ gap.ramo }}">
               <input type="hidden" name="titolo" value="Proposta {{ gap.nome_ramo }}">
               <input type="hidden" name="next" value="{{ url_for('clients.view_analysis', client_id=client.id, analysis_id=analysis.id) }}">
@@ -117,6 +127,7 @@
                 <i class="bi bi-funnel"></i> In pipeline
               </button>
             </form>
+            {% endif %}
           </div>
           {% if gap.trattativa %}
           {% set t = gap.trattativa %}
