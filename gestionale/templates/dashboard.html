@@ -93,6 +93,13 @@
   </div>
 </div>
 
+{% if sincronizzazione and sincronizzazione.da_caricare %}
+<div class="alert alert-info d-flex align-items-center gap-2 py-2 small">
+  <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+  <span>Ci sono dati salvati da «{{ sincronizzazione.pacchetto.pc }}» il {{ sincronizzazione.pacchetto.creato | dataora_it }} non ancora caricati su questo PC.</span>
+  <a class="ms-auto btn btn-sm btn-primary" href="{{ url_for('sincronizzazione.pagina') }}">Sincronizza</a>
+</div>
+{% endif %}
 {% if stats.clienti_senza_privacy %}
 <div class="alert alert-secondary d-flex align-items-center gap-2 py-2 small">
   <i class="bi bi-shield-lock"></i>

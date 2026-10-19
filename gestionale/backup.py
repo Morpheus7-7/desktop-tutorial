@@ -152,7 +152,7 @@ def _cartella_lavoro() -> str | None:
     return cartella
 
 
-def _scrivi_archivio(fileobj, cartella_lavoro: str | None) -> None:
+def _scrivi_archivio(fileobj, cartella_lavoro: str | None, extra_manifest: dict | None = None) -> None:
     """Scrive l'archivio ZIP completo (database, documenti, manifest) in ``fileobj``."""
     origine = sqlite_path()
     if origine is None:
@@ -170,7 +170,7 @@ def _scrivi_archivio(fileobj, cartella_lavoro: str | None) -> None:
                     percorso = os.path.join(cartella, nome)
                     if os.path.isfile(percorso) and not os.path.islink(percorso):
                         zf.write(percorso, CARTELLA_ZIP_DOCUMENTI + nome)
-            zf.writestr(NOME_MANIFEST, json.dumps(_manifest(), ensure_ascii=False, indent=2))
+            zf.writestr(NOME_MANIFEST, json.dumps({**_manifest(), **(extra_manifest or {})}, ensure_ascii=False, indent=2))
 
 
 def scrivi_backup(fileobj) -> None:
@@ -178,7 +178,7 @@ def scrivi_backup(fileobj) -> None:
     _scrivi_archivio(fileobj, _cartella_lavoro())
 
 
-def crea_backup(destinazione: str) -> str:
+def crea_backup(destinazione: str, extra_manifest: dict | None = None) -> str:
     """Scrive l'archivio ZIP di backup in ``destinazione`` e ne restituisce il percorso.
 
     L'archivio viene scritto con un nome temporaneo nella stessa cartella e
@@ -192,7 +192,7 @@ def crea_backup(destinazione: str) -> str:
     )
     try:
         with os.fdopen(fd, "w+b") as fh:
-            _scrivi_archivio(fh, cartella)
+            _scrivi_archivio(fh, cartella, extra_manifest)
             fh.flush()
             os.fsync(fh.fileno())
         os.replace(parziale, destinazione)

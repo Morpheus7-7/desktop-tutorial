@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Sincronizza PC — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<h1 class="page-title mb-1"><i class="bi bi-arrow-left-right me-2" aria-hidden="true"></i>Sincronizza PC</h1>
+<p class="page-subtitle mb-3">Lavora su un PC alla volta: a fine lavoro salva i dati nella cartella di sincronizzazione, poi sull'altro PC caricali.</p>
+
+{% if conferma %}
+<div class="alert alert-warning">
+  <h2 class="h6"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i> Attenzione</h2>
+  <p class="mb-2">{{ conferma[1] }}</p>
+  <form method="post" action="{{ url_for('sincronizzazione.salva' if conferma[0] == 'salva' else 'sincronizzazione.carica') }}" class="d-flex gap-2 flex-wrap">
+    {{ csrf_field() }}
+    <input type="hidden" name="forza" value="1">
+    <button class="btn btn-danger">{{ 'Salva comunque' if conferma[0] == 'salva' else 'Carica comunque' }}</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('sincronizzazione.pagina') }}">Annulla</a>
+  </form>
+</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-folder2-open me-1" aria-hidden="true"></i> Cartella di sincronizzazione</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('sincronizzazione.imposta_cartella') }}">
+          {{ csrf_field() }}
+          <label class="form-label" for="sync-cartella">Percorso della cartella</label>
+          <div class="input-group">
+            <input id="sync-cartella" type="text" class="form-control" name="cartella" required
+                   placeholder="es. E:\Gestionale oppure C:\Users\Nome\OneDrive\Gestionale" value="{{ s.cartella or '' }}">
+            <button class="btn btn-outline-primary">Salva</button>
+          </div>
+          <div class="form-text">Una chiavetta USB o una cartella di OneDrive, Dropbox o Google Drive. Va scelta su ogni PC: la lettera della chiavetta può cambiare.</div>
+        </form>
+        {% if s.errore_cartella %}<div class="alert alert-danger small mt-3 mb-0">{{ s.errore_cartella }}</div>{% endif %}
+        <dl class="row small mt-3 mb-0">
+          <dt class="col-sm-5">Questo PC</dt><dd class="col-sm-7">{{ s.pc }}</dd>
+          <dt class="col-sm-5">Ultima sincronizzazione</dt>
+          <dd class="col-sm-7">{% if s.ultimo_at %}{{ s.ultimo_at | dataora_it }} ({{ "dati salvati per l'altro PC" if s.ultima_operazione == 'inviato' else "dati caricati dall'altro PC" }}){% else %}mai{% endif %}</dd>
+          <dt class="col-sm-5">Modifiche da allora</dt>
+          <dd class="col-sm-7">{{ s.modifiche_locali }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100 {{ 'border-primary' if s.da_caricare else '' }}">
+      <div class="card-header"><i class="bi bi-box-seam me-1" aria-hidden="true"></i> Pacchetto nella cartella</div>
+      <div class="card-body">
+        {% if s.pacchetto %}
+        <dl class="row small">
+          <dt class="col-sm-5">Salvato da</dt><dd class="col-sm-7">{{ s.pacchetto.pc or '—' }}</dd>
+          <dt class="col-sm-5">Il</dt><dd class="col-sm-7">{{ s.pacchetto.creato | dataora_it }}</dd>
+          <dt class="col-sm-5">Contiene</dt><dd class="col-sm-7">{{ s.pacchetto.clienti }} clienti, {{ s.pacchetto.polizze }} polizze, {{ s.pacchetto.titoli }} titoli</dd>
+        </dl>
+        {% if s.da_caricare %}
+        <div class="alert alert-info small"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Viene dall'altro PC e non è ancora stato caricato qui.</div>
+        {% else %}
+        <p class="small text-success"><i class="bi bi-check-circle me-1" aria-hidden="true"></i>Questo PC è allineato al pacchetto.</p>
+        {% endif %}
+        {% elif s.cartella and not s.errore_cartella %}
+        <p class="small ga-muted">Nessun pacchetto nella cartella: salvalo dal PC su cui hai lavorato.</p>
+        {% else %}
+        <p class="small ga-muted">Scegli prima la cartella di sincronizzazione.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-md-6">
+    <form method="post" action="{{ url_for('sincronizzazione.salva') }}" class="card h-100">
+      {{ csrf_field() }}
+      <div class="card-body">
+        <h2 class="h6"><i class="bi bi-upload me-1" aria-hidden="true"></i> Ho finito di lavorare qui</h2>
+        <p class="small ga-muted">Salva tutti i dati (anche i documenti) nella cartella, pronti per l'altro PC.</p>
+        <button class="btn btn-primary" {% if not s.cartella or s.errore_cartella %}disabled{% endif %}>Salva per l'altro PC</button>
+      </div>
+    </form>
+  </div>
+  <div class="col-md-6">
+    <form method="post" action="{{ url_for('sincronizzazione.carica') }}" class="card h-100"
+          data-confirm="Caricare i dati dell'altro PC? I dati di questo PC verranno sostituiti (resta una copia di sicurezza) e dovrai accedere di nuovo.">
+      {{ csrf_field() }}
+      <div class="card-body">
+        <h2 class="h6"><i class="bi bi-download me-1" aria-hidden="true"></i> Inizio a lavorare qui</h2>
+        <p class="small ga-muted">Sostituisce i dati di questo PC con quelli salvati sull'altro. Poi dovrai accedere di nuovo.</p>
+        <button class="btn {{ 'btn-primary' if s.da_caricare else 'btn-outline-primary' }}" {% if not s.da_caricare %}disabled{% endif %}>Carica dall'altro PC</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

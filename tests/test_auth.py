@@ -535,7 +535,7 @@ def test_consultazione_tutte_le_pagine_di_sola_lettura_restano_aperte(app, letto
     """Ogni GET senza parametri e senza modulo (fuori dall'amministrazione) resta accessibile."""
     regole = [r for r in app.url_map.iter_rules()
               if "GET" in r.methods and "POST" not in r.methods and not r.arguments
-              and not r.endpoint.startswith(("static", "settings.", "users.", "audit."))
+              and not r.endpoint.startswith(("static", "settings.", "users.", "audit.", "sincronizzazione."))
               and r.endpoint not in PAGINE_ROTTE]
     assert len(regole) > 10
     with app.test_request_context():

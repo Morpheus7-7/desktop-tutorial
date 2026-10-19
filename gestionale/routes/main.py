@@ -54,6 +54,20 @@ def _premi_provvigioni_attive():
     return premi, provv
 
 
+def _sincronizzazione_da_caricare() -> dict | None:
+    """Avviso in dashboard per l'amministratore: dati dell'altro PC da caricare."""
+    from flask import g
+
+    from .. import sincronizzazione
+
+    if g.get("user") is None or not g.user.is_admin or not sincronizzazione.cartella():
+        return None
+    try:
+        return sincronizzazione.situazione()
+    except Exception:  # noqa: BLE001 - l'avviso non deve mai bloccare la dashboard
+        return None
+
+
 def _clienti_per_tipo() -> list[dict]:
     """Numero di clienti per tipo, nell'ordine dei tipi."""
     conteggi = dict(db.session.query(Client.tipo, db.func.count(Client.id)).group_by(Client.tipo).all())
@@ -193,6 +207,7 @@ def dashboard():
 
     return render_template(
         "dashboard.html",
+        sincronizzazione=_sincronizzazione_da_caricare(),
         stats=stats,
         prossime_scadenze=prossime_scadenze,
         prossimi_eventi=prossimi_eventi,

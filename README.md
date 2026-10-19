@@ -287,6 +287,26 @@ archivi conservati) e **ripristinare** un archivio.
 
 Conserva periodicamente una copia dei backup su un disco esterno o in cloud.
 
+
+### Due PC: «Sincronizza PC»
+
+Per chi lavora su più computer (es. un fisso a casa e un portatile), uno alla
+volta. Dal menu **Sincronizza PC** (amministratori):
+
+1. su ogni PC scegli una **cartella di sincronizzazione**: una chiavetta USB
+   o una cartella di OneDrive, Dropbox o Google Drive;
+2. a fine lavoro premi **«Salva per l'altro PC»**: tutti i dati (documenti
+   compresi) finiscono in `gestionale_sincronizzazione.zip` nella cartella;
+3. sull'altro PC premi **«Carica dall'altro PC»** (la dashboard lo ricorda
+   quando c'è un pacchetto nuovo), poi accedi di nuovo.
+
+Protezioni: se su questo PC ci sono modifiche successive all'ultima
+sincronizzazione, il caricamento chiede conferma; se nella cartella c'è un
+pacchetto dell'altro PC non ancora caricato, il salvataggio chiede conferma.
+Il pacchetto precedente resta come `gestionale_sincronizzazione_precedente.zip`
+e ogni caricamento crea prima una copia di sicurezza dei dati attuali. Non è
+una fusione: vince sempre l'ultimo pacchetto caricato.
+
 ## Struttura
 
 ```
