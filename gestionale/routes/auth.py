@@ -1,7 +1,7 @@
 """Accesso, uscita, configurazione iniziale e cambio password."""
 from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for
 
-from ..models import Settings, User, db, now
+from ..models import ASPETTI, TEMI, Settings, User, db, now
 from ..security import (
     ESITO_BLOCCATO,
     ESITO_BLOCCATO_ORA,
@@ -173,3 +173,18 @@ def change_password():
                 flash("Password aggiornata: accedi di nuovo con la nuova password.", "success")
                 return redirect(url_for("auth.login"))
     return render_template("auth/password.html")
+
+
+@bp.route("/profilo/aspetto", methods=["GET", "POST"])
+def aspetto():
+    """Tema di colore e modalità chiara/scura dell'utente."""
+    user = g.user
+    if request.method == "POST":
+        tema = request.form.get("tema")
+        modalita = request.form.get("aspetto")
+        user.tema = tema if tema in {t[0] for t in TEMI} else "blu"
+        user.aspetto = modalita if modalita in dict(ASPETTI) else "auto"
+        db.session.commit()
+        flash("Aspetto aggiornato.", "success")
+        return redirect(url_for("auth.aspetto"))
+    return render_template("auth/aspetto.html", temi=TEMI, aspetti=ASPETTI)

@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="it">
+<html lang="it" data-tema="{{ g.user.tema if g.user else 'blu' }}" data-aspetto="{{ g.user.aspetto if g.user else 'auto' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{% block title %}Gestionale Assicurativo{% endblock %}</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%231e3a8a' d='M8 0l6 2v5c0 4-2.7 6.7-6 9-3.3-2.3-6-5-6-9V2z'/%3E%3Cpath fill='%23fff' d='M11.4 5.6l-4 4-2-2 .9-.9 1.1 1.1 3.1-3.1z'/%3E%3C/svg%3E">
+  <script src="{{ url_for('static', filename='aspetto.js') }}"></script>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icona.png') }}">
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='vendor/bootstrap-icons.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
@@ -98,6 +99,7 @@
           </span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+          <li><a class="dropdown-item" href="{{ url_for('auth.aspetto') }}"><i class="bi bi-palette me-2"></i>Aspetto</a></li>
           <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key me-2"></i>Cambia password</a></li>
           {% if is_admin %}<li><a class="dropdown-item" href="{{ url_for('settings.edit') }}"><i class="bi bi-gear me-2"></i>Impostazioni</a></li>{% endif %}
           <li><hr class="dropdown-divider"></li>

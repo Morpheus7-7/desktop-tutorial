@@ -431,3 +431,14 @@ def test_senza_finestra_si_usa_il_browser(monkeypatch):
     assert rd.modulo_finestra({"GESTIONALE_BROWSER": "1"}) is None
     monkeypatch.setitem(__import__("sys").modules, "webview", None)  # pywebview non installato
     assert rd.modulo_finestra({}) is None
+
+
+def test_finestra_ricorda_dimensione_e_posizione(tmp_path):
+    class _Finestra:
+        width, height, x, y = 1500, 900, 40, 30
+
+    rd.salva_geometria(tmp_path, _Finestra())
+    assert rd.leggi_geometria(tmp_path) == {"width": 1500, "height": 900, "x": 40, "y": 30}
+    (tmp_path / rd.FILE_FINESTRA).write_text('{"width": 10, "height": 99999, "x": -5000, "y": 1}')
+    assert rd.leggi_geometria(tmp_path) == {}  # valori assurdi ignorati
+    assert rd.leggi_geometria(None) == {}

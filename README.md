@@ -289,6 +289,13 @@ archivi conservati) e **ripristinare** un archivio.
 Conserva periodicamente una copia dei backup su un disco esterno o in cloud.
 
 
+### Aspetto
+
+Dal menu utente → **Aspetto** ognuno sceglie il proprio **tema di colore** (blu,
+ottanio, verde smeraldo, viola, bordeaux, grafite) e la **modalità chiara,
+scura o «come Windows»**. Il programma ha una sua icona e, nella versione
+desktop, la finestra riapre con la dimensione e la posizione dell'ultima volta.
+
 ### Due PC: «Sincronizza PC»
 
 Per chi lavora su più computer (es. un fisso a casa e un portatile), uno alla

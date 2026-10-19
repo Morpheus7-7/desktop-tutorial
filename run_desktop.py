@@ -547,9 +547,46 @@ def modulo_finestra(env: Mapping[str, str] | None = None):
     return webview
 
 
-def apri_finestra(url: str, webview=None) -> bool:
+FILE_FINESTRA = "finestra.json"
+
+
+def leggi_geometria(cartella: Path | None) -> dict:
+    """Dimensione e posizione della finestra all'ultima chiusura (valori plausibili o niente)."""
+    if cartella is None:
+        return {}
+    try:
+        import json
+
+        dati = json.loads((Path(cartella) / FILE_FINESTRA).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    geometria = {}
+    if isinstance(dati, dict):
+        larghezza, altezza = dati.get("width"), dati.get("height")
+        if isinstance(larghezza, int) and isinstance(altezza, int) and 800 <= larghezza <= 8000 and 500 <= altezza <= 5000:
+            geometria.update(width=larghezza, height=altezza)
+        x, y = dati.get("x"), dati.get("y")
+        if isinstance(x, int) and isinstance(y, int) and -100 <= x <= 7000 and -100 <= y <= 4000:
+            geometria.update(x=x, y=y)
+    return geometria
+
+
+def salva_geometria(cartella: Path | None, finestra) -> None:
+    if cartella is None:
+        return
+    try:
+        import json
+
+        dati = {k: int(getattr(finestra, k)) for k in ("width", "height", "x", "y") if getattr(finestra, k, None) is not None}
+        (Path(cartella) / FILE_FINESTRA).write_text(json.dumps(dati), encoding="utf-8")
+    except Exception:  # noqa: BLE001 - non deve mai impedire la chiusura
+        pass
+
+
+def apri_finestra(url: str, webview=None, cartella: Path | None = None) -> bool:
     """Apre il gestionale in una finestra propria e attende che venga chiusa.
 
+    La finestra riapre con la dimensione e la posizione dell'ultima volta.
     Restituisce False se la finestra non si può aprire (si userà il browser).
     """
     webview = webview if webview is not None else modulo_finestra()
@@ -560,9 +597,20 @@ def apri_finestra(url: str, webview=None) -> bool:
         impostazioni = getattr(webview, "settings", None)
         if isinstance(impostazioni, dict):
             impostazioni["ALLOW_DOWNLOADS"] = True
-        webview.create_window(TITOLO_FINESTRA, url, width=1366, height=860, min_size=(1024, 640),
-                              text_select=True)
-        webview.start(private_mode=False)
+        opzioni = {"width": 1366, "height": 860, **leggi_geometria(cartella)}
+        finestra = webview.create_window(
+            TITOLO_FINESTRA, url, min_size=(1024, 640), text_select=True,
+            background_color="#f3f5f9",  # niente lampo bianco all'apertura
+            **opzioni,
+        )
+        eventi = getattr(finestra, "events", None)
+        if eventi is not None and hasattr(eventi, "closing"):
+            eventi.closing += lambda *_: salva_geometria(cartella, finestra)
+        icona = Path(getattr(sys, "_MEIPASS", Path(__file__).parent)) / "gestionale" / "static" / "icona.png"
+        avvio = {"private_mode": False}
+        if icona.is_file():
+            avvio["icon"] = str(icona)  # usata su Linux; su Windows vale l'icona dell'exe
+        webview.start(**avvio)
     except Exception:  # noqa: BLE001 - es. WebView2 mancante: si ripiega sul browser
         logging.getLogger("gestionale.avvio").exception("Finestra non disponibile, uso il browser")
         return False
@@ -592,7 +640,7 @@ def _main(argv: list[str]) -> int:
             # Il programma è già aperto: un'altra finestra (o il browser) sulla stessa istanza.
             url = apri_istanza_esistente(cartella, apri=lambda u: None)
             if url:
-                if not apri_finestra(url):
+                if not apri_finestra(url, cartella=cartella):
                     webbrowser.open(url)
                 return 0
             raise ErroreAvvio(
@@ -662,7 +710,7 @@ def _main(argv: list[str]) -> int:
     if webview is not None:
         # Il motore gira in sottofondo; chiudendo la finestra si chiude il programma.
         threading.Thread(target=avvia_server, name="server", daemon=True).start()
-        if apri_finestra(url, webview):
+        if apri_finestra(url, webview, cartella):
             log.info("Finestra chiusa: programma terminato")
             return 0
     # Senza finestra propria: browser predefinito, server in primo piano.

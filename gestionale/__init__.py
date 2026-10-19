@@ -77,6 +77,8 @@ def _ensure_schema() -> None:
         },
         "users": {
             "sessione_versione": "ALTER TABLE users ADD COLUMN sessione_versione INTEGER NOT NULL DEFAULT 0",
+            "tema": "ALTER TABLE users ADD COLUMN tema VARCHAR(20) NOT NULL DEFAULT 'blu'",
+            "aspetto": "ALTER TABLE users ADD COLUMN aspetto VARCHAR(10) NOT NULL DEFAULT 'auto'",
         },
         "documents": {
             "dimensione": "ALTER TABLE documents ADD COLUMN dimensione INTEGER",

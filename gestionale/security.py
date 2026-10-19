@@ -48,6 +48,7 @@ PUBLIC_ENDPOINTS = {"static", "auth.login", "auth.setup"}
 READONLY_ALLOWED_POST = {
     "auth.logout",
     "auth.change_password",
+    "auth.aspetto",
     "notifications.mark_read",
     "notifications.mark_all_read",
 }

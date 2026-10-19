@@ -1261,6 +1261,18 @@ class ClaimNote(db.Model):
     created_at = db.Column(db.DateTime, default=now)
 
 
+# Aspetto scelto da ogni utente (pagina «Aspetto»): tema di colore e modalità.
+TEMI = [
+    ("blu", "Blu fiducia", "#0f1d3d", "#2563eb"),
+    ("ottanio", "Ottanio", "#082a33", "#0e7490"),
+    ("smeraldo", "Verde smeraldo", "#052e26", "#059669"),
+    ("viola", "Viola", "#1e0b3d", "#7c3aed"),
+    ("bordeaux", "Bordeaux", "#2b0b10", "#b91c1c"),
+    ("grafite", "Grafite", "#111318", "#374151"),
+]
+ASPETTI = [("auto", "Come Windows"), ("chiaro", "Chiaro"), ("scuro", "Scuro")]
+
+
 class User(db.Model):
     """Utente del gestionale."""
 
@@ -1280,6 +1292,8 @@ class User(db.Model):
     bloccato_fino = db.Column(db.DateTime)
     ultimo_accesso = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=now)
+    tema = db.Column(db.String(20), default="blu", nullable=False)
+    aspetto = db.Column(db.String(10), default="auto", nullable=False)
 
     def set_password(self, password: str) -> None:
         metodo = current_app.config.get("PASSWORD_HASH_METHOD", "scrypt")

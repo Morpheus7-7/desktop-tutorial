@@ -83,4 +83,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon="gestionale/static/icona.ico",  # icona del programma (barra delle applicazioni, Esplora file)
 )
