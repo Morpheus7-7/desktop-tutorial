@@ -1,7 +1,11 @@
 """Avvio «desktop» del Gestionale Assicurativo.
 
-Fa partire il server web locale, avvia lo scheduler delle notifiche e apre
-automaticamente il browser sull'applicazione. È l'entry point usato per
+Avvia il motore interno del programma (un server locale raggiungibile solo da
+questo computer, senza internet), lo scheduler delle notifiche e apre il
+gestionale in una **finestra propria**, come un normale programma Windows
+(pywebview, con il motore WebView2 già presente in Windows 10 e 11). Se la
+finestra non è disponibile si apre il browser predefinito; con
+``GESTIONALE_BROWSER=1`` si usa sempre il browser. È l'entry point usato per
 l'eseguibile impacchettato con PyInstaller (vedi ``gestionale.spec``), ma si
 può lanciare anche direttamente con:
 
@@ -25,9 +29,8 @@ senza estrarlo) i dati non vengono mai salvati lì: quelli eventualmente già
 creati in una cartella temporanea vengono copiati nella cartella dell'utente.
 
 Il programma si avvia una sola volta per cartella dati: un secondo avvio apre
-il browser sull'istanza già in esecuzione. Gli errori di avvio vengono scritti
-in ``avvio.log`` nella cartella dati e la finestra resta aperta finché non si
-preme Invio.
+un'altra finestra sull'istanza già in esecuzione. Gli errori di avvio vengono
+scritti in ``avvio.log`` nella cartella dati e mostrati in un messaggio.
 
 Per recuperare l'accesso se si dimentica la password dell'amministratore:
 
@@ -65,6 +68,8 @@ FILE_LOG_AVVIO = "avvio.log"
 ENV_CARTELLA_DATI = "GESTIONALE_DATI"
 ENV_PORTATILE = "GESTIONALE_PORTATILE"
 HOST = "127.0.0.1"
+TITOLO_FINESTRA = "Gestionale Assicurativo"
+ENV_BROWSER = "GESTIONALE_BROWSER"
 PORTA_PREDEFINITA = 5000
 VALORI_VERI = {"1", "true", "yes", "si", "sì", "on"}
 
@@ -500,6 +505,70 @@ def attendi_invio(messaggio: str = "Premi Invio per chiudere…") -> None:
         pass
 
 
+def apri_console() -> None:
+    """Apre una console per i comandi interattivi quando l'eseguibile non ne ha una."""
+    if sys.platform != "win32" or sys.stdin is not None:
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.kernel32.AllocConsole()
+        sys.stdin = open("CONIN$", encoding="utf-8")
+        sys.stdout = sys.stderr = open("CONOUT$", "w", encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def mostra_errore(testo: str) -> None:
+    """Mostra un errore anche senza console (eseguibile a finestra)."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            ctypes.windll.user32.MessageBoxW(None, testo, TITOLO_FINESTRA, 0x10)  # MB_ICONERROR
+            return
+        except Exception:  # noqa: BLE001 - ripiego sulla console
+            pass
+    print(testo)
+
+
+# ----------------------------------------------------------------------
+# Finestra del programma
+# ----------------------------------------------------------------------
+def modulo_finestra(env: Mapping[str, str] | None = None):
+    """Il modulo pywebview se la finestra propria è utilizzabile, altrimenti None."""
+    env = os.environ if env is None else env
+    if env.get(ENV_BROWSER, "").strip().lower() in ("1", "si", "sì", "true", "yes"):
+        return None
+    try:
+        import webview  # pywebview
+    except Exception:  # noqa: BLE001 - non installato o senza motore grafico
+        return None
+    return webview
+
+
+def apri_finestra(url: str, webview=None) -> bool:
+    """Apre il gestionale in una finestra propria e attende che venga chiusa.
+
+    Restituisce False se la finestra non si può aprire (si userà il browser).
+    """
+    webview = webview if webview is not None else modulo_finestra()
+    if webview is None:
+        return False
+    try:
+        # Backup, esportazioni CSV e calendario si scaricano anche dalla finestra.
+        impostazioni = getattr(webview, "settings", None)
+        if isinstance(impostazioni, dict):
+            impostazioni["ALLOW_DOWNLOADS"] = True
+        webview.create_window(TITOLO_FINESTRA, url, width=1366, height=860, min_size=(1024, 640),
+                              text_select=True)
+        webview.start(private_mode=False)
+    except Exception:  # noqa: BLE001 - es. WebView2 mancante: si ripiega sul browser
+        logging.getLogger("gestionale.avvio").exception("Finestra non disponibile, uso il browser")
+        return False
+    return True
+
+
 # ----------------------------------------------------------------------
 # Avvio
 # ----------------------------------------------------------------------
@@ -520,10 +589,11 @@ def _main(argv: list[str]) -> int:
     if not reimposta:
         _blocco = BloccoIstanza(cartella / FILE_BLOCCO)
         if not _blocco.acquisisci():
-            url = apri_istanza_esistente(cartella)
+            # Il programma è già aperto: un'altra finestra (o il browser) sulla stessa istanza.
+            url = apri_istanza_esistente(cartella, apri=lambda u: None)
             if url:
-                print(f"Il Gestionale Assicurativo è già in esecuzione: ho aperto il browser su {url}")
-                time.sleep(2)  # il tempo di leggere il messaggio
+                if not apri_finestra(url):
+                    webbrowser.open(url)
                 return 0
             raise ErroreAvvio(
                 "Il Gestionale Assicurativo risulta già in esecuzione con la stessa cartella dati, ma non "
@@ -553,6 +623,8 @@ def _main(argv: list[str]) -> int:
     if reimposta:
         from gestionale.cli import chiedi_e_reimposta
 
+        apri_console()
+
         with app.app_context():
             return chiedi_e_reimposta(argv[1])
 
@@ -574,19 +646,33 @@ def _main(argv: list[str]) -> int:
     print("  Chiudi questa finestra per fermare il programma.")
     print("=" * 60)
 
-    # Il socket è già in ascolto: il browser può aprirsi subito.
-    apertura = threading.Timer(1.0, webbrowser.open, args=(url,))
-    apertura.daemon = True
-    apertura.start()
-
     try:
         from waitress import serve  # server WSGI di produzione, puro Python
     except ImportError:  # pragma: no cover
         # Fallback: server integrato di Flask (nessuna dipendenza extra).
         sock.close()
-        app.run(host=HOST, port=porta, debug=False, use_reloader=False)
+
+        def avvia_server():
+            app.run(host=HOST, port=porta, debug=False, use_reloader=False)
     else:
-        serve(app, sockets=[sock], threads=8)
+        def avvia_server():
+            serve(app, sockets=[sock], threads=8)
+
+    webview = modulo_finestra()
+    if webview is not None:
+        # Il motore gira in sottofondo; chiudendo la finestra si chiude il programma.
+        threading.Thread(target=avvia_server, name="server", daemon=True).start()
+        if apri_finestra(url, webview):
+            log.info("Finestra chiusa: programma terminato")
+            return 0
+    # Senza finestra propria: browser predefinito, server in primo piano.
+    apertura = threading.Timer(1.0, webbrowser.open, args=(url,))
+    apertura.daemon = True
+    apertura.start()
+    if webview is None:
+        avvia_server()
+    else:  # il server è già partito nel thread: si resta in attesa
+        threading.Event().wait()
     return 0
 
 
@@ -601,16 +687,17 @@ def main(argv: list[str] | None = None) -> int:
         raise
     except BaseException as exc:  # noqa: BLE001 - l'utente deve sempre vedere cosa è successo
         percorso = registra_errore_avvio(traceback.format_exc())
-        print("=" * 60)
-        print("  Il Gestionale Assicurativo si è fermato per un errore.")
-        if isinstance(exc, ErroreAvvio):
-            print(f"  {exc}")
-        else:
-            print(f"  {exc.__class__.__name__}: {exc}")
+        dettaglio = str(exc) if isinstance(exc, ErroreAvvio) else f"{exc.__class__.__name__}: {exc}"
+        testo = "Il Gestionale Assicurativo si è fermato per un errore.\n\n" + dettaglio
         if percorso:
-            print(f"  Dettagli tecnici nel file: {percorso}")
-        print("=" * 60)
-        attendi_invio()
+            testo += f"\n\nDettagli tecnici nel file: {percorso}"
+        if sys.stdout is not None:  # avviato da console
+            print("=" * 60)
+            print(testo)
+            print("=" * 60)
+            attendi_invio()
+        else:
+            mostra_errore(testo)
         return 1
 
 

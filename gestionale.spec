@@ -30,12 +30,17 @@ hiddenimports = [
     "gestionale.routes.opportunities",
     "gestionale.routes.policies",
     "gestionale.routes.settings",
+    "gestionale.routes.sincronizzazione",
     "gestionale.routes.titles",
     "gestionale.routes.users",
     "gestionale.cli",
     "flask_sqlalchemy",
     "sqlalchemy.dialects.sqlite",
     "waitress",
+    # Finestra propria del programma (WebView2 su Windows).
+    "webview",
+    "webview.platforms.edgechromium",
+    "webview.platforms.winforms",
 ]
 
 a = Analysis(
@@ -72,7 +77,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,  # mostra l'indirizzo su cui aprire il browser
+    console=False,  # il gestionale si apre nella sua finestra, senza console
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

@@ -1,8 +1,15 @@
 # Impacchettare il Gestionale in un eseguibile
 
 Il gestionale può essere distribuito come **eseguibile unico** che avvia il
-server web locale e apre automaticamente il browser: chi lo usa non deve
-installare Python né conoscere la riga di comando. Basta fare doppio clic.
+gestionale in una **finestra propria**, come un normale programma Windows:
+chi lo usa non deve installare Python né conoscere la riga di comando. Basta
+fare doppio clic. Tutti i dati restano sul PC: il motore interno risponde solo
+a questo computer e non serve internet.
+
+La finestra usa **Microsoft Edge WebView2**, già presente in Windows 10 e 11
+aggiornati (se mancasse, si scarica gratis da Microsoft cercando «WebView2
+Runtime»). Se la finestra non si può aprire, il programma ripiega sul browser
+predefinito; per usare sempre il browser imposta `GESTIONALE_BROWSER=1`.
 
 - Su **Windows** si ottiene `GestionaleAssicurativo.exe`
 - Su **macOS/Linux** si ottiene un binario `GestionaleAssicurativo`
@@ -48,10 +55,9 @@ Per lanciarlo:
 2. Apri l'esecuzione riuscita e scarica l'artifact **`GestionaleAssicurativo-windows`**.
 3. **Estrai lo zip** (tasto destro → *Estrai tutto*) in una cartella stabile,
    ad esempio `C:\Gestionale` o `Documenti\Gestionale` (non in *Programmi*),
-   poi fai doppio clic su `GestionaleAssicurativo.exe` estratto: si apre il
-   browser sull'applicazione. Se lo avvii direttamente dall'interno dello zip
-   i dati vengono comunque salvati nella cartella dati dell'utente, ma la
-   console mostra un avviso.
+   poi fai doppio clic su `GestionaleAssicurativo.exe` estratto: si apre la
+   finestra del gestionale. Se lo avvii direttamente dall'interno dello zip
+   i dati vengono comunque salvati nella cartella dati dell'utente.
 
 > Nota: il workflow **non** parte a ogni push, per non generare esiti rossi
 > quando Actions non è disponibile. L'artifact resta scaricabile per il periodo
@@ -78,9 +84,8 @@ pyinstaller gestionale.spec --noconfirm
 #    macOS/Linux:  dist/GestionaleAssicurativo
 ```
 
-Doppio clic sull'eseguibile (oppure lancialo da terminale): partirà il server e
-si aprirà il browser su `http://127.0.0.1:5000`. Per fermarlo, chiudi la
-finestra della console (i backup vengono scritti con un nome temporaneo e
+Doppio clic sull'eseguibile: si apre la finestra del gestionale. Per fermarlo
+chiudi la finestra (i backup vengono scritti con un nome temporaneo e
 rinominati solo a fine scrittura: chiudere a metà non lascia archivi corrotti).
 
 ### Provare l'avvio «desktop» senza compilare
@@ -99,7 +104,7 @@ python run_desktop.py
 
 - **Entry point:** `run_desktop.py` — sceglie la cartella dati, impedisce un
   secondo avvio sulla stessa cartella, apre la porta (5000 o, se occupata, una
-  libera), avvia lo scheduler delle notifiche, apre il browser e serve l'app con
+  libera), avvia lo scheduler delle notifiche, apre la finestra (pywebview, con ripiego sul browser) e serve l'app con
   [waitress](https://github.com/Pylons/waitress) (server WSGI puro Python; se
   non disponibile, usa il server integrato di Flask come fallback). All'avvio
   forza i tipi MIME di `.js`, `.css`, `.svg` e dei font, che su alcuni PC
@@ -142,12 +147,12 @@ chiuso) oppure usa **Impostazioni → Backup**.
   firmati e possono generare un avviso. Scegli «Ulteriori informazioni →
   Esegui comunque», oppure firma l'eseguibile con un certificato tuo.
 - **La porta 5000 è occupata**: il launcher passa automaticamente a una porta
-  libera; l'indirizzo esatto è stampato nella console all'avvio.
+  libera (scritta in `porta.txt` nella cartella dati).
 - **Ho fatto doppio clic due volte**: il programma gira una sola volta per
-  cartella dati. Il secondo avvio apre il browser sul gestionale già in
-  esecuzione e si chiude (niente doppio server né email doppie).
-- **La finestra mostra un errore all'avvio**: la console resta aperta finché
-  non premi Invio e il dettaglio tecnico viene salvato in `avvio.log` nella
+  cartella dati. Il secondo avvio apre un'altra finestra sul gestionale già in
+  esecuzione (niente doppio server né email doppie).
+- **Compare un errore all'avvio**: un messaggio lo descrive e il dettaglio
+  tecnico viene salvato in `avvio.log` nella
   cartella dati (il percorso è indicato nel messaggio): invialo all'assistenza.
 - **Dove sono i miei dati?** Il percorso è stampato nella console a ogni avvio
   («Dati salvati in: …»); in **Impostazioni → Backup** trovi la cartella dei

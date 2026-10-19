@@ -398,3 +398,36 @@ def test_eliminazione_non_tocca_file_fuori_dalla_cartella(client, app, tmp_path)
         with app.app_context():
             assert db.session.get(Document, doc_id) is None
     assert importante.read_bytes() == b"dati"
+
+
+# ----------------------------------------------------------------------
+# Finestra propria del programma
+# ----------------------------------------------------------------------
+class _WebviewFinto:
+    def __init__(self, guasto=False):
+        self.settings = {}
+        self.finestre = []
+        self.avviato = False
+        self.guasto = guasto
+
+    def create_window(self, titolo, url, **opzioni):
+        self.finestre.append((titolo, url, opzioni))
+
+    def start(self, **opzioni):
+        if self.guasto:
+            raise RuntimeError("WebView2 non installato")
+        self.avviato = True
+
+
+def test_finestra_propria_con_download_abilitati():
+    finto = _WebviewFinto()
+    assert rd.apri_finestra("http://127.0.0.1:5000", finto) is True
+    assert finto.avviato and finto.finestre[0][:2] == ("Gestionale Assicurativo", "http://127.0.0.1:5000")
+    assert finto.settings["ALLOW_DOWNLOADS"] is True
+
+
+def test_senza_finestra_si_usa_il_browser(monkeypatch):
+    assert rd.apri_finestra("http://127.0.0.1:5000", _WebviewFinto(guasto=True)) is False
+    assert rd.modulo_finestra({"GESTIONALE_BROWSER": "1"}) is None
+    monkeypatch.setitem(__import__("sys").modules, "webview", None)  # pywebview non installato
+    assert rd.modulo_finestra({}) is None

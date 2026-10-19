@@ -164,8 +164,9 @@ attività** e **backup** integrati.
 ## Applicazione desktop (.exe)
 
 Vuoi provarla senza installare Python? È possibile impacchettare il gestionale
-in un **eseguibile unico** (`GestionaleAssicurativo.exe` su Windows) che avvia il
-server locale e apre il browser da solo. Il modo più semplice per ottenere il
+in un **eseguibile unico** (`GestionaleAssicurativo.exe` su Windows) che si apre
+in una **finestra propria**, come un normale programma, con tutti i dati salvati
+sul PC. Il modo più semplice per ottenere il
 `.exe` è la build automatica su GitHub Actions. Tutti i dettagli in
 **[PACKAGING.md](PACKAGING.md)**.
 
@@ -193,8 +194,8 @@ python app.py
 
 `run_desktop.py` è il modo consigliato per l'uso quotidiano (è lo stesso avvio
 dell'eseguibile): usa il server [waitress](https://github.com/Pylons/waitress),
-avvia lo **scheduler** (email automatiche e backup giornaliero), apre il
-browser e salva i dati nella cartella dati dell'utente (vedi
+avvia lo **scheduler** (email automatiche e backup giornaliero), apre la
+finestra del programma (o il browser, se la finestra non è disponibile) e salva i dati nella cartella dati dell'utente (vedi
 [PACKAGING.md](PACKAGING.md#cartella-dei-dati); per tenerli altrove imposta
 `GESTIONALE_DATI`).
 
@@ -311,7 +312,7 @@ una fusione: vince sempre l'ultimo pacchetto caricato.
 
 ```
 app.py                     # avvio per lo sviluppo (server di Flask, senza scheduler con `flask run`)
-run_desktop.py             # avvio «desktop» consigliato: cartella dati, istanza unica, server + browser (usato dall'exe)
+run_desktop.py             # avvio «desktop» consigliato: cartella dati, istanza unica, finestra propria o browser (usato dall'exe)
 seed_demo.py               # dati di esempio
 gestionale.spec            # ricetta PyInstaller per l'eseguibile
 gestionale/
