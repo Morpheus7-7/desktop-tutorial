@@ -253,3 +253,129 @@ def open_anyway():
     desktop.prendi_blocco(_cartella_corrente())
     flash("Archivio aperto su questo PC. Non usarlo nello stesso momento sull'altro PC.", "warning")
     return redirect(url_for("main.dashboard"))
+
+
+# ----------------------------------------------------------------------
+# Google: Gmail (SMTP), cartella di Google Drive per desktop, Calendar
+# ----------------------------------------------------------------------
+def _file_config_locale() -> Path | None:
+    return Path(current_app.config["DC_CONFIG_FILE"]) if current_app.config.get("DC_CONFIG_FILE") else None
+
+
+@bp.route("/google", methods=["GET", "POST"])
+def google():
+    from .. import google as g
+
+    file_config = _file_config_locale()
+    config = desktop.leggi_configurazione(file_config)
+    s = Settings.get()
+    if request.method == "POST":
+        azione = request.form.get("azione")
+        if azione == "drive":
+            percorso = (request.form.get("cartella_drive") or "").strip()
+            if percorso and not Path(percorso).is_dir():
+                flash("Questa cartella non esiste su questo PC: controlla che Google Drive per desktop sia avviato.", "danger")
+                return redirect(url_for("settings.google"))
+            config["cartella_drive"] = percorso or None
+            desktop.salva_configurazione(config, file_config)
+            flash("Cartella di Google Drive salvata." if percorso else "Cartella di Google Drive rimossa.", "success")
+        elif azione == "gmail":
+            s.smtp_host = g.GMAIL_SMTP["smtp_host"]
+            s.smtp_port = g.GMAIL_SMTP["smtp_port"]
+            s.smtp_security = g.GMAIL_SMTP["smtp_security"]
+            utente = (request.form.get("gmail") or "").strip()
+            if utente:
+                s.smtp_user = utente
+                s.mail_from = s.mail_from or utente
+            if request.form.get("password"):
+                s.smtp_password = request.form["password"].replace(" ", "")
+            db.session.commit()
+            flash("Gmail impostato. Prova l'invio da «Notifiche email» → «Salva e invia email di prova».", "success")
+        return redirect(url_for("settings.google"))
+    return render_template(
+        "settings/google.html",
+        cartella_drive=config.get("cartella_drive"),
+        drive_ok=bool(config.get("cartella_drive")) and Path(config["cartella_drive"]).is_dir(),
+        candidati=g.candidati_drive(),
+        s=s,
+        gmail_attivo=(s.smtp_host or "").lower() == g.GMAIL_SMTP["smtp_host"],
+    )
+
+
+# ----------------------------------------------------------------------
+# Aggiornamenti (Release di GitHub)
+# ----------------------------------------------------------------------
+def controlla_aggiornamenti(app) -> None:
+    """Controlla se c'è una versione nuova e ne salva l'esito in app.config.
+    Pensata per girare in un thread all'avvio: un errore di rete non deve
+    disturbare l'utente, viene solo annotato."""
+    from .. import __version__, aggiornamenti
+
+    try:
+        app.config["DC_AGGIORNAMENTO"] = aggiornamenti.controlla(__version__)
+        app.config["DC_AGGIORNAMENTO_ERRORE"] = None
+    except Exception as exc:  # noqa: BLE001 - rete assente, GitHub non raggiungibile…
+        app.config["DC_AGGIORNAMENTO_ERRORE"] = str(exc) or exc.__class__.__name__
+    app.config["DC_AGGIORNAMENTO_CONTROLLATO"] = datetime.now()
+
+
+def _installabile() -> bool:
+    import sys
+
+    return bool(current_app.config.get("DC_DESKTOP")) and sys.platform == "win32"
+
+
+@bp.route("/aggiornamenti", methods=["GET", "POST"])
+def updates():
+    from .. import __version__
+
+    file_config = _file_config_locale()
+    config = desktop.leggi_configurazione(file_config)
+    if request.method == "POST":
+        azione = request.form.get("azione")
+        if azione == "controlla":
+            controlla_aggiornamenti(current_app._get_current_object())
+            errore = current_app.config.get("DC_AGGIORNAMENTO_ERRORE")
+            if errore:
+                flash(f"Controllo non riuscito: {errore}", "danger")
+            elif not current_app.config.get("DC_AGGIORNAMENTO"):
+                flash(f"Hai già l'ultima versione ({__version__}).", "success")
+        elif azione == "automatico" and file_config:
+            config["aggiornamenti_automatici"] = request.form.get("automatico") == "1"
+            desktop.salva_configurazione(config, file_config)
+            flash("Preferenza salvata.", "success")
+        return redirect(url_for("settings.updates"))
+    return render_template(
+        "settings/aggiornamenti.html",
+        versione=__version__,
+        nuova=current_app.config.get("DC_AGGIORNAMENTO"),
+        controllato=current_app.config.get("DC_AGGIORNAMENTO_CONTROLLATO"),
+        errore=current_app.config.get("DC_AGGIORNAMENTO_ERRORE"),
+        installabile=_installabile(),
+        automatico=config.get("aggiornamenti_automatici", True),
+        desktop_mode=bool(file_config),
+    )
+
+
+@bp.route("/aggiornamenti/installa", methods=["POST"])
+def install_update():
+    from .. import aggiornamenti
+
+    nuova = current_app.config.get("DC_AGGIORNAMENTO")
+    if not nuova or not _installabile():
+        abort(404)
+    try:
+        percorso = aggiornamenti.scarica_e_verifica(nuova)
+    except (OSError, aggiornamenti.AggiornamentoNonValido) as exc:
+        flash(f"Aggiornamento non riuscito: {exc}", "danger")
+        return redirect(url_for("settings.updates"))
+    desktop.esegui_backup(_cartella_corrente(), motivo="aggiornamento")
+    try:
+        aggiornamenti.avvia_installatore(percorso)
+    except OSError as exc:
+        flash(f"Non riesco ad avviare l'installatore: {exc}", "danger")
+        return redirect(url_for("settings.updates"))
+    chiudi = current_app.config.get("DC_SHUTDOWN")
+    if chiudi:
+        threading.Timer(1.5, chiudi).start()
+    return render_template("settings/aggiornamento_in_corso.html", nuova=nuova)

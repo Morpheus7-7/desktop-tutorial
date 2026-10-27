@@ -327,6 +327,7 @@ code { color: var(--dc-ink); background: var(--dc-surface-2); padding: .05rem .3
   color: var(--dc-ink); font-size: 1.15rem; border: 1px solid transparent;
 }
 .dc-icon-btn:hover { background: var(--dc-surface-2); color: var(--dc-ink); }
+.dc-icon-btn.dc-aggiorna, .dc-icon-btn.dc-aggiorna:hover { color: var(--dc-success); }
 .dc-count {
   position: absolute; top: .2rem; right: .15rem; min-width: 1.15rem; height: 1.15rem;
   padding: 0 .3rem; border-radius: 999px; font-size: .7rem; font-weight: 700; line-height: 1.15rem;
@@ -609,3 +610,9 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 @media print {
   .scheda .check .casella.spuntata { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
+
+/* ---------- Sblocco con PIN ------------------------------------------------ */
+.sblocco { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.25rem; }
+.sblocco-marchio { font-size: 2rem; font-stretch: 82%; color: var(--dc-ink); }
+.sblocco-card { width: 100%; max-width: 22rem; }
+.sblocco-card input[type="password"] { letter-spacing: .4em; }

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Privacy — Deal Combined{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h3 mb-0"><i class="bi bi-gear me-2"></i>Impostazioni</h1>
+</div>
+{% include "settings/_nav.html" %}
+
+{% if codice_nuovo %}
+<div class="alert alert-success" role="alert">
+  <h2 class="h6">PIN impostato. Annota il codice di recupero:</h2>
+  <p class="fs-4 fw-bold numeri mb-1">{{ codice_nuovo }}</p>
+  <p class="small mb-0">Serve se dimentichi il PIN. Non verrà mostrato di nuovo: scrivilo e conservalo lontano dal PC.</p>
+</div>
+{% endif %}
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <section class="card mb-4" aria-labelledby="t-pin">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-pin"><i class="bi bi-lock me-1"></i> PIN all'apertura</h2></div>
+      <div class="card-body">
+        <p class="misura">Con il PIN attivo, Deal Combined chiede il codice all'apertura e dopo un periodo di inattività.
+          {% if s.pin_hash %}<strong class="text-success">Il PIN è attivo.</strong>{% else %}<strong>Il PIN non è impostato.</strong>{% endif %}</p>
+
+        <form method="post" class="border-top pt-3" autocomplete="off">
+          <input type="hidden" name="azione" value="imposta">
+          <div class="row g-3">
+            {% if s.pin_hash %}
+            <div class="col-md-4"><label class="form-label" for="pin_attuale">PIN attuale</label>
+              <input class="form-control numeri" type="password" id="pin_attuale" name="pin_attuale" inputmode="numeric" required></div>
+            {% endif %}
+            <div class="col-md-4"><label class="form-label" for="pin">{% if s.pin_hash %}Nuovo PIN{% else %}PIN{% endif %}</label>
+              <input class="form-control numeri" type="password" id="pin" name="pin" inputmode="numeric" minlength="4" maxlength="12" required></div>
+            <div class="col-md-4"><label class="form-label" for="pin_conferma">Ripeti il PIN</label>
+              <input class="form-control numeri" type="password" id="pin_conferma" name="pin_conferma" inputmode="numeric" minlength="4" maxlength="12" required></div>
+          </div>
+          <p class="small text-muted mt-2 mb-3">Da 4 a 12 cifre, non tutte uguali e non in sequenza. Se i dati sono condivisi tra due PC, il PIN vale per entrambi.</p>
+          <button class="btn btn-primary">{% if s.pin_hash %}Cambia PIN{% else %}Imposta il PIN{% endif %}</button>
+        </form>
+
+        {% if s.pin_hash %}
+        <form method="post" class="border-top pt-3 mt-3 row g-2 align-items-end" autocomplete="off">
+          <input type="hidden" name="azione" value="minuti">
+          <div class="col-sm-4"><label class="form-label" for="blocco_minuti">Blocca dopo (minuti di inattività)</label>
+            <input class="form-control numeri" type="number" id="blocco_minuti" name="blocco_minuti" min="1" max="240" value="{{ s.blocco_minuti or 10 }}"></div>
+          <div class="col-sm-4"><label class="form-label" for="pin_attuale_m">PIN attuale</label>
+            <input class="form-control numeri" type="password" id="pin_attuale_m" name="pin_attuale" inputmode="numeric" required></div>
+          <div class="col-sm-4"><button class="btn btn-outline-primary w-100">Salva</button></div>
+        </form>
+        <form method="post" class="border-top pt-3 mt-3 row g-2 align-items-end" autocomplete="off"
+              onsubmit="return confirm('Rimuovere il PIN?');">
+          <input type="hidden" name="azione" value="rimuovi">
+          <div class="col-sm-8"><label class="form-label" for="pin_attuale_r">PIN attuale</label>
+            <input class="form-control numeri" type="password" id="pin_attuale_r" name="pin_attuale" inputmode="numeric" required></div>
+          <div class="col-sm-4"><button class="btn btn-outline-danger w-100">Rimuovi il PIN</button></div>
+        </form>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="col-lg-5">
+    <section class="card" aria-labelledby="t-disco">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-disco"><i class="bi bi-device-hdd me-1"></i> Cifratura del disco</h2></div>
+      <div class="card-body">
+        {% if cifratura == 'attiva' %}
+          <p class="text-success fw-semibold mb-2"><i class="bi bi-shield-check"></i> BitLocker è attivo sul disco dei dati.</p>
+          <p class="small text-muted mb-0">Se il PC viene perso o rubato, i dati dei clienti non sono leggibili.</p>
+        {% elif cifratura in ('non_attiva', 'sospesa') %}
+          <p class="text-danger fw-semibold mb-2"><i class="bi bi-shield-exclamation"></i> BitLocker {{ 'è sospeso' if cifratura == 'sospesa' else 'non è attivo' }} sul disco dei dati.</p>
+          <p class="small misura">Il PIN protegge lo schermo, non i file: chi ha il disco in mano può leggere l'archivio.
+            Su un portatile con dati di clienti conviene attivare la cifratura: <em>Impostazioni di Windows → Privacy e sicurezza →
+            Crittografia dispositivo</em> (o <em>Gestisci BitLocker</em> nelle edizioni Pro). Conserva la chiave di ripristino.</p>
+        {% elif cifratura == 'in_corso' %}
+          <p class="fw-semibold mb-0"><i class="bi bi-hourglass-split"></i> La cifratura BitLocker è in corso.</p>
+        {% else %}
+          <p class="small text-muted mb-0">Lo stato della cifratura non è verificabile qui. Su Windows controlla
+            <em>Impostazioni → Privacy e sicurezza → Crittografia dispositivo</em>.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

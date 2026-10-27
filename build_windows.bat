@@ -22,10 +22,16 @@ if not exist "%ISCC%" (
   echo per l'installatore installa Inno Setup 6 e rilancia questo file.
   goto :fine
 )
-"%ISCC%" installer\DealCombined.iss || goto :errore
+for /f "delims=" %%v in ('python -c "import gestionale; print(gestionale.__version__)"') do set "VERSIONE=%%v"
+"%ISCC%" /DVersioneApp=%VERSIONE% installer\DealCombined.iss || goto :errore
+rem Impronta SHA-256: da caricare nella Release insieme all'installatore,
+rem serve all'aggiornamento automatico per verificare il file scaricato.
+powershell -NoProfile -Command "(Get-FileHash dist\Installa-DealCombined.exe -Algorithm SHA256).Hash.ToLower() + '  Installa-DealCombined.exe' | Set-Content -Encoding ascii dist\Installa-DealCombined.exe.sha256" || goto :errore
 
 echo.
-echo Fatto: dist\Installa-DealCombined.exe
+echo Fatto: dist\Installa-DealCombined.exe (versione %VERSIONE%)
+echo Per pubblicare l'aggiornamento crea una Release su GitHub con tag v%VERSIONE%
+echo e allega Installa-DealCombined.exe e Installa-DealCombined.exe.sha256.
 goto :fine
 
 :errore

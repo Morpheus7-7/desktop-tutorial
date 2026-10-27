@@ -4,6 +4,8 @@ Gestionale per intermediari assicurativi: anagrafiche clienti
 (professionisti e aziende), polizze, documenti, analisi automatica dei
 rischi, follow-up, scadenzario e notifiche.
 """
+__version__ = "2.1.0"
+
 import os
 from datetime import date
 
@@ -40,6 +42,13 @@ def _ensure_schema() -> None:
         },
         "documents": {
             "dimensione": "ALTER TABLE documents ADD COLUMN dimensione INTEGER",
+        },
+        "settings": {
+            "pin_hash": "ALTER TABLE settings ADD COLUMN pin_hash VARCHAR(200)",
+            "pin_recupero_hash": "ALTER TABLE settings ADD COLUMN pin_recupero_hash VARCHAR(200)",
+            "blocco_minuti": "ALTER TABLE settings ADD COLUMN blocco_minuti INTEGER DEFAULT 10",
+            "pin_tentativi": "ALTER TABLE settings ADD COLUMN pin_tentativi INTEGER DEFAULT 0",
+            "pin_attesa_fino": "ALTER TABLE settings ADD COLUMN pin_attesa_fino DATETIME",
         },
         "followups": {
             "policy_id": "ALTER TABLE followups ADD COLUMN policy_id INTEGER",

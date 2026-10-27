@@ -27,7 +27,9 @@
 <div class="dc-shell">
   {% set ep = request.endpoint or '' %}
   {% set bp = request.blueprint or '' %}
-  <aside class="dc-rail offcanvas-lg offcanvas-start" id="dc-rail" tabindex="-1" aria-label="Navigazione principale">
+  {# Con lo schermo bloccato dal PIN non si mostra niente dell'archivio. #}
+  {% set bloccato = ep in ('privacy.unlock', 'privacy.recover') %}
+  <aside class="dc-rail offcanvas-lg offcanvas-start" id="dc-rail" tabindex="-1" aria-label="Navigazione principale" {% if bloccato %}hidden{% endif %}>
     <div class="dc-rail-inner">
       <div class="d-flex align-items-center justify-content-between">
         <a class="dc-brand" href="{{ url_for('main.dashboard') }}" aria-label="Deal Combined, vai a Oggi">
@@ -68,6 +70,7 @@
 
   <div class="dc-main">
     <header class="dc-topbar">
+      {% if not bloccato %}
       <button class="btn dc-icon-btn d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#dc-rail" aria-controls="dc-rail" aria-label="Apri il menu">
         <i class="bi bi-list"></i>
       </button>
@@ -78,16 +81,30 @@
         <input class="form-control" type="search" name="q" placeholder="Cerca clienti e polizze"
                value="{{ request.args.get('q', '') if ep == 'main.search' else '' }}" aria-label="Cerca clienti e polizze">
       </form>
+      {% else %}<span class="me-auto"></span>{% endif %}
 
       <div class="dc-topbar-actions">
         <button class="btn dc-icon-btn" type="button" id="dc-tema" aria-label="Tema: automatico" title="Tema: automatico">
           <i class="bi bi-circle-half" aria-hidden="true"></i>
         </button>
+        {% if config.DC_AGGIORNAMENTO and not bloccato %}
+        <a class="btn dc-icon-btn dc-aggiorna" href="{{ url_for('settings.updates') }}"
+           aria-label="Disponibile la versione {{ config.DC_AGGIORNAMENTO.versione }}" title="Disponibile la versione {{ config.DC_AGGIORNAMENTO.versione }}">
+          <i class="bi bi-arrow-up-circle" aria-hidden="true"></i>
+        </a>
+        {% endif %}
+        {% if dc_pin_minuti and not bloccato %}
+        <form method="post" action="{{ url_for('privacy.lock_now') }}" class="d-inline">
+          <button class="btn dc-icon-btn" aria-label="Blocca ora" title="Blocca ora"><i class="bi bi-lock" aria-hidden="true"></i></button>
+        </form>
+        {% endif %}
+        {% if not bloccato %}
         <a class="btn dc-icon-btn position-relative" href="{{ url_for('notifications.list_notifications') }}"
            aria-label="Notifiche{% if notifiche_non_lette %}: {{ notifiche_non_lette }} da leggere{% endif %}" title="Notifiche">
           <i class="bi bi-bell" aria-hidden="true"></i>
           {% if notifiche_non_lette %}<span class="dc-count">{{ notifiche_non_lette }}</span>{% endif %}
         </a>
+        {% endif %}
       </div>
     </header>
 
@@ -154,6 +171,24 @@
     fetch("{{ url_for('settings.shutdown') }}", { method: "POST", headers: { "X-DC-Azione": "chiudi" } })
       .finally(function () { document.body.innerHTML = '<main class="p-5"><h1 class="h4">Deal Combined è stato chiuso.</h1><p>Puoi chiudere questa scheda del browser.</p></main>'; });
   });
+</script>
+{% endif %}
+{% if dc_pin_minuti and not bloccato %}
+<script>
+  /* Blocco per inattività: dopo i minuti scelti torna alla schermata del PIN. */
+  (function () {
+    var limite = {{ dc_pin_minuti }} * 60 * 1000, timer;
+    function riarma() {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        location.href = "{{ url_for('privacy.unlock') }}?next=" + encodeURIComponent(location.pathname + location.search);
+      }, limite);
+    }
+    ["mousemove", "keydown", "pointerdown", "scroll", "touchstart"].forEach(function (e) {
+      window.addEventListener(e, riarma, { passive: true });
+    });
+    riarma();
+  })();
 </script>
 {% endif %}
 {% block scripts %}{% endblock %}

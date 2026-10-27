@@ -1,7 +1,9 @@
 """Follow-up: attività da svolgere con scadenza (chiamate, rinnovi, preventivi…)."""
 from datetime import date, datetime
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
+
+from .. import google
 
 from ..models import (
     FOLLOWUP_PRIORITIES,
@@ -92,3 +94,30 @@ def _back_to_origin(fu: FollowUp):
     if request.form.get("da_lista"):
         return redirect(url_for("followups.list_followups"))
     return redirect(url_for("clients.detail", client_id=fu.client_id) + "#followup")
+
+
+# ----------------------------------------------------------------------
+# Google Calendar: link per singolo follow-up ed esportazione .ics
+# ----------------------------------------------------------------------
+def _dettagli(f: FollowUp) -> str:
+    parti = [f"Cliente: {f.cliente.ragione_sociale}", f"Tipo: {f.tipo_label}"]
+    if f.descrizione:
+        parti.append(f.descrizione)
+    return "\n".join(parti)
+
+
+@bp.app_template_global("link_calendar")
+def link_calendar_followup(f: FollowUp) -> str:
+    return google.link_calendar(f"{f.titolo} · {f.cliente.ragione_sociale}", f.data_scadenza, _dettagli(f))
+
+
+@bp.route("/calendario.ics")
+def calendar_ics():
+    aperti = FollowUp.query.filter_by(stato="aperto").order_by(FollowUp.data_scadenza.asc()).all()
+    dati = google.calendario_ics([
+        {"uid": f"followup-{f.id}", "titolo": f"{f.titolo} · {f.cliente.ragione_sociale}",
+         "giorno": f.data_scadenza, "dettagli": _dettagli(f)}
+        for f in aperti
+    ])
+    return Response(dati, mimetype="text/calendar",
+                    headers={"Content-Disposition": "attachment; filename=deal-combined-follow-up.ics"})

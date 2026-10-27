@@ -89,6 +89,7 @@ DOCUMENT_CATEGORIES = [
     ("sinistro", "Documentazione sinistro"),
     ("adeguatezza", "Questionario di adeguatezza"),
     ("privacy", "Privacy / GDPR"),
+    ("scheda", "Scheda compilata"),
     ("altro", "Altro"),
 ]
 DOCUMENT_CATEGORY_LABELS = dict(DOCUMENT_CATEGORIES)
@@ -418,6 +419,12 @@ class Settings(db.Model):
     mail_from = db.Column(db.String(200))
     mail_to = db.Column(db.String(500))  # destinatari separati da virgola/;
     intervallo_minuti = db.Column(db.Integer, default=30)  # cadenza controllo automatico
+    # Privacy: PIN all'apertura (hash scrypt), codice di recupero, blocco per inattività
+    pin_hash = db.Column(db.String(200))
+    pin_recupero_hash = db.Column(db.String(200))
+    blocco_minuti = db.Column(db.Integer, default=10)
+    pin_tentativi = db.Column(db.Integer, default=0)
+    pin_attesa_fino = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     @staticmethod

@@ -5,9 +5,11 @@ def register_blueprints(app: Flask) -> None:
     from . import (
         academy,
         client_sheets,
+        privacy,
         clients,
         documents,
         followups,
+        importazione,
         main,
         notifications,
         opportunities,
@@ -25,3 +27,5 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(settings.bp)
     app.register_blueprint(academy.bp)
     app.register_blueprint(client_sheets.bp)
+    app.register_blueprint(privacy.bp)
+    app.register_blueprint(importazione.bp)

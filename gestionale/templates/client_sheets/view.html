@@ -3,12 +3,28 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3 no-print flex-wrap gap-2">
   <a class="btn btn-outline-secondary" href="{{ url_for('clients.detail', client_id=client.id) }}#schede"><i class="bi bi-arrow-left"></i> {{ client.ragione_sociale }}</a>
-  <div class="d-flex gap-2">
+  <div class="d-flex gap-2 flex-wrap">
     <form method="post" action="{{ url_for('client_sheets.delete_sheet', client_id=client.id, compilata_id=sc.id) }}"
           onsubmit="return confirm('Eliminare questa scheda compilata?');">
       <button class="btn btn-outline-danger"><i class="bi bi-trash"></i> Elimina</button>
     </form>
     <a class="btn btn-outline-primary" href="{{ url_for('client_sheets.edit_sheet', client_id=client.id, compilata_id=sc.id) }}"><i class="bi bi-pencil"></i> Modifica</a>
+    <div class="dropdown">
+      <button class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+      <div class="dropdown-menu dropdown-menu-end">
+        <a class="dropdown-item" href="{{ url_for('client_sheets.sheet_pdf', client_id=client.id, compilata_id=sc.id) }}"><i class="bi bi-download me-1"></i>Scarica il PDF</a>
+        <form method="post" action="{{ url_for('client_sheets.save_pdf', client_id=client.id, compilata_id=sc.id) }}">
+          <button class="dropdown-item" name="dove" value="documenti"><i class="bi bi-folder2-open me-1"></i>Salva nei documenti del cliente</button>
+          {% if drive %}
+          <button class="dropdown-item" name="dove" value="drive"><i class="bi bi-google me-1"></i>Salva in Google Drive</button>
+          <button class="dropdown-item" name="dove" value="entrambi"><i class="bi bi-files me-1"></i>Salva in entrambi</button>
+          {% else %}
+          <a class="dropdown-item text-muted" href="{{ url_for('settings.google') }}"><i class="bi bi-google me-1"></i>Imposta Google Drive…</a>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+    <a class="btn btn-outline-primary" href="{{ url_for('client_sheets.email_sheet', client_id=client.id, compilata_id=sc.id) }}"><i class="bi bi-envelope"></i> Invia per email</a>
     <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
   </div>
 </div>

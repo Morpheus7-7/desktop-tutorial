@@ -116,6 +116,12 @@ def main() -> None:
 
     start_scheduler(app)
 
+    if desktop.leggi_configurazione(file_config).get("aggiornamenti_automatici", True):
+        from gestionale.routes.settings import controlla_aggiornamenti
+
+        # Dopo qualche secondo, per non rallentare l'apertura.
+        threading.Timer(8, controlla_aggiornamenti, args=(app,)).start()
+
     print("=" * 60)
     print("  Deal Combined è in esecuzione.")
     print(f"  Indirizzo:        {url}")

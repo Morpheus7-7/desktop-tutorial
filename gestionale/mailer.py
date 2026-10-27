@@ -138,6 +138,32 @@ def send_test_email(settings: Settings | None = None) -> tuple[bool, str]:
         return False, f"Invio non riuscito: {exc}"
 
 
+def invia_al_cliente(destinatario: str, oggetto: str, testo: str,
+                     allegati: list[tuple[str, bytes, str]] | None = None,
+                     settings: Settings | None = None) -> None:
+    """Invia un'email al cliente con gli allegati indicati (nome, dati, mime).
+
+    Usa il server configurato in Impostazioni (per Gmail: smtp.gmail.com con
+    una «password per le app»): l'email compare anche in «Posta inviata».
+    Solleva ValueError se manca la configurazione o l'indirizzo.
+    """
+    cfg = effective_config(settings)
+    if not cfg.host or not (cfg.mittente or cfg.user):
+        raise ValueError("Configura prima l'invio email in Impostazioni → Notifiche email (server e mittente).")
+    destinatario = (destinatario or "").strip()
+    if "@" not in destinatario or any(c in destinatario for c in "\r\n,;<>"):
+        raise ValueError("Indirizzo email del destinatario non valido.")
+    msg = EmailMessage()
+    msg["Subject"] = oggetto.replace("\r", " ").replace("\n", " ").strip()[:200]
+    msg["From"] = cfg.mittente or cfg.user
+    msg["To"] = destinatario
+    msg.set_content(testo)
+    for nome, dati, mime in allegati or []:
+        principale, _, secondario = mime.partition("/")
+        msg.add_attachment(dati, maintype=principale, subtype=secondario, filename=nome)
+    _send(cfg, msg)
+
+
 # ----------------------------------------------------------------------
 # Digest delle notifiche
 # ----------------------------------------------------------------------

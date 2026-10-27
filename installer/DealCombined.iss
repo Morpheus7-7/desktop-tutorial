@@ -10,13 +10,17 @@
 ; programma non cancella mai clienti, polizze e documenti.
 
 #define NomeApp "Deal Combined"
-#define VersioneApp "2.0.0"
+; La versione si può passare da riga di comando: ISCC /DVersioneApp=2.1.0 …
+#ifndef VersioneApp
+  #define VersioneApp "2.1.0"
+#endif
 #define Eseguibile "DealCombined.exe"
 
 [Setup]
 AppId={{B6C2D1F0-5D0A-4C8E-9C1E-7A2E4F3D9B11}
 AppName={#NomeApp}
 AppVersion={#VersioneApp}
+VersionInfoVersion={#VersioneApp}
 AppPublisher={#NomeApp}
 DefaultDirName={autopf}\{#NomeApp}
 DefaultGroupName={#NomeApp}
@@ -50,3 +54,28 @@ Name: "{autodesktop}\{#NomeApp}"; Filename: "{app}\{#Eseguibile}"; Tasks: deskto
 
 [Run]
 Filename: "{app}\{#Eseguibile}"; Description: "Avvia {#NomeApp}"; Flags: nowait postinstall skipifsilent
+; Aggiornamento automatico (installazione silenziosa): riapre il programma.
+Filename: "{app}\{#Eseguibile}"; Flags: nowait; Check: WizardSilent
+
+[Code]
+// Durante un aggiornamento il vecchio DealCombined.exe potrebbe essere
+// ancora in chiusura: si aspetta qualche secondo che il file si liberi.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Tentativi: Integer;
+  Percorso: String;
+begin
+  Result := '';
+  Percorso := ExpandConstant('{app}\{#Eseguibile}');
+  Tentativi := 0;
+  while FileExists(Percorso) and (not RenameFile(Percorso, Percorso + '.vecchio')) and (Tentativi < 20) do
+  begin
+    Sleep(500);
+    Tentativi := Tentativi + 1;
+  end;
+  if FileExists(Percorso + '.vecchio') then
+  begin
+    if not RenameFile(Percorso + '.vecchio', Percorso) then
+      DeleteFile(Percorso + '.vecchio');
+  end;
+end;
