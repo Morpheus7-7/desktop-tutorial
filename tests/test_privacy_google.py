@@ -277,3 +277,27 @@ def test_mostra_finestra_richiede_intestazione(app, client):
     app.config["DC_MOSTRA"] = lambda: chiamate.append(1)
     assert client.post("/impostazioni/mostra").status_code == 404
     assert client.post("/impostazioni/mostra", headers={"X-DC-Azione": "mostra"}).status_code == 204
+
+
+def test_in_pausa_nessuna_scrittura_e_database_chiuso(app, client):
+    import run_desktop
+    from gestionale.models import Notification
+
+    with app.app_context():
+        c = Client(tipo="azienda", ragione_sociale="Pausa Srl")
+        db.session.add(c)
+        db.session.flush()
+        db.session.add(Policy(client_id=c.id, compagnia="Generali", numero_polizza="P-1",
+                              data_scadenza=date.today() + timedelta(days=5)))
+        db.session.commit()
+    app.config["DC_IN_PAUSA"] = True  # finestra nella barra o archivio aperto altrove
+    client.get("/clienti/")
+    with app.app_context():
+        assert Notification.query.count() == 0 and FollowUp.query.count() == 0
+    run_desktop.chiudi_database(app)
+    with app.app_context():
+        assert db.engine.pool.checkedin() == 0  # nessun collegamento al file rimasto aperto
+    app.config["DC_IN_PAUSA"] = False
+    client.get("/clienti/")
+    with app.app_context():
+        assert Notification.query.count() > 0  # alla riapertura riprende da solo

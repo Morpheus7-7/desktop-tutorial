@@ -62,6 +62,33 @@ def _attendi_server(port: int, secondi: float = 15.0) -> None:
             time.sleep(0.1)
 
 
+NOME_MUTEX = "DealCombinedAppMutex"  # lo stesso in installer/DealCombined.iss
+
+
+def _prendi_mutex():
+    """Mutex di Windows con nome: dice all'installatore (e a una seconda
+    copia) che il programma è aperto. Restituisce (handle, già_esistente)."""
+    if sys.platform != "win32":
+        return None, False
+    import ctypes
+
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.CreateMutexW(None, False, NOME_MUTEX)
+    return handle, kernel32.GetLastError() == 183  # ERROR_ALREADY_EXISTS
+
+
+def chiudi_database(app) -> None:
+    """Chiude ogni collegamento al file del database. Su Windows un file
+    aperto non può essere sostituito da OneDrive/Google Drive: con la
+    finestra nella barra la versione arrivata dall'altro PC deve poter
+    entrare. Alla riapertura SQLAlchemy si ricollega da solo."""
+    from gestionale.models import db
+
+    with app.app_context():
+        db.session.remove()
+        db.engine.dispose()
+
+
 def _altra_copia_attiva(file_istanza: Path) -> bool:
     """Se il programma è già aperto (magari solo nella barra), gli chiede di
     mostrare la finestra e restituisce True."""
@@ -87,7 +114,15 @@ def main() -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
 
     file_istanza = file_config.parent / "istanza.txt"
-    if _altra_copia_attiva(file_istanza):
+    mutex_app, gia_aperto = _prendi_mutex()  # resta aperto finché il programma è attivo
+    if gia_aperto:
+        # L'altra copia potrebbe essere ancora in avvio: le si dà qualche secondo.
+        for _ in range(20):
+            if _altra_copia_attiva(file_istanza):
+                return
+            time.sleep(1)
+        return
+    if _altra_copia_attiva(file_istanza):  # fuori da Windows: solo il file
         return
 
     # Senza console (programma installato) i messaggi vanno in un file di log.
@@ -115,32 +150,44 @@ def main() -> None:
     app.config.update(DC_DESKTOP=True, DC_CONFIG_FILE=str(file_config), DC_BLOCCO_ALTRUI=None,
                       DC_HO_BLOCCO=False, DC_IN_PAUSA=True)
     stato = {"backup_fatto": False}
+    mutex_blocco = threading.Lock()  # entra/esce e battito non si sovrappongono
 
     def entra() -> None:
         """La finestra si apre: l'archivio diventa «aperto su questo PC», a
         meno che non lo sia già su un altro (pagina di avviso)."""
-        altrui = desktop.blocco_altrui(data_dir)
-        app.config["DC_BLOCCO_ALTRUI"] = altrui
-        if not altrui:
-            if not stato["backup_fatto"]:
-                desktop.esegui_backup(data_dir, motivo="avvio")
-                stato["backup_fatto"] = True
-            desktop.prendi_blocco(data_dir)
-            app.config["DC_HO_BLOCCO"] = True
-        app.config["DC_IN_PAUSA"] = False
+        with mutex_blocco:
+            altrui = desktop.blocco_altrui(data_dir)
+            app.config["DC_BLOCCO_ALTRUI"] = altrui
+            if not altrui:
+                if not stato["backup_fatto"]:
+                    desktop.esegui_backup(data_dir, motivo="avvio")
+                    stato["backup_fatto"] = True
+                desktop.prendi_blocco(data_dir)
+                app.config["DC_HO_BLOCCO"] = True
+            # Se l'archivio è aperto altrove resta in pausa finché l'utente
+            # non sceglie «Apri comunque».
+            app.config["DC_IN_PAUSA"] = bool(altrui)
 
     def esce() -> None:
         """La finestra va nella barra: l'archivio si libera per l'altro PC."""
         from datetime import datetime
 
-        app.config["DC_IN_PAUSA"] = True
-        app.config["DC_NASCOSTA_ALLE"] = datetime.utcnow().timestamp()  # stesso orologio del PIN
-        if app.config.get("DC_HO_BLOCCO"):
-            desktop.rilascia_blocco(data_dir)
-            app.config["DC_HO_BLOCCO"] = False
+        with mutex_blocco:
+            app.config["DC_IN_PAUSA"] = True
+            app.config["DC_NASCOSTA_ALLE"] = datetime.utcnow().timestamp()  # stesso orologio del PIN
+            if app.config.get("DC_HO_BLOCCO"):
+                desktop.rilascia_blocco(data_dir)
+                app.config["DC_HO_BLOCCO"] = False
+            chiudi_database(app)
 
     def chiudi() -> None:
         esce()
+        ferma_icona = app.config.get("DC_FERMA_ICONA")
+        if ferma_icona:
+            try:
+                ferma_icona()
+            except Exception:  # noqa: BLE001 - l'icona potrebbe essere già ferma
+                pass
         try:
             file_istanza.unlink(missing_ok=True)
         except OSError:
@@ -155,11 +202,12 @@ def main() -> None:
         # qualche minuto l'altro PC potrà riaprire l'archivio.
         while True:
             time.sleep(desktop.BATTITO_OGNI)
-            if app.config.get("DC_HO_BLOCCO") and not app.config.get("DC_BLOCCO_ALTRUI"):
-                try:
-                    desktop.prendi_blocco(data_dir)
-                except OSError:
-                    pass
+            with mutex_blocco:
+                if app.config.get("DC_HO_BLOCCO") and not app.config.get("DC_BLOCCO_ALTRUI"):
+                    try:
+                        desktop.prendi_blocco(data_dir)
+                    except OSError:
+                        pass
 
     threading.Thread(target=battito, name="blocco", daemon=True).start()
 
@@ -251,16 +299,14 @@ def _avvia_barra(app, finestra, entra, esce, chiudi, url):
 
     def esci() -> None:
         stato["uscita"] = True
-        try:
-            icona.stop()
-        finally:
-            chiudi()
+        chiudi()  # toglie anche l'icona
 
     def alla_chiusura():
         if stato["uscita"]:
             return True
         esce()
         finestra.hide()
+        finestra.load_url("about:blank")  # ferma i timer della pagina (blocco PIN, ricarica)
         if not stato.get("avvisato"):
             stato["avvisato"] = True
             icona.notify("Deal Combined resta attivo qui per i promemoria. Per chiuderlo: tasto destro → Esci.",
@@ -274,6 +320,7 @@ def _avvia_barra(app, finestra, entra, esce, chiudi, url):
         return None
 
     app.config["DC_MOSTRA"] = mostra
+    app.config["DC_FERMA_ICONA"] = icona.stop
     finestra.events.closing += alla_chiusura
 
     def controlla_promemoria() -> None:
@@ -283,6 +330,8 @@ def _avvia_barra(app, finestra, entra, esce, chiudi, url):
             try:
                 with app.app_context():
                     novita = annunciatore.novita(promemoria.elementi_di_oggi())
+                if app.config.get("DC_IN_PAUSA"):
+                    chiudi_database(app)  # lettura lampo: il file non resta aperto
                 if novita:
                     titolo, testo = novita
                     icona.notify(testo, titolo)

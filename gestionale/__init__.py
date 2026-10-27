@@ -134,6 +134,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     def refresh_notifications():
         from .notifications import auto_create_renewal_followups, generate_notifications
 
+        if app.config.get("DC_IN_PAUSA"):
+            return  # finestra nella barra o archivio aperto sull'altro PC: niente scritture
         auto_create_renewal_followups()
         generate_notifications()
 

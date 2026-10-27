@@ -25,6 +25,9 @@ from .models import (
 )
 
 RIGHE_MASSIME = 20000
+COLONNE_MASSIME = 80
+ESEMPIO_CLIENTE = "Rossi Impianti S.r.l."
+ESEMPIO_COMPAGNIA = "Compagnia Esempio"
 
 # ----------------------------------------------------------------------
 # Colonne: campo -> (intestazione del modello, altri nomi riconosciuti, tipo)
@@ -258,7 +261,7 @@ def _fogli_da_xlsx(dati: bytes) -> list[tuple[str, list[list]]]:
     try:
         for foglio in libro.worksheets:
             righe = []
-            for riga in foglio.iter_rows(values_only=True):
+            for riga in foglio.iter_rows(values_only=True, max_col=COLONNE_MASSIME):
                 righe.append(list(riga))
                 if len(righe) > RIGHE_MASSIME + 1:
                     raise FileNonValido(f"Il foglio «{foglio.title}» ha più di {RIGHE_MASSIME} righe.")
@@ -329,10 +332,13 @@ class _Indice:
 
     def __init__(self):
         self.per_piva, self.per_cf, self.per_nome = {}, {}, {}
+        self.codici = {}  # rif -> (P.IVA, CF) già noti
         for c in Client.query.all():
             self.aggiungi(("db", c.id), c.partita_iva, c.codice_fiscale, c.ragione_sociale)
 
     def aggiungi(self, rif, piva, cf, nome):
+        noti = self.codici.get(rif, (None, None))
+        self.codici[rif] = (noti[0] or piva, noti[1] or (cf.upper() if cf else None))
         if piva:
             self.per_piva.setdefault(piva, rif)
         if cf:
@@ -341,8 +347,19 @@ class _Indice:
             self.per_nome.setdefault(_chiave_nome(nome), rif)
 
     def trova(self, piva=None, cf=None, nome=None):
-        return ((piva and self.per_piva.get(piva)) or (cf and self.per_cf.get(cf.upper()))
-                or (nome and self.per_nome.get(_chiave_nome(nome))) or None)
+        trovato = (piva and self.per_piva.get(piva)) or (cf and self.per_cf.get(cf.upper()))
+        if trovato:
+            return trovato
+        per_nome = nome and self.per_nome.get(_chiave_nome(nome))
+        if per_nome and not self.codici_in_conflitto(per_nome, piva, cf):
+            return per_nome
+        return None
+
+    def codici_in_conflitto(self, rif, piva, cf) -> bool:
+        """Stesso nome ma P.IVA o codice fiscale diversi: sono due persone
+        (o aziende) diverse, non lo stesso cliente."""
+        noti_piva, noti_cf = self.codici.get(rif, (None, None))
+        return bool((piva and noti_piva and piva != noti_piva) or (cf and noti_cf and cf.upper() != noti_cf))
 
     def cerca_testo(self, testo: str):
         """Il campo «Cliente» delle polizze può contenere nome, P.IVA o CF."""
@@ -418,6 +435,10 @@ def analizza(dati: bytes, nome_file: str) -> dict:
                 r["esito"] = "errore"
             else:
                 trovato = indice.trova(d.get("partita_iva"), d.get("codice_fiscale"), d.get("ragione_sociale"))
+                omonimo = indice.per_nome.get(_chiave_nome(d.get("ragione_sociale")))
+                if not trovato and omonimo:
+                    r["avvisi"].append("Esiste già un cliente con lo stesso nome ma P.IVA o codice fiscale "
+                                       "diversi: verrà creato un cliente nuovo")
                 if trovato:
                     r["esito"] = "esistente" if trovato[0] == "db" else "doppione"
                     r["rif"] = trovato
@@ -445,8 +466,11 @@ def analizza(dati: bytes, nome_file: str) -> dict:
             for campo in ("compagnia", "numero_polizza"):
                 if not d.get(campo):
                     r["errori"].append(f"Manca {COLONNE_POLIZZE[campo][0].lower()}")
-            rif = (indice.trova(d.get("partita_iva"), d.get("codice_fiscale"))
-                   or (d.get("cliente") and indice.cerca_testo(d["cliente"])))
+            rif = indice.trova(d.get("partita_iva"), d.get("codice_fiscale"))
+            if not rif and d.get("cliente"):
+                rif = indice.cerca_testo(d["cliente"])
+                if rif and indice.codici_in_conflitto(rif, d.get("partita_iva"), d.get("codice_fiscale")):
+                    rif = None  # stesso nome ma codici diversi: è un altro cliente
             if not rif:
                 if d.get("cliente") and not re.fullmatch(r"[\d\s]+", d["cliente"]):
                     # Cliente non presente: lo crea con i dati della riga.
@@ -470,6 +494,13 @@ def analizza(dati: bytes, nome_file: str) -> dict:
                 r["esito"] = "nuova"
                 polizze_viste.add(chiave)
             polizze.append(r)
+
+    for r in clienti:
+        if r["dati"].get("ragione_sociale") == ESEMPIO_CLIENTE:
+            r["avvisi"].append("È la riga di esempio del modello: cancellala dal file se non è un tuo cliente")
+    for r in polizze:
+        if r["dati"].get("compagnia") == ESEMPIO_COMPAGNIA:
+            r["avvisi"].append("È la riga di esempio del modello: cancellala dal file se non è una tua polizza")
 
     def conta(righe, esito):
         return sum(1 for r in righe if r["esito"] == esito)
@@ -589,7 +620,7 @@ def modello_xlsx() -> bytes:
 
     clienti = libro.create_sheet("Clienti", 0)
     prepara(clienti, COLONNE_CLIENTI, [
-        "Rossi Impianti S.r.l.", "Azienda", "Mario Rossi", "01234567890", "01234567890", "43.21.01", None, None,
+        ESEMPIO_CLIENTE, "Azienda", "Mario Rossi", "01234567890", "01234567890", "43.21.01", None, None,
         "Impianti elettrici", "Via Roma 1", "Brescia", "25121", "BS", "info@rossiimpianti.it", None,
         "030 1234567", 12, 1500000, "Installazione impianti elettrici civili e industriali", None,
     ])
@@ -600,7 +631,7 @@ def modello_xlsx() -> bytes:
 
     polizze = libro.create_sheet("Polizze", 1)
     prepara(polizze, COLONNE_POLIZZE, [
-        "Rossi Impianti S.r.l.", "Compagnia Esempio", "123456789", BRANCH_LABELS["rct_rco"], 3000000, 2450,
+        ESEMPIO_CLIENTE, ESEMPIO_COMPAGNIA, "123456789", BRANCH_LABELS["rct_rco"], 3000000, 2450,
         12, "Annuale", date(date.today().year, 1, 1), date(date.today().year, 12, 31), "Sì", "Attiva", None,
     ])
     lista(polizze, COLONNE_POLIZZE, "ramo", rif(2, elenchi["Ramo"]))

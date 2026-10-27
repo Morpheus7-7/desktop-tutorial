@@ -13,9 +13,12 @@ import os
 import secrets
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 TENTATIVI_MASSIMI = 5
+_CIFRATURA_VALIDA_PER = 600  # secondi: PowerShell è lento, lo stato cambia di rado
+_cifratura_letta: dict[str, tuple[float, str]] = {}
 ATTESA_SECONDI = 60
 _ALFABETO_RECUPERO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # niente I, O, 0, 1: si leggono male
 
@@ -77,6 +80,15 @@ def stato_cifratura(percorso: str | Path) -> str:
     if sys.platform != "win32":
         return "sconosciuta"
     unita = Path(percorso).resolve().drive or "C:"
+    letta = _cifratura_letta.get(unita)
+    if letta and time.monotonic() - letta[0] < _CIFRATURA_VALIDA_PER:
+        return letta[1]
+    stato = _leggi_bitlocker(unita)
+    _cifratura_letta[unita] = (time.monotonic(), stato)
+    return stato
+
+
+def _leggi_bitlocker(unita: str) -> str:
     comando = (
         "(New-Object -ComObject Shell.Application).NameSpace('" + unita + "\\')"
         ".Self.ExtendedProperty('System.Volume.BitLockerProtection')"

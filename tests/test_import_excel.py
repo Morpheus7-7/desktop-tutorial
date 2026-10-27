@@ -177,3 +177,28 @@ def test_cliente_esistente_con_nome_diverso_non_si_duplica(app):
         assert a["ignorati"] == []  # i fogli di aiuto del modello non sono segnalati
         ie.importa(a)
         assert Client.query.count() == 1 and Policy.query.count() == 1
+
+
+def test_stesso_nome_codici_diversi_non_si_uniscono(app):
+    with app.app_context():
+        db.session.add(Client(tipo="dipendente", ragione_sociale="Mario Rossi", codice_fiscale="RSSMRA80A01H501U"))
+        db.session.commit()
+        dati = _xlsx({
+            "Clienti": [["Nome", "Codice fiscale"], ["Mario Rossi", "RSSMRA75B02F205X"]],
+            "Polizze": [["Cliente", "Codice fiscale", "Compagnia", "Numero polizza"],
+                        ["Mario Rossi", "RSSMRA75B02F205X", "Generali", "Z-1"]],
+        })
+        a = ie.analizza(dati, "omonimi.xlsx")
+        assert a["clienti"][0]["esito"] == "nuovo"
+        assert any("stesso nome" in w for w in a["clienti"][0]["avvisi"])
+        ie.importa(a)
+        vecchio = Client.query.filter_by(codice_fiscale="RSSMRA80A01H501U").one()
+        nuovo = Client.query.filter_by(codice_fiscale="RSSMRA75B02F205X").one()
+        assert vecchio.polizze == [] and [p.numero_polizza for p in nuovo.polizze] == ["Z-1"]
+
+
+def test_righe_di_esempio_segnalate(app):
+    with app.app_context():
+        a = ie.analizza(ie.modello_xlsx(), "modello.xlsx")
+        assert any("esempio" in w for w in a["clienti"][0]["avvisi"])
+        assert any("esempio" in w for w in a["polizze"][0]["avvisi"])

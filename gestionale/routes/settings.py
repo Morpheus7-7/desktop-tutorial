@@ -264,6 +264,7 @@ def open_anyway():
     current_app.config["DC_BLOCCO_ALTRUI"] = None
     desktop.prendi_blocco(_cartella_corrente())
     current_app.config["DC_HO_BLOCCO"] = True
+    current_app.config["DC_IN_PAUSA"] = False
     flash("Archivio aperto su questo PC. Non usarlo nello stesso momento sull'altro PC.", "warning")
     return redirect(url_for("main.dashboard"))
 

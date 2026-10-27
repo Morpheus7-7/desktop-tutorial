@@ -15,6 +15,8 @@
   #define VersioneApp "2.1.0"
 #endif
 #define Eseguibile "DealCombined.exe"
+; Stesso nome usato da run_desktop.py: indica che il programma è aperto.
+#define MutexApp "DealCombinedAppMutex"
 
 [Setup]
 AppId={{B6C2D1F0-5D0A-4C8E-9C1E-7A2E4F3D9B11}
@@ -62,27 +64,22 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 [Run]
 Filename: "{app}\{#Eseguibile}"; Description: "Avvia {#NomeApp}"; Flags: nowait postinstall skipifsilent
 ; Aggiornamento automatico (installazione silenziosa): riapre il programma.
-Filename: "{app}\{#Eseguibile}"; Flags: nowait; Check: WizardSilent
+Filename: "{app}\{#Eseguibile}"; Flags: nowait runasoriginaluser; Check: WizardSilent
 
 [Code]
-// Durante un aggiornamento il vecchio DealCombined.exe potrebbe essere
-// ancora in chiusura: si aspetta qualche secondo che il file si liberi.
+// Durante un aggiornamento il vecchio DealCombined.exe si sta ancora
+// chiudendo: si aspetta (fino a 30 secondi) che rilasci il suo mutex.
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   Tentativi: Integer;
-  Percorso: String;
 begin
   Result := '';
-  Percorso := ExpandConstant('{app}\{#Eseguibile}');
   Tentativi := 0;
-  while FileExists(Percorso) and (not RenameFile(Percorso, Percorso + '.vecchio')) and (Tentativi < 20) do
+  while CheckForMutexes('{#MutexApp}') and (Tentativi < 60) do
   begin
     Sleep(500);
     Tentativi := Tentativi + 1;
   end;
-  if FileExists(Percorso + '.vecchio') then
-  begin
-    if not RenameFile(Percorso + '.vecchio', Percorso) then
-      DeleteFile(Percorso + '.vecchio');
-  end;
+  if CheckForMutexes('{#MutexApp}') then
+    Result := 'Deal Combined è ancora aperto: chiudilo (tasto destro sull''icona vicino all''orologio → Esci) e riprova.';
 end;
