@@ -62,11 +62,20 @@ def board():
             }
         )
     aperte = Opportunity.query.filter(Opportunity.fase.in_(OPPORTUNITY_OPEN_STAGES)).count()
+    # Il nastro segna la trattativa aperta ferma da più tempo: è quella da muovere.
+    ferma = (
+        Opportunity.query.filter(Opportunity.fase.in_(OPPORTUNITY_OPEN_STAGES))
+        .order_by(Opportunity.updated_at.asc())
+        .first()
+    )
+    giorni_ferma = (datetime.utcnow() - ferma.updated_at).days if ferma and ferma.updated_at else None
     return render_template(
         "opportunities/board.html",
         colonne=colonne,
         stages=OPPORTUNITY_STAGES,
         aperte=aperte,
+        ferma=ferma,
+        giorni_ferma=giorni_ferma,
     )
 
 

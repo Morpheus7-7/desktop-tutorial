@@ -86,6 +86,9 @@ def delete(followup_id):
 
 
 def _back_to_origin(fu: FollowUp):
+    dest = request.form.get("next", "")
+    if dest.startswith("/") and not dest.startswith("//") and "\\" not in dest:
+        return redirect(dest)
     if request.form.get("da_lista"):
         return redirect(url_for("followups.list_followups"))
     return redirect(url_for("clients.detail", client_id=fu.client_id) + "#followup")

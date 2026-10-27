@@ -113,9 +113,12 @@ def new_client():
 @bp.route("/<int:client_id>")
 def detail(client_id):
     client = db.get_or_404(Client, client_id)
+    aperti = [f for f in client.followups if f.stato == "aperto"]
+    prossimo_followup = min(aperti, key=lambda f: f.data_scadenza) if aperti else None
     return render_template(
         "clients/detail.html",
         client=client,
+        prossimo_followup=prossimo_followup,
         policy_branches=POLICY_BRANCHES,
         policy_statuses=POLICY_STATUSES,
         payment_frequencies=PAYMENT_FREQUENCIES,

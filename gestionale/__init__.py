@@ -1,4 +1,4 @@
-"""Gestionale Assicurativo — applicazione Flask.
+"""Deal Combined — applicazione Flask (gestionale assicurativo).
 
 Gestionale per intermediari assicurativi: anagrafiche clienti
 (professionisti e aziende), polizze, documenti, analisi automatica dei

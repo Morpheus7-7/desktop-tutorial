@@ -1,4 +1,4 @@
-"""Avvio «desktop» del Gestionale Assicurativo.
+"""Avvio «desktop» di Deal Combined.
 
 Fa partire il server web locale, avvia lo scheduler delle notifiche e apre
 automaticamente il browser sull'applicazione. È l'entry point usato per
@@ -60,7 +60,7 @@ def main() -> None:
     start_scheduler(app)
 
     print("=" * 60)
-    print("  Gestionale Assicurativo è in esecuzione.")
+    print("  Deal Combined è in esecuzione.")
     print(f"  Apri il browser su:  {url}")
     print(f"  Dati salvati in:     {data_dir}")
     print("  Chiudi questa finestra per fermare il programma.")

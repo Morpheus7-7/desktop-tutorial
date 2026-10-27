@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Pipeline — Gestionale Assicurativo{% endblock %}
+{% block title %}Pipeline — Deal Combined{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <div>
@@ -23,7 +23,11 @@
       <div class="kanban-body">
         {% if col.valore %}<div class="small text-muted mb-2 px-1">Valore: {{ col.valore | euro }}</div>{% endif %}
         {% for o in col.opps %}
-        <div class="card mb-2">
+        <div class="card mb-2 {% if ferma and o.id == ferma.id %}con-nastro{% endif %}">
+          {% if ferma and o.id == ferma.id %}
+          <div class="nastro" role="note"><i class="bi bi-bookmark-fill" aria-hidden="true"></i> Muovi questa
+            <span class="visually-hidden">: è la trattativa ferma da più tempo</span></div>
+          {% endif %}
           <div class="card-body p-2">
             <div class="d-flex justify-content-between align-items-start">
               <span class="fw-semibold small">{{ o.titolo }}</span>
@@ -34,6 +38,7 @@
             </a>
             {% if o.ramo %}<div class="small text-muted">{{ o.ramo_label }}</div>{% endif %}
             {% if o.premio_stimato %}<div class="small">Premio: <strong>{{ o.premio_stimato | euro }}</strong>{% if o.provvigione_stimata %} · prov. {{ o.provvigione_stimata | euro }}{% endif %}</div>{% endif %}
+            {% if ferma and o.id == ferma.id and giorni_ferma %}<div class="small text-danger">Ferma da {{ giorni_ferma }} giorni</div>{% endif %}
             {% if o.origine == 'analisi_rischi' %}<span class="badge bg-light text-dark border mt-1"><i class="bi bi-magic"></i> da analisi</span>{% endif %}
 
             <div class="d-flex gap-1 mt-2">

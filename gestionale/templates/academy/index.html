@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Accademia commerciale — Gestionale Assicurativo{% endblock %}
+{% block title %}Accademia commerciale — Deal Combined{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
@@ -32,25 +32,19 @@
   <div class="col-lg-6">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="trattativa-title"><i class="bi bi-lightning-charge"></i> Obiezione del giorno</span>
+        <span><i class="bi bi-lightning-charge"></i> Obiezione del giorno</span>
         <span class="badge bg-light text-dark border">{{ categorie[pillola.categoria] }}</span>
       </div>
       <div class="card-body">
         <div class="fs-5 fw-semibold">«{{ pillola.obiezione }}»</div>
         <div class="small text-muted mb-2">Prima di leggere la risposta, prova a formularne una ad alta voce.</div>
-        <a class="btn btn-sm btn-warning" href="{{ url_for('academy.drill', id=pillola.id) }}"><i class="bi bi-play-fill"></i> Allenati</a>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('academy.drill', id=pillola.id) }}"><i class="bi bi-play-fill"></i> Allenati</a>
       </div>
     </div>
   </div>
 </div>
 
-{% if prossima %}
-<div class="alert alert-primary d-flex justify-content-between align-items-center flex-wrap gap-2">
-  <div><i class="bi bi-arrow-right-circle me-1"></i> Prossima lezione: <strong>{{ prossima[1].titolo }}</strong>
-    <span class="text-muted">— settimana {{ prossima[0].numero }}, {{ prossima[0].titolo }}</span></div>
-  <a class="btn btn-primary btn-sm" href="{{ url_for('academy.module', modulo_id=prossima[0].id) }}#{{ prossima[1].id }}">Studia ora</a>
-</div>
-{% else %}
+{% if not prossima %}
 <div class="alert alert-success"><i class="bi bi-trophy me-1"></i> Hai completato tutte le lezioni del percorso. Continua con l'allenamento quotidiano e i role-play.</div>
 {% endif %}
 
@@ -59,9 +53,14 @@
   {% for item in moduli %}
   {% set m = item.m %}
   <div class="col-md-6 col-xl-4">
-    <a class="text-decoration-none text-reset" href="{{ url_for('academy.module', modulo_id=m.id) }}">
+    {% set e_prossimo = prossima and prossima[0].id == m.id %}
+    <a class="text-decoration-none text-reset" href="{{ url_for('academy.module', modulo_id=m.id) }}{% if e_prossimo %}#{{ prossima[1].id }}{% endif %}">
       <div class="card modulo-card h-100">
         <div class="card-body">
+          {% if e_prossimo %}
+          <div class="nastro" role="note"><i class="bi bi-bookmark-fill" aria-hidden="true"></i> Prossima lezione
+            <span class="nastro-dettaglio">· {{ prossima[1].titolo }}</span></div>
+          {% endif %}
           <div class="d-flex gap-3 align-items-start">
             <span class="modulo-icona"><i class="bi {{ m.icona }}"></i></span>
             <div class="flex-grow-1">

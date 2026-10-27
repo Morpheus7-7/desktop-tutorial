@@ -1,4 +1,4 @@
-# Gestionale Assicurativo
+# Deal Combined
 
 Gestionale web per intermediari assicurativi che seguono **professionisti e
 aziende**. Permette di raccogliere in un unico posto anagrafiche, polizze e
@@ -79,6 +79,27 @@ organizzazione personale.
 I contenuti sono in `gestionale/academy.py`. I riferimenti normativi (IDD,
 Regolamenti IVASS, privacy) sono indicazioni formative: verifica sempre le
 versioni vigenti e le procedure della tua compagnia o intermediario.
+
+## Grafica, temi e dispositivi
+
+La grafica segue il mondo dell'**agenda del consulente**, descritto in
+[DESIGN.md](DESIGN.md): barra laterale verde come copertina, pagina «Oggi» con
+la data in grande e un unico **nastro rosso** che segna il prossimo passo (la
+prossima attività, la trattativa da muovere, il prossimo follow-up del cliente,
+la prossima lezione dell'Accademia).
+
+- **Tema chiaro e scuro**: all'apertura segue il sistema; il pulsante nella
+  barra superiore alterna automatico → chiaro → scuro e la scelta resta nel
+  browser. Le stampe escono sempre chiare.
+- **Dispositivi**: computer, tablet, telefono e pieghevoli. Sui pieghevoli con
+  cerniera (due pannelli affiancati) la pagina «Oggi» mette la lista su un
+  pannello e trattative/portafoglio sull'altro, lasciando libera la piega
+  (CSS *viewport segments*).
+- **Carattere**: Archivo (SIL Open Font License, `gestionale/static/vendor/fonts/Archivo-OFL.txt`),
+  servito in locale per funzionare anche offline.
+- Il contesto di prodotto per chi lavora alla grafica è in [PRODUCT.md](PRODUCT.md);
+  la skill di design [Impeccable](https://github.com/pbakaus/impeccable) è inclusa
+  in `.claude/skills/impeccable/`.
 
 ## Applicazione desktop (.exe)
 

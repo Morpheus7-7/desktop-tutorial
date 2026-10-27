@@ -3,6 +3,8 @@ from datetime import date, timedelta
 
 from flask import Blueprint, render_template, request
 
+from ..academy import pillola_del_giorno
+
 from ..models import (
     BRANCH_LABELS,
     OPPORTUNITY_OPEN_STAGES,
@@ -16,6 +18,57 @@ from ..models import (
 )
 
 bp = Blueprint("main", __name__)
+
+GIORNI_SETTIMANA = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
+MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio",
+        "agosto", "settembre", "ottobre", "novembre", "dicembre"]
+GIORNI_BREVI = ["lun", "mar", "mer", "gio", "ven", "sab", "dom"]
+
+
+def _pagina_del_giorno(oggi: date) -> dict:
+    """Intestazione in stile agenda: giorno, settimana, giorno dell'anno."""
+    fine_anno = date(oggi.year, 12, 31)
+    numero = oggi.timetuple().tm_yday
+    return {
+        "numero": oggi.day,
+        "giorno": GIORNI_SETTIMANA[oggi.weekday()],
+        "mese_anno": f"{MESI[oggi.month - 1]} {oggi.year}",
+        "settimana": oggi.isocalendar()[1],
+        "giorno_anno": numero,
+        "rimanenti": (fine_anno - oggi).days,
+    }
+
+
+def _agenda_oggi(oggi: date) -> list[dict]:
+    """Elenco unico delle cose da fare: follow-up aperti (fino a 7 giorni) e
+    scadenze polizze (fino a 30 giorni), dal più urgente."""
+    voci = []
+    for f in FollowUp.query.filter(
+        FollowUp.stato == "aperto", FollowUp.data_scadenza <= oggi + timedelta(days=7)
+    ):
+        voci.append({
+            "tipo": "followup", "id": f.id, "data": f.data_scadenza,
+            "titolo": f.titolo, "etichetta": f.tipo_label,
+            "cliente": f.cliente, "priorita": f.priorita,
+        })
+    for p in Policy.query.filter(
+        Policy.stato.in_(["attiva", "in_rinnovo"]),
+        Policy.data_scadenza.isnot(None),
+        Policy.data_scadenza <= oggi + timedelta(days=30),
+    ):
+        voci.append({
+            "tipo": "scadenza", "id": p.id, "data": p.data_scadenza,
+            "titolo": f"Rinnovo {p.ramo_label}", "etichetta": f"Polizza {p.numero_polizza}",
+            "cliente": p.cliente, "priorita": "alta",
+        })
+    peso_priorita = {"alta": 0, "media": 1, "bassa": 2}
+    voci.sort(key=lambda v: (v["data"], peso_priorita.get(v["priorita"], 1), v["tipo"] != "followup"))
+    for v in voci:
+        delta = (v["data"] - oggi).days
+        v["giorni"] = delta
+        v["gruppo"] = "ritardo" if delta < 0 else "oggi" if delta == 0 else "settimana" if delta <= 7 else "avanti"
+        v["giorno_breve"] = GIORNI_BREVI[v["data"].weekday()]
+    return voci
 
 
 def _premi_provvigioni_attive():
@@ -108,8 +161,24 @@ def dashboard():
         .all()
     )
 
+    agenda = _agenda_oggi(today)
+    gruppi = [
+        ("ritardo", "In ritardo"),
+        ("oggi", "Oggi"),
+        ("settimana", "Nei prossimi 7 giorni"),
+        ("avanti", "Scadenze entro 30 giorni"),
+    ]
+    agenda_gruppi = [
+        (chiave, titolo, [v for v in agenda if v["gruppo"] == chiave]) for chiave, titolo in gruppi
+    ]
+
     return render_template(
         "dashboard.html",
+        pagina=_pagina_del_giorno(today),
+        agenda=agenda,
+        agenda_gruppi=[g for g in agenda_gruppi if g[2]],
+        prossimo_passo=agenda[0] if agenda else None,
+        pillola=pillola_del_giorno(today),
         stats=stats,
         prossime_scadenze=prossime_scadenze,
         prossimi_followup=prossimi_followup,
