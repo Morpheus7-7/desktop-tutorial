@@ -24,3 +24,6 @@ dist/
 .impeccable/review/
 .impeccable/questions/
 .impeccable/config.local.json
+
+# Superpowers: cartella di lavoro locale (piani in corso, brainstorming)
+.superpowers/
