@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Aggiornamenti — Deal Combined{% endblock %}
+{% block title %}Programma — Deal Combined{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <h1 class="h3 mb-0"><i class="bi bi-gear me-2"></i>Impostazioni</h1>
@@ -46,6 +46,25 @@
   </div>
 
   <div class="col-lg-5">
+    {% if avvio is not none %}
+    <section class="card mb-4" aria-labelledby="t-avvio">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-avvio"><i class="bi bi-bell me-1"></i> Promemoria e avvio con Windows</h2></div>
+      <div class="card-body">
+        <p class="small misura">Chiudendo la finestra, Deal Combined resta come icona vicino all'orologio e ti avvisa con una
+          notifica di Windows dei follow-up di oggi (o in ritardo) e delle polizze che scadono entro 7 giorni.
+          Per chiuderlo del tutto: tasto destro sull'icona → <strong>Esci</strong>.</p>
+        <form method="post">
+          <input type="hidden" name="azione" value="avvio">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="avvio" name="avvio" value="1" {% if avvio %}checked{% endif %}>
+            <label class="form-check-label" for="avvio">Avvia con Windows (solo l'icona, senza aprire la finestra)</label>
+          </div>
+          <button class="btn btn-outline-primary btn-sm">Salva</button>
+        </form>
+        <p class="small text-muted mt-3 mb-0">Con la finestra chiusa l'archivio risulta libero: se lo usi da due PC, puoi aprirlo sull'altro.</p>
+      </div>
+    </section>
+    {% endif %}
     {% if desktop_mode %}
     <section class="card mb-4" aria-labelledby="t-automatico">
       <div class="card-header"><h2 class="h6 mb-0" id="t-automatico"><i class="bi bi-clock-history me-1"></i> Controllo automatico</h2></div>

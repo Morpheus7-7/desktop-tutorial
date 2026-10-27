@@ -113,7 +113,12 @@ propria, funziona senza internet. I dati stanno in `Documenti\Deal Combined`,
 con un backup automatico a ogni avvio. Da *Impostazioni → Dati e backup* si
 esporta o importa l'archivio e si può spostare la cartella dati in OneDrive o
 Google Drive per usarlo da **due PC**: un avviso impedisce di aprirlo su
-entrambi nello stesso momento. L'installatore si crea con `build_windows.bat`.
+entrambi nello stesso momento. In più: **icona vicino all'orologio** con le
+notifiche di Windows per follow-up e scadenze e avvio con Windows, **PIN** con
+blocco per inattività, **PDF** delle schede salvati in Google Drive o inviati
+al cliente con **Gmail**, follow-up in **Google Calendar**, **import da Excel**
+di clienti e polizze e **aggiornamenti automatici** verificati.
+L'installatore si crea con `build_windows.bat`.
 Tutti i dettagli in **[PACKAGING.md](PACKAGING.md)**.
 
 ## Requisiti

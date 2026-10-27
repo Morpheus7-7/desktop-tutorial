@@ -53,7 +53,10 @@ def _run(app: Flask) -> None:
     # Piccola attesa iniziale: lascia completare l'avvio del server.
     time.sleep(5)
     while True:
-        _tick(app)
+        # Con la finestra chiusa nella barra l'archivio può essere aperto
+        # sull'altro PC: in quel caso il gestionale non scrive nulla.
+        if not app.config.get("DC_IN_PAUSA"):
+            _tick(app)
         time.sleep(_intervallo_secondi(app))
 
 

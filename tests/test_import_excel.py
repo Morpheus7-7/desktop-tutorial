@@ -165,3 +165,15 @@ def test_flusso_web_anteprima_e_conferma(app, client):
     client.post("/clienti/importa/conferma", data={"token": token})
     with app.app_context():
         assert Policy.query.count() == 1
+
+
+def test_cliente_esistente_con_nome_diverso_non_si_duplica(app):
+    with app.app_context():
+        db.session.add(Client(tipo="azienda", ragione_sociale="ROSSI IMPIANTI", partita_iva="01234567890"))
+        db.session.commit()
+        a = ie.analizza(ie.modello_xlsx(), "modello.xlsx")
+        assert a["conteggi"]["clienti_nuovi"] == 0 and a["conteggi"]["clienti_esistenti"] == 1
+        assert a["polizze"][0]["nome_cliente"] == "ROSSI IMPIANTI"
+        assert a["ignorati"] == []  # i fogli di aiuto del modello non sono segnalati
+        ie.importa(a)
+        assert Client.query.count() == 1 and Policy.query.count() == 1

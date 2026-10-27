@@ -10,6 +10,7 @@
   {% elif r.esito == 'doppione' %}<span class="badge text-bg-secondary">Ripetuto nel file</span>
   {% else %}<span class="badge text-bg-danger">Errore</span>{% endif %}
 {%- endmacro %}
+{% macro quanti(n, uno, molti) %}{{ n }} {{ uno if n == 1 else molti }}{% endmacro %}
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb small">
@@ -26,13 +27,13 @@
   <div class="col-sm-6">
     <section class="card h-100"><div class="card-body">
       <h2 class="h6">Clienti</h2>
-      <p class="mb-0"><strong>{{ c.clienti_nuovi }}</strong> nuovi · {{ c.clienti_esistenti }} già presenti{% if c.clienti_errori %} · <span class="text-danger">{{ c.clienti_errori }} con errori</span>{% endif %}</p>
+      <p class="mb-0"><strong>{{ quanti(c.clienti_nuovi, 'nuovo', 'nuovi') }}</strong> · {{ c.clienti_esistenti }} già present{{ 'e' if c.clienti_esistenti == 1 else 'i' }}{% if c.clienti_errori %} · <span class="text-danger">{{ c.clienti_errori }} con errori</span>{% endif %}</p>
     </div></section>
   </div>
   <div class="col-sm-6">
     <section class="card h-100"><div class="card-body">
       <h2 class="h6">Polizze</h2>
-      <p class="mb-0"><strong>{{ c.polizze_nuove }}</strong> nuove · {{ c.polizze_esistenti }} già presenti{% if c.polizze_errori %} · <span class="text-danger">{{ c.polizze_errori }} con errori</span>{% endif %}</p>
+      <p class="mb-0"><strong>{{ quanti(c.polizze_nuove, 'nuova', 'nuove') }}</strong> · {{ c.polizze_esistenti }} già present{{ 'e' if c.polizze_esistenti == 1 else 'i' }}{% if c.polizze_errori %} · <span class="text-danger">{{ c.polizze_errori }} con errori</span>{% endif %}</p>
     </div></section>
   </div>
 </div>
@@ -47,7 +48,7 @@
   <form method="post" action="{{ url_for('importazione.confirm') }}"
         onsubmit="this.querySelector('button').disabled = true;">
     <input type="hidden" name="token" value="{{ token }}">
-    <button class="btn btn-primary"><i class="bi bi-check2-circle"></i> Importa {{ c.clienti_nuovi }} clienti e {{ c.polizze_nuove }} polizze</button>
+    <button class="btn btn-primary"><i class="bi bi-check2-circle"></i> Importa {{ quanti(c.clienti_nuovi, 'cliente', 'clienti') }} e {{ quanti(c.polizze_nuove, 'polizza', 'polizze') }}</button>
   </form>
   {% endif %}
   <form method="post" action="{{ url_for('importazione.cancel') }}">

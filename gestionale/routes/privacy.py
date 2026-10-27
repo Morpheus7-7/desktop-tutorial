@@ -11,7 +11,7 @@ from ..models import Settings, db
 bp = Blueprint("privacy", __name__)
 
 LIBERI = {"privacy.unlock", "privacy.recover", "static", "settings.shutdown",
-          "settings.in_use", "settings.open_anyway"}
+          "settings.in_use", "settings.open_anyway", "settings.show_window"}
 
 
 def _pin_attivo() -> bool:
@@ -36,7 +36,10 @@ def richiedi_pin():
     adesso = datetime.utcnow().timestamp()
     ultima = session.get("dc_attivita")
     limite = max(1, s.blocco_minuti or 10) * 60
-    if not session.get("dc_sbloccato") or ultima is None or adesso - ultima > limite:
+    # Finestra chiusa nella barra: alla riapertura si chiede di nuovo il PIN.
+    nascosta_alle = current_app.config.get("DC_NASCOSTA_ALLE") or 0
+    if (not session.get("dc_sbloccato") or ultima is None or adesso - ultima > limite
+            or ultima < nascosta_alle):
         session.pop("dc_sbloccato", None)
         destinazione = request.full_path if request.method == "GET" else url_for("main.dashboard")
         return redirect(url_for("privacy.unlock", next=destinazione.rstrip("?")))

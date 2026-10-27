@@ -3,5 +3,5 @@
   <li class="nav-item"><a class="nav-link {% if request.endpoint == 'settings.data' %}active{% endif %}" href="{{ url_for('settings.data') }}"><i class="bi bi-hdd"></i> Dati e backup</a></li>
   <li class="nav-item"><a class="nav-link {% if request.endpoint == 'settings.google' %}active{% endif %}" href="{{ url_for('settings.google') }}"><i class="bi bi-google"></i> Google</a></li>
   <li class="nav-item"><a class="nav-link {% if request.endpoint == 'privacy.settings' %}active{% endif %}" href="{{ url_for('privacy.settings') }}"><i class="bi bi-lock"></i> Privacy</a></li>
-  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'settings.updates' %}active{% endif %}" href="{{ url_for('settings.updates') }}"><i class="bi bi-arrow-repeat"></i> Aggiornamenti</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'settings.updates' %}active{% endif %}" href="{{ url_for('settings.updates') }}"><i class="bi bi-window-desktop"></i> Programma</a></li>
 </ul>

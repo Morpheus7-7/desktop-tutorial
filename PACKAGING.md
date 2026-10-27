@@ -35,9 +35,82 @@ sono due modi.
      Prima di passare all'altro PC aspetta che la sincronizzazione sia finita.
    - **Chiusura anomala:** se il programma si è chiuso male, ad esempio per
      un PC spento di colpo, dopo 3 minuti l'avviso non compare più.
+   - **Finestra chiusa = archivio libero:** chiudendo la finestra il
+     programma resta solo come icona vicino all'orologio (per i promemoria)
+     e l'archivio risulta libero, quindi puoi aprirlo sull'altro PC.
 2. **Archivio da portare (manuale).** *Esporta archivio* crea un unico `.zip`
    con database e documenti. Sull'altro PC usa *Importa*. Prima di sostituire
    i dati viene salvata una copia completa di quelli attuali in `Backup\`.
+
+## Icona vicino all'orologio e promemoria
+
+- Chiudendo la finestra (la X), Deal Combined **resta attivo come icona**
+  vicino all'orologio di Windows. Doppio clic o *Apri Deal Combined* la
+  riapre; tasto destro → **Esci** chiude davvero il programma.
+- Ogni 15 minuti controlla i **follow-up di oggi o in ritardo** e le
+  **polizze che scadono entro 7 giorni** e, se c'è qualcosa di nuovo, mostra
+  una notifica di Windows (una sola volta al giorno per ogni voce).
+- Con la finestra chiusa il gestionale non scrive nulla nell'archivio (le
+  email automatiche ripartono alla riapertura) e, se è attivo il PIN, alla
+  riapertura lo richiede.
+- **Avvio con Windows:** si sceglie durante l'installazione o in
+  *Impostazioni → Programma*. All'accensione del PC parte solo l'icona, senza
+  aprire la finestra.
+- Se apri il programma mentre è già nella barra, si riapre la finestra
+  esistente invece di avviarne un secondo.
+
+## PIN e privacy
+
+*Impostazioni → Privacy*: un PIN (4–12 cifre) chiesto all'apertura e dopo i
+minuti di inattività scelti, con un pulsante **Blocca ora** in alto. Al
+momento di impostarlo il programma mostra **una sola volta** un codice di
+recupero: conservalo, serve se dimentichi il PIN. Dopo 5 tentativi sbagliati
+bisogna attendere un minuto. Il PIN protegge lo schermo, non i file: per
+proteggere i dati se il portatile viene perso serve **BitLocker**, di cui la
+stessa pagina mostra lo stato.
+
+## Google: Gmail, Drive e Calendar
+
+Da *Impostazioni → Google*, senza registrare app su Google Cloud:
+
+- **Gmail:** le schede compilate si inviano al cliente come PDF allegato
+  (pulsante *Invia per email* nella scheda), con una *password per le app*
+  di Google. Le email compaiono in «Posta inviata».
+- **Google Drive:** con *Google Drive per desktop* installato, i PDF si
+  salvano in `Il mio Drive\Deal Combined\Clienti\<cliente>` e Drive li carica.
+  La cartella si imposta per ogni PC.
+- **Google Calendar:** ogni follow-up aperto ha un pulsante che apre Calendar
+  con l'evento già compilato; *Esporta in Calendar (.ics)* li importa tutti.
+
+## Importare clienti e polizze da Excel
+
+*Clienti → Importa da Excel*: scarica il modello (fogli *Clienti* e
+*Polizze*, menu a tendina per ramo, stato e frazionamento) oppure carica il tuo
+Excel/CSV: le intestazioni comuni (Ragione sociale, P.IVA, Compagnia,
+N. polizza, Scadenza…) sono riconosciute. Prima vedi un'**anteprima** con
+nuovi, già presenti ed errori riga per riga; niente viene salvato finché non
+confermi. I clienti esistenti non vengono sovrascritti (si completano solo i
+campi vuoti), le polizze già presenti si saltano e prima dell'importazione si
+fa un backup.
+
+## Aggiornamenti
+
+*Impostazioni → Programma* mostra la versione installata e, all'avvio,
+controlla se su GitHub c'è una versione nuova (si può disattivare): in quel
+caso compare un'icona verde in alto. *Scarica e installa* fa un backup,
+scarica l'installatore, **ne verifica l'impronta SHA-256**, chiude il
+programma, lo aggiorna e lo riapre. I dati non vengono toccati.
+
+**Per pubblicare una versione:**
+1. aggiorna `__version__` in `gestionale/__init__.py` (es. `2.2.0`);
+2. esegui `build_windows.bat`: crea `dist\Installa-DealCombined.exe` e
+   `dist\Installa-DealCombined.exe.sha256`;
+3. su GitHub crea una *Release* con tag `v2.2.0` e allega **entrambi** i file.
+   Senza il file `.sha256` il programma mostra solo il link alla pagina della
+   versione, senza installare nulla.
+
+In alternativa, se GitHub Actions è attivo, basta creare e spingere il tag
+`v2.2.0`: il workflow compila e pubblica la Release con i due file.
 
 ## Ottenere l'installatore
 

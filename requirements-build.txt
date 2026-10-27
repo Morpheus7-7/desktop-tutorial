@@ -2,3 +2,6 @@
 pyinstaller>=6.3
 # Finestra propria del programma (Edge WebView2, già presente in Windows 10/11)
 pywebview>=5.3; sys_platform == "win32"
+# Icona vicino all'orologio e notifiche di Windows
+pystray>=0.19; sys_platform == "win32"
+Pillow>=10; sys_platform == "win32"

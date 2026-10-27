@@ -43,6 +43,7 @@ Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Crea un'icona sul desktop"; GroupDescription: "Icone:"
+Name: "avvioautomatico"; Description: "Avvia con Windows (icona vicino all'orologio con i promemoria)"; GroupDescription: "Promemoria:"
 
 [Files]
 Source: "..\dist\{#Eseguibile}"; DestDir: "{app}"; Flags: ignoreversion
@@ -51,6 +52,12 @@ Source: "..\dist\{#Eseguibile}"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{group}\{#NomeApp}"; Filename: "{app}\{#Eseguibile}"
 Name: "{group}\Disinstalla {#NomeApp}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#NomeApp}"; Filename: "{app}\{#Eseguibile}"; Tasks: desktopicon
+
+[Registry]
+; Stesso nome e parametro usati da Impostazioni → Programma (gestionale/promemoria.py).
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#NomeApp}"; ValueData: """{app}\{#Eseguibile}"" --avvio-silenzioso"; Flags: uninsdeletevalue; Tasks: avvioautomatico
+; Se l'avvio con Windows è stato attivato dal programma, la disinstallazione lo toglie comunque.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "{#NomeApp}"; Flags: uninsdeletevalue dontcreatekey
 
 [Run]
 Filename: "{app}\{#Eseguibile}"; Description: "Avvia {#NomeApp}"; Flags: nowait postinstall skipifsilent

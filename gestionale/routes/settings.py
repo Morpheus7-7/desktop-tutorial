@@ -224,6 +224,17 @@ def shutdown():
     return ("", 204)
 
 
+@bp.route("/mostra", methods=["POST"])
+def show_window():
+    """Riporta in primo piano la finestra: la usa una seconda copia del
+    programma, aperta mentre questa è già attiva nella barra."""
+    mostra = current_app.config.get("DC_MOSTRA")
+    if not mostra or request.headers.get("X-DC-Azione") != "mostra":
+        abort(404)
+    threading.Thread(target=mostra, daemon=True).start()
+    return ("", 204)
+
+
 # ----------------------------------------------------------------------
 # Archivio aperto su un altro PC (cartella dati sincronizzata)
 # ----------------------------------------------------------------------
@@ -233,7 +244,8 @@ def ferma_se_aperto_altrove():
     porta all'avviso finché l'utente non decide."""
     if not current_app.config.get("DC_BLOCCO_ALTRUI"):
         return None
-    if request.endpoint in ("settings.in_use", "settings.open_anyway", "settings.shutdown", "static"):
+    if request.endpoint in ("settings.in_use", "settings.open_anyway", "settings.shutdown",
+                            "settings.show_window", "static"):
         return None
     return redirect(url_for("settings.in_use"))
 
@@ -251,6 +263,7 @@ def in_use():
 def open_anyway():
     current_app.config["DC_BLOCCO_ALTRUI"] = None
     desktop.prendi_blocco(_cartella_corrente())
+    current_app.config["DC_HO_BLOCCO"] = True
     flash("Archivio aperto su questo PC. Non usarlo nello stesso momento sull'altro PC.", "warning")
     return redirect(url_for("main.dashboard"))
 
@@ -340,6 +353,14 @@ def updates():
                 flash(f"Controllo non riuscito: {errore}", "danger")
             elif not current_app.config.get("DC_AGGIORNAMENTO"):
                 flash(f"Hai già l'ultima versione ({__version__}).", "success")
+        elif azione == "avvio" and _installabile():
+            from .. import promemoria
+
+            try:
+                promemoria.imposta_avvio_automatico(request.form.get("avvio") == "1")
+                flash("Avvio con Windows aggiornato.", "success")
+            except OSError as exc:
+                flash(f"Non riesco a cambiare l'avvio con Windows: {exc}", "danger")
         elif azione == "automatico" and file_config:
             config["aggiornamenti_automatici"] = request.form.get("automatico") == "1"
             desktop.salva_configurazione(config, file_config)
@@ -354,7 +375,14 @@ def updates():
         installabile=_installabile(),
         automatico=config.get("aggiornamenti_automatici", True),
         desktop_mode=bool(file_config),
+        avvio=_avvio_con_windows() if _installabile() else None,
     )
+
+
+def _avvio_con_windows():
+    from .. import promemoria
+
+    return promemoria.avvio_automatico()
 
 
 @bp.route("/aggiornamenti/installa", methods=["POST"])

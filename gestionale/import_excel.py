@@ -397,7 +397,7 @@ def analizza(dati: bytes, nome_file: str) -> dict:
             righe_clienti.append((nome, righe, inizio))
         elif tipo == "polizze":
             righe_polizze.append((nome, righe, inizio))
-        elif not _vuota(righe[inizio]):
+        elif not _vuota(righe[inizio]) and not _norm(nome).startswith(("istruzion", "valori")):
             ignorati.append(nome)
 
     if not righe_clienti and not righe_polizze:
@@ -421,6 +421,9 @@ def analizza(dati: bytes, nome_file: str) -> dict:
                 if trovato:
                     r["esito"] = "esistente" if trovato[0] == "db" else "doppione"
                     r["rif"] = trovato
+                    # Anche il nome scritto nel file porta a questo cliente:
+                    # le polizze che lo usano non devono crearne un doppione.
+                    indice.aggiungi(trovato, d.get("partita_iva"), d.get("codice_fiscale"), d.get("ragione_sociale"))
                 else:
                     r["esito"] = "nuovo"
                     r["rif"] = ("file", len(clienti))

@@ -166,7 +166,10 @@ a { text-underline-offset: .18em; }
 [data-bs-theme="dark"] .badge.bg-danger,
 [data-bs-theme="dark"] .badge.bg-primary,
 [data-bs-theme="dark"] .badge.bg-info,
-[data-bs-theme="dark"] .badge.bg-secondary { color: #0d1512 !important; }
+[data-bs-theme="dark"] .badge.bg-secondary,
+[data-bs-theme="dark"] .badge.text-bg-success,
+[data-bs-theme="dark"] .badge.text-bg-danger,
+[data-bs-theme="dark"] .badge.text-bg-secondary { color: #0d1512 !important; }
 .numeri { font-variant-numeric: tabular-nums; }
 code { color: var(--dc-ink); background: var(--dc-surface-2); padding: .05rem .3rem; border-radius: .25rem; font-size: .85em; }
 
