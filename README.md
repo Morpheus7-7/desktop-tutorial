@@ -105,13 +105,16 @@ la prossima lezione dell'Accademia).
   la skill di design [Impeccable](https://github.com/pbakaus/impeccable) è inclusa
   in `.claude/skills/impeccable/`.
 
-## Applicazione desktop (.exe)
+## Programma installato sul PC (Windows)
 
-Vuoi provarla senza installare Python? È possibile impacchettare il gestionale
-in un **eseguibile unico** (`GestionaleAssicurativo.exe` su Windows) che avvia il
-server locale e apre il browser da solo. Il modo più semplice per ottenere il
-`.exe` è la build automatica su GitHub Actions. Tutti i dettagli in
-**[PACKAGING.md](PACKAGING.md)**.
+Deal Combined si installa come un normale programma, con
+`Installa-DealCombined.exe`: icona sul desktop e nel menu Start, finestra
+propria, funziona senza internet. I dati stanno in `Documenti\Deal Combined`,
+con un backup automatico a ogni avvio. Da *Impostazioni → Dati e backup* si
+esporta o importa l'archivio e si può spostare la cartella dati in OneDrive o
+Google Drive per usarlo da **due PC**: un avviso impedisce di aprirlo su
+entrambi nello stesso momento. L'installatore si crea con `build_windows.bat`.
+Tutti i dettagli in **[PACKAGING.md](PACKAGING.md)**.
 
 ## Requisiti
 
@@ -171,14 +174,19 @@ d'ambiente, che **hanno la precedenza** su quanto salvato nel database:
 
 ```
 app.py                     # entry point (server di sviluppo)
-run_desktop.py             # avvio «desktop»: server + browser (usato dall'exe)
+run_desktop.py             # avvio del programma installato: finestra propria, dati in Documenti
 seed_demo.py               # dati di esempio
 gestionale.spec            # ricetta PyInstaller per l'eseguibile
+build_windows.bat          # crea DealCombined.exe e l'installatore
+installer/                 # installatore Inno Setup e icona
 gestionale/
   __init__.py              # application factory, filtri e micro-migrazioni
   models.py                # modelli e vocabolari (rami, categorie, Settings…)
   risk_engine.py           # motore di analisi automatica dei rischi
   academy.py               # contenuti dell'Accademia commerciale
+  schede.py                # schede compilabili: campi, precompilazione
+  desktop.py               # programma installato: cartella dati, backup, blocco tra PC
+  archivio.py              # esporta/importa l'archivio .zip
   notifications.py         # generazione notifiche da scadenze e follow-up
   mailer.py                # invio email (SMTP stdlib) e digest notifiche
   scheduler.py             # thread in background per l'invio automatico

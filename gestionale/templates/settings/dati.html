@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Dati e backup — Deal Combined{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h3 mb-0"><i class="bi bi-gear me-2"></i>Impostazioni</h1>
+</div>
+{% include "settings/_nav.html" %}
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <section class="card mb-4" aria-labelledby="t-cartella">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-cartella"><i class="bi bi-folder2 me-1"></i> Dove sono i tuoi dati</h2></div>
+      <div class="card-body">
+        <p class="mb-1">Cartella dati</p>
+        <p class="fw-semibold text-break mb-1"><code>{{ cartella }}</code></p>
+        <p class="small text-muted mb-3">Database {{ (dimensione_db / 1024 / 1024) | round(1) }} MB · documenti caricati nella sottocartella <code>uploads</code> · copie di sicurezza in <code>Backup</code>.</p>
+
+        {% if desktop_mode %}
+        <form method="post" action="{{ url_for('settings.change_folder') }}" class="border-top pt-3">
+          <label class="form-label fw-semibold" for="cartella">Sposta la cartella dati</label>
+          <p class="small text-muted misura">Per usare Deal Combined da <strong>due PC</strong>, indica una cartella sincronizzata
+            (OneDrive, Google Drive, Dropbox) uguale su entrambi. Un avviso ti fermerà se l'archivio è già aperto sull'altro PC.</p>
+          <input class="form-control mb-2" id="cartella" name="cartella" placeholder="es. C:\Users\Mario\OneDrive\Deal Combined" required>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="copia" name="copia" value="1" checked>
+            <label class="form-check-label" for="copia">Copia lì i dati attuali (se la cartella non contiene già un archivio)</label>
+          </div>
+          <button class="btn btn-outline-primary"><i class="bi bi-arrow-right-circle"></i> Usa questa cartella</button>
+        </form>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card mb-4" aria-labelledby="t-porta">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-porta"><i class="bi bi-arrow-left-right me-1"></i> Porta i dati su un altro PC</h2></div>
+      <div class="card-body">
+        <p class="misura">Esporta un unico file <code>.zip</code> con clienti, polizze, schede e documenti. Sull'altro PC aprilo da qui con <strong>Importa</strong>.</p>
+        <a class="btn btn-primary mb-4" href="{{ url_for('settings.export_archive') }}"><i class="bi bi-download"></i> Esporta archivio</a>
+
+        <form method="post" action="{{ url_for('settings.import_archive') }}" enctype="multipart/form-data" class="border-top pt-3">
+          <label class="form-label fw-semibold" for="archivio">Importa un archivio</label>
+          <input class="form-control mb-2" type="file" id="archivio" name="archivio" accept=".zip" required>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="conferma" name="conferma" value="1" required>
+            <label class="form-check-label" for="conferma">Sostituisci i dati di questo PC con quelli dell'archivio.
+              Prima viene salvata una copia completa dei dati attuali in <code>Backup</code>.</label>
+          </div>
+          <button class="btn btn-outline-danger"><i class="bi bi-upload"></i> Importa e sostituisci</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <div class="col-lg-5">
+    <section class="card" aria-labelledby="t-backup">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0" id="t-backup"><i class="bi bi-shield-check me-1"></i> Copie di sicurezza</h2>
+        <form method="post" action="{{ url_for('settings.backup_now') }}"><button class="btn btn-sm btn-outline-primary">Fai un backup ora</button></form>
+      </div>
+      <div class="card-body">
+        <p class="small text-muted">Una copia del database viene fatta a ogni avvio; restano le ultime 10.</p>
+        {% if backup %}
+        <ul class="list-unstyled small mb-0 numeri">
+          {% for b in backup %}<li class="py-1 border-bottom">{{ b.name }}</li>{% endfor %}
+        </ul>
+        {% else %}
+        <p class="small mb-0">Nessun backup ancora.</p>
+        {% endif %}
+      </div>
+    </section>
+    {% if blocco %}
+    <p class="small text-muted mt-3"><i class="bi bi-lock"></i> Archivio in uso su: <strong>{{ blocco.pc }}</strong>{% if blocco.pc == questo_pc %} (questo PC){% endif %}.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,8 +1,28 @@
-"""Impostazioni applicative: configurazione notifiche via email (SMTP)."""
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+"""Impostazioni: notifiche via email (SMTP), dati e backup."""
+import threading
+from datetime import datetime
+from pathlib import Path
 
+from flask import (
+    Blueprint, abort, current_app, flash, redirect, render_template, request, send_file, url_for,
+)
+
+from .. import archivio, desktop
+from ..archivio import percorso_db
+from ..desktop import NOME_DB
 from ..mailer import contatore_pending, effective_config, send_pending_notifications, send_test_email
 from ..models import Settings, db
+
+LIMITE_IMPORTAZIONE = 1024 ** 3  # 1 GB: l'archivio comprende i documenti caricati
+
+
+def aggiorna_schema() -> None:
+    """Dopo un'importazione: crea tabelle e colonne mancanti (archivio di una
+    versione precedente)."""
+    from .. import _ensure_schema
+
+    db.create_all()
+    _ensure_schema()
 
 bp = Blueprint("settings", __name__, url_prefix="/impostazioni")
 
@@ -83,3 +103,153 @@ def send_now():
     else:
         flash("Nessuna notifica da inviare al momento.", "info")
     return redirect(url_for("settings.edit"))
+
+
+# ----------------------------------------------------------------------
+# Dati e backup: cartella dati, backup, esporta/importa l'archivio
+# ----------------------------------------------------------------------
+def _cartella_corrente() -> Path:
+    return percorso_db(current_app.config["SQLALCHEMY_DATABASE_URI"]).parent
+
+
+@bp.route("/dati", methods=["GET"])
+def data():
+    cartella = _cartella_corrente()
+    db_file = cartella / NOME_DB
+    blocco = desktop.leggi_blocco(cartella)
+    return render_template(
+        "settings/dati.html",
+        cartella=cartella,
+        desktop_mode=current_app.config.get("DC_DESKTOP", False),
+        dimensione_db=db_file.stat().st_size if db_file.exists() else 0,
+        backup=desktop.elenco_backup(cartella),
+        blocco=blocco,
+        questo_pc=desktop.nome_pc(),
+    )
+
+
+@bp.route("/dati/backup", methods=["POST"])
+def backup_now():
+    creato = desktop.esegui_backup(_cartella_corrente(), motivo="manuale")
+    flash(f"Backup creato: {creato.name}." if creato else "Non c'è ancora un database da salvare.",
+          "success" if creato else "warning")
+    return redirect(url_for("settings.data"))
+
+
+@bp.route("/dati/esporta", methods=["GET"])
+def export_archive():
+    cartella = _cartella_corrente()
+    zip_bytes = archivio.esporta(cartella / NOME_DB, Path(current_app.config["UPLOAD_FOLDER"]))
+    nome = f"deal-combined-archivio-{datetime.now():%Y%m%d-%H%M}.zip"
+    return send_file(zip_bytes, mimetype="application/zip", as_attachment=True, download_name=nome)
+
+
+@bp.route("/dati/importa", methods=["POST"])
+def import_archive():
+    request.max_content_length = LIMITE_IMPORTAZIONE
+    file = request.files.get("archivio")
+    if not file or not file.filename:
+        flash("Scegli il file .zip dell'archivio da importare.", "warning")
+        return redirect(url_for("settings.data"))
+    if request.form.get("conferma") != "1":
+        flash("Conferma di voler sostituire i dati attuali.", "warning")
+        return redirect(url_for("settings.data"))
+    dati = file.read()
+    cartella = _cartella_corrente()
+    uploads = Path(current_app.config["UPLOAD_FOLDER"])
+    # Copia di sicurezza completa (database e documenti) prima di sostituire.
+    backup_dir = cartella / desktop.NOME_BACKUP
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    copia = backup_dir / f"archivio-prima-di-importare-{datetime.now():%Y%m%d-%H%M%S}.zip"
+    if (cartella / NOME_DB).exists():
+        copia.write_bytes(archivio.esporta(cartella / NOME_DB, uploads).getvalue())
+    db.session.remove()
+    db.engine.dispose()
+    try:
+        archivio.importa(dati, cartella / NOME_DB, uploads)
+    except archivio.ArchivioNonValido as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("settings.data"))
+    aggiorna_schema()
+    flash(f"Archivio importato. I dati precedenti sono salvati in Backup\\{copia.name}.", "success")
+    return redirect(url_for("main.dashboard"))
+
+
+@bp.route("/dati/cartella", methods=["POST"])
+def change_folder():
+    if not current_app.config.get("DC_DESKTOP"):
+        flash("La cartella dati si cambia solo nel programma installato.", "warning")
+        return redirect(url_for("settings.data"))
+    nuova = Path((request.form.get("cartella") or "").strip()).expanduser()
+    errore = desktop.verifica_cartella(nuova)
+    if errore:
+        flash(errore, "danger")
+        return redirect(url_for("settings.data"))
+    attuale = _cartella_corrente()
+    if nuova.resolve() == attuale.resolve():
+        flash("È già la cartella in uso.", "info")
+        return redirect(url_for("settings.data"))
+    if (nuova / NOME_DB).exists():
+        messaggio = ("Nella nuova cartella c'è già un archivio di Deal Combined: al prossimo avvio "
+                     "userai quello. I dati di questa cartella restano dove sono.")
+    elif request.form.get("copia") == "1":
+        db_corrente = attuale / NOME_DB
+        if db_corrente.exists():
+            desktop.esegui_backup(attuale, motivo="spostamento")
+            archivio.importa(
+                archivio.esporta(db_corrente, Path(current_app.config["UPLOAD_FOLDER"])).getvalue(),
+                nuova / NOME_DB, nuova / desktop.NOME_UPLOADS,
+            )
+        messaggio = "Dati copiati nella nuova cartella."
+    else:
+        messaggio = "Al prossimo avvio partirai da un archivio vuoto in quella cartella."
+    file_config = Path(current_app.config["DC_CONFIG_FILE"]) if current_app.config.get("DC_CONFIG_FILE") else None
+    config = desktop.leggi_configurazione(file_config)
+    config["cartella_dati"] = str(nuova)
+    desktop.salva_configurazione(config, file_config)
+    flash(f"{messaggio} Chiudi e riapri Deal Combined per usare la nuova cartella.", "success")
+    return redirect(url_for("settings.data"))
+
+
+@bp.route("/chiudi", methods=["POST"])
+def shutdown():
+    """Chiude il programma (solo nella versione installata). Richiede
+    l'intestazione impostata dal nostro pulsante: un altro sito non può
+    aggiungerla a una richiesta verso l'app."""
+    if not current_app.config.get("DC_DESKTOP") or request.headers.get("X-DC-Azione") != "chiudi":
+        abort(404)
+    chiudi = current_app.config.get("DC_SHUTDOWN")
+    if chiudi:
+        threading.Timer(0.5, chiudi).start()
+    return ("", 204)
+
+
+# ----------------------------------------------------------------------
+# Archivio aperto su un altro PC (cartella dati sincronizzata)
+# ----------------------------------------------------------------------
+@bp.before_app_request
+def ferma_se_aperto_altrove():
+    """Se all'avvio l'archivio risultava aperto su un altro PC, ogni pagina
+    porta all'avviso finché l'utente non decide."""
+    if not current_app.config.get("DC_BLOCCO_ALTRUI"):
+        return None
+    if request.endpoint in ("settings.in_use", "settings.open_anyway", "settings.shutdown", "static"):
+        return None
+    return redirect(url_for("settings.in_use"))
+
+
+@bp.route("/in-uso", methods=["GET"])
+def in_use():
+    blocco = current_app.config.get("DC_BLOCCO_ALTRUI")
+    if not blocco:
+        return redirect(url_for("main.dashboard"))
+    return render_template("settings/in_uso.html", blocco=blocco,
+                           desktop_mode=current_app.config.get("DC_DESKTOP", False))
+
+
+@bp.route("/in-uso/apri-comunque", methods=["POST"])
+def open_anyway():
+    current_app.config["DC_BLOCCO_ALTRUI"] = None
+    desktop.prendi_blocco(_cartella_corrente())
+    flash("Archivio aperto su questo PC. Non usarlo nello stesso momento sull'altro PC.", "warning")
+    return redirect(url_for("main.dashboard"))

@@ -59,6 +59,9 @@
 
       <div class="dc-rail-foot">
         <a class="nav-link {% if bp == 'settings' %}active{% endif %}" href="{{ url_for('settings.edit') }}"><i class="bi bi-gear"></i> Impostazioni</a>
+        {% if config.DC_DESKTOP and not config.DC_FINESTRA %}
+        <button class="nav-link w-100 text-start border-0 bg-transparent" type="button" id="dc-esci"><i class="bi bi-power"></i> Chiudi Deal Combined</button>
+        {% endif %}
       </div>
     </div>
   </aside>
@@ -144,6 +147,15 @@
     });
   })();
 </script>
+{% if config.DC_DESKTOP and not config.DC_FINESTRA %}
+<script>
+  document.getElementById("dc-esci").addEventListener("click", function () {
+    if (!confirm("Chiudere Deal Combined? I dati sono già salvati.")) return;
+    fetch("{{ url_for('settings.shutdown') }}", { method: "POST", headers: { "X-DC-Azione": "chiudi" } })
+      .finally(function () { document.body.innerHTML = '<main class="p-5"><h1 class="h4">Deal Combined è stato chiuso.</h1><p>Puoi chiudere questa scheda del browser.</p></main>'; });
+  });
+</script>
+{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

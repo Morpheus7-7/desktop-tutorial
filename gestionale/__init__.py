@@ -7,7 +7,9 @@ rischi, follow-up, scadenzario e notifiche.
 import os
 from datetime import date
 
-from flask import Flask
+from urllib.parse import urlparse
+
+from flask import Flask, abort, request
 from sqlalchemy import inspect, text
 
 from .models import db
@@ -109,6 +111,15 @@ def create_app(test_config: dict | None = None) -> Flask:
 
         unread = Notification.query.filter_by(letta=False).count()
         return {"notifiche_non_lette": unread, "oggi": date.today()}
+
+    @app.before_request
+    def blocca_richieste_da_altri_siti():
+        """Le modifiche arrivano solo dalle pagine dell'app: un sito esterno
+        aperto nel browser non può inviare moduli verso il gestionale."""
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            provenienza = request.headers.get("Origin") or request.headers.get("Referer")
+            if provenienza and urlparse(provenienza).netloc != request.host:
+                abort(403)
 
     @app.before_request
     def refresh_notifications():

@@ -45,13 +45,20 @@ jobs:
       - name: Verifica che l'eseguibile esista
         shell: pwsh
         run: |
-          if (-not (Test-Path "dist/GestionaleAssicurativo.exe")) {
+          if (-not (Test-Path "dist/DealCombined.exe")) {
             throw "Eseguibile non trovato in dist/"
           }
-          Get-Item "dist/GestionaleAssicurativo.exe" | Format-List Name, Length
-      - name: Carica l'eseguibile come artifact
+          Get-Item "dist/DealCombined.exe" | Format-List Name, Length
+      - name: Crea l'installatore (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\DealCombined.iss
+      - name: Carica eseguibile e installatore come artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GestionaleAssicurativo-windows
-          path: dist/GestionaleAssicurativo.exe
+          name: DealCombined-windows
+          path: |
+            dist/DealCombined.exe
+            dist/Installa-DealCombined.exe
           if-no-files-found: error

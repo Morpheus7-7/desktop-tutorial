@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Archivio aperto su un altro PC — Deal Combined{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <section class="card mt-4">
+      <div class="card-body p-4">
+        <h1 class="h4"><i class="bi bi-exclamation-triangle text-warning me-2"></i>L'archivio è aperto su «{{ blocco.pc }}»</h1>
+        <p class="misura">I dati di Deal Combined sono in una cartella condivisa tra più PC e in questo momento risultano aperti
+          su <strong>{{ blocco.pc }}</strong>. Se li usi da due PC insieme, le modifiche di uno possono cancellare quelle dell'altro
+          o rovinare l'archivio.</p>
+        <p class="misura mb-4"><strong>Cosa fare:</strong> chiudi Deal Combined su {{ blocco.pc }}, aspetta che la sincronizzazione
+          (OneDrive, Google Drive…) finisca, poi riapri il programma qui.</p>
+        <div class="d-flex flex-wrap gap-2">
+          {% if desktop_mode %}
+          <button class="btn btn-primary" type="button" id="dc-chiudi"><i class="bi bi-power"></i> Chiudi Deal Combined</button>
+          {% endif %}
+          <form method="post" action="{{ url_for('settings.open_anyway') }}"
+                onsubmit="return confirm('Aprire comunque? Usa l\'archivio su un solo PC alla volta.');">
+            <button class="btn btn-outline-danger">Apri comunque (sconsigliato)</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{% if desktop_mode %}
+<script>
+  document.getElementById("dc-chiudi").addEventListener("click", function () {
+    fetch("{{ url_for('settings.shutdown') }}", { method: "POST", headers: { "X-DC-Azione": "chiudi" } })
+      .finally(function () { document.body.innerHTML = '<main class="p-5"><h1 class="h4">Deal Combined è stato chiuso.</h1></main>'; });
+  });
+</script>
+{% endif %}
+{% endblock %}
