@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ sc.titolo }} · {{ client.ragione_sociale }} — Deal Combined{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 no-print flex-wrap gap-2">
+  <a class="btn btn-outline-secondary" href="{{ url_for('clients.detail', client_id=client.id) }}#schede"><i class="bi bi-arrow-left"></i> {{ client.ragione_sociale }}</a>
+  <div class="d-flex gap-2">
+    <form method="post" action="{{ url_for('client_sheets.delete_sheet', client_id=client.id, compilata_id=sc.id) }}"
+          onsubmit="return confirm('Eliminare questa scheda compilata?');">
+      <button class="btn btn-outline-danger"><i class="bi bi-trash"></i> Elimina</button>
+    </form>
+    <a class="btn btn-outline-primary" href="{{ url_for('client_sheets.edit_sheet', client_id=client.id, compilata_id=sc.id) }}"><i class="bi bi-pencil"></i> Modifica</a>
+    <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+  </div>
+</div>
+
+<article class="scheda card" data-bs-theme="light">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <h1 class="h4 mb-1"><i class="bi {{ struttura.icona }} me-1"></i>{{ sc.titolo }}</h1>
+      <div class="small text-muted">Compilata il {{ sc.data_compilazione | data_it }}{% if sc.updated_at and sc.created_at and sc.updated_at.date() != sc.created_at.date() %} · aggiornata il {{ sc.updated_at | data_it }}{% endif %}</div>
+    </div>
+    <div class="text-end"><div class="scheda-marchio"><strong>Deal</strong> Combined</div></div>
+  </div>
+
+  <div class="campo mt-3">
+    <span class="etichetta">Cliente:</span><span class="valore">{{ client.ragione_sociale }}</span>
+    <span class="etichetta">Consulente:</span><span class="valore" style="max-width: 16rem;">{{ sc.consulente or '' }}</span>
+  </div>
+
+  {% for sez in struttura.sezioni %}
+  {% set si = loop.index0 %}
+  <section>
+    <h2>{{ sez.titolo }}</h2>
+    {% if sez.tipo == 'campi' %}
+      {% for etichetta in sez.campi %}
+      {% set v = valori.get('s%dc%d' % (si, loop.index0), '') %}
+      <div class="campo"><span class="etichetta">{{ etichetta }}:</span>{% if v %}<span class="valore">{{ v }}</span>{% else %}<span class="riga"></span>{% endif %}</div>
+      {% endfor %}
+    {% elif sez.tipo == 'domande' %}
+      {% for domanda in sez.domande %}
+      {% set v = valori.get('s%dd%d' % (si, loop.index0), '') %}
+      <div class="domanda">{{ domanda }}</div>
+      {% if v %}<p class="risposta">{{ v }}</p>{% else %}<div class="spazio"></div>{% endif %}
+      {% endfor %}
+    {% elif sez.tipo == 'check' %}
+      <div class="row">
+        {% for voce in sez.voci %}
+        {% set fatto = valori.get('s%dv%d' % (si, loop.index0)) %}
+        <div class="col-md-6 check"><span class="casella {% if fatto %}spuntata{% endif %}" aria-hidden="true"></span>{{ voce }}<span class="visually-hidden">{% if fatto %}: sì{% else %}: no{% endif %}</span></div>
+        {% endfor %}
+      </div>
+    {% elif sez.tipo == 'tabella' %}
+      {% set fisse = sez.righe_fisse %}
+      {% set n_righe = (fisse | length) if fisse else sez.righe %}
+      <table>
+        <thead><tr>{% for col in sez.colonne %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for ri in range(n_righe) %}
+          <tr>
+            {% for col in sez.colonne %}
+            {% set ki = loop.index0 %}
+            {% if fisse and ki == 0 %}<td>{{ fisse[ri] }}</td>
+            {% else %}<td>{{ valori.get('s%dr%dk%d' % (si, ri, ki), '') }}</td>{% endif %}
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <section>
+    <h2>Note</h2>
+    {% if valori.get('note') %}<p class="risposta">{{ valori.get('note') }}</p>
+    {% else %}<div class="spazio"></div><div class="spazio"></div>{% endif %}
+  </section>
+</article>
+{% endblock %}

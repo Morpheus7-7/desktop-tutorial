@@ -24,6 +24,8 @@ from ..models import (
     db,
 )
 from ..risk_engine import analyze_client
+from ..academy import get_scheda
+from ..schede import SCHEDE_CLIENTE
 
 bp = Blueprint("clients", __name__, url_prefix="/clienti")
 
@@ -119,6 +121,7 @@ def detail(client_id):
         "clients/detail.html",
         client=client,
         prossimo_followup=prossimo_followup,
+        schede_cliente=[get_scheda(i) for i in SCHEDE_CLIENTE],
         policy_branches=POLICY_BRANCHES,
         policy_statuses=POLICY_STATUSES,
         payment_frequencies=PAYMENT_FREQUENCIES,

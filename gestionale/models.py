@@ -156,6 +156,13 @@ class Client(db.Model):
         lazy=True,
         order_by="Opportunity.created_at.desc()",
     )
+    schede = db.relationship(
+        "SchedaCompilata",
+        backref="cliente",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="SchedaCompilata.updated_at.desc()",
+    )
 
     @property
     def tipo_label(self):
@@ -460,3 +467,42 @@ class QuizAttempt(db.Model):
     @property
     def percentuale(self) -> int:
         return round(100 * self.punteggio / self.totale) if self.totale else 0
+
+
+class SchedaCompilata(db.Model):
+    """Scheda dell'Accademia compilata dal gestionale e salvata nel cliente.
+
+    `contenuto` conserva sia la struttura della scheda al momento del
+    salvataggio (così una modifica futura ai modelli non altera le schede già
+    compilate) sia i valori inseriti.
+    """
+
+    __tablename__ = "schede_compilate"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True)
+    scheda_id = db.Column(db.String(60), nullable=False)
+    titolo = db.Column(db.String(200), nullable=False)
+    data_compilazione = db.Column(db.Date, default=date.today, nullable=False)
+    consulente = db.Column(db.String(120))
+    contenuto_json = db.Column(db.Text, nullable=False, default="{}")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def contenuto(self) -> dict:
+        try:
+            return json.loads(self.contenuto_json or "{}")
+        except ValueError:
+            return {}
+
+    @contenuto.setter
+    def contenuto(self, value: dict) -> None:
+        self.contenuto_json = json.dumps(value, ensure_ascii=False)
+
+    @property
+    def compilazione(self) -> tuple[int, int]:
+        """(campi compilati, campi totali): misura quanto è completa la scheda."""
+        valori = self.contenuto.get("valori", {})
+        pieni = sum(1 for v in valori.values() if v not in ("", None, False))
+        return pieni, len(valori)

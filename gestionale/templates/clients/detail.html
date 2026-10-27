@@ -16,13 +16,18 @@
   </div>
   <div class="d-flex gap-2">
     <div class="dropdown">
-      <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-printer"></i> Schede</button>
+      <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-clipboard-plus"></i> Compila scheda</button>
       <ul class="dropdown-menu dropdown-menu-end">
-        <li><a class="dropdown-item" href="{{ url_for('academy.sheet', scheda_id='raccolta-azienda' if client.tipo in ('azienda', 'professionista') else 'raccolta-privato', cliente=client.id) }}">Raccolta informazioni</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('academy.sheet', scheda_id='preparazione-appuntamento', cliente=client.id) }}">Preparazione appuntamento</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('academy.sheet', scheda_id='revisione-annuale', cliente=client.id) }}">Revisione annuale</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('academy.sheet', scheda_id='mappa-referenze', cliente=client.id) }}">Mappa relazioni e referenze</a></li>
-        <li><a class="dropdown-item" href="{{ url_for('academy.sheet', scheda_id='informazioni-da-dare', cliente=client.id) }}">Check-list documenti da dare</a></li>
+        {% set raccolta = 'raccolta-privato' if client.tipo == 'dipendente' else 'raccolta-azienda' %}
+        <li><span class="dropdown-header">Compila e salva nel cliente</span></li>
+        {% for s in schede_cliente if s.id == raccolta %}
+        <li><a class="dropdown-item fw-semibold" href="{{ url_for('client_sheets.new_sheet', client_id=client.id, scheda_id=s.id) }}"><i class="bi {{ s.icona }} me-1"></i>{{ s.titolo }}</a></li>
+        {% endfor %}
+        {% for s in schede_cliente if s.id != raccolta %}
+        <li><a class="dropdown-item" href="{{ url_for('client_sheets.new_sheet', client_id=client.id, scheda_id=s.id) }}"><i class="bi {{ s.icona }} me-1"></i>{{ s.titolo }}</a></li>
+        {% endfor %}
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{{ url_for('academy.sheet', scheda_id=raccolta, cliente=client.id) }}"><i class="bi bi-printer me-1"></i>Stampa vuota da compilare a mano</a></li>
       </ul>
     </div>
     <a class="btn btn-outline-primary" href="{{ url_for('clients.edit_client', client_id=client.id) }}">
@@ -49,6 +54,7 @@
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-documenti">Documenti <span class="badge bg-secondary">{{ client.documenti | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-opportunita">Opportunità <span class="badge bg-secondary">{{ client.opportunita | selectattr('aperta') | list | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-followup">Follow-up <span class="badge bg-secondary">{{ client.followups | selectattr('stato', 'equalto', 'aperto') | list | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-schede">Schede <span class="badge bg-secondary">{{ client.schede | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-analisi">Analisi rischi <span class="badge bg-secondary">{{ client.analisi | length }}</span></button></li>
 </ul>
 
@@ -388,6 +394,39 @@
   </div>
 
   <!-- ============ ANALISI RISCHI ============ -->
+  <div class="tab-pane fade" id="tab-schede">
+    {% if client.schede %}
+    <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Scheda</th><th>Data</th><th>Consulente</th><th>Compilazione</th><th></th></tr></thead>
+      <tbody>
+      {% for sc in client.schede %}
+        {% set pieni, totali = sc.compilazione %}
+        <tr>
+          <td><a class="fw-semibold" href="{{ url_for('client_sheets.view_sheet', client_id=client.id, compilata_id=sc.id) }}">{{ sc.titolo }}</a></td>
+          <td>{{ sc.data_compilazione | data_it }}</td>
+          <td>{{ sc.consulente or '—' }}</td>
+          <td class="numeri small">{{ pieni }} campi su {{ totali }}</td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('client_sheets.edit_sheet', client_id=client.id, compilata_id=sc.id) }}" title="Modifica" aria-label="Modifica {{ sc.titolo }}"><i class="bi bi-pencil"></i></a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('client_sheets.view_sheet', client_id=client.id, compilata_id=sc.id) }}"><i class="bi bi-eye"></i> Apri</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="py-3">
+      <p class="mb-2">Nessuna scheda compilata per questo cliente.</p>
+      <p class="text-muted small misura">Compila le schede direttamente qui: restano salvate nella pratica, si possono modificare e stampare.
+        I dati già presenti nel gestionale (anagrafica, polizze in essere) vengono scritti in automatico.</p>
+      {% set raccolta = 'raccolta-privato' if client.tipo == 'dipendente' else 'raccolta-azienda' %}
+      <a class="btn btn-primary" href="{{ url_for('client_sheets.new_sheet', client_id=client.id, scheda_id=raccolta) }}"><i class="bi bi-clipboard-plus"></i> Compila la raccolta informazioni</a>
+    </div>
+    {% endif %}
+  </div>
+
   <div class="tab-pane fade" id="tab-analisi">
     <div class="row g-4">
       <div class="col-lg-5">
@@ -445,7 +484,8 @@
   document.addEventListener('DOMContentLoaded', function () {
     const map = {
       polizze: '#tab-polizze', documenti: '#tab-documenti',
-      opportunita: '#tab-opportunita', followup: '#tab-followup', analisi: '#tab-analisi'
+      opportunita: '#tab-opportunita', followup: '#tab-followup', analisi: '#tab-analisi',
+      schede: '#tab-schede'
     };
     const target = map[window.location.hash.replace('#', '')];
     if (target) {

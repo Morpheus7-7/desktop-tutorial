@@ -541,19 +541,19 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 .scheda .check .casella { display: inline-block; width: .95rem; height: .95rem; border: 1.5px solid #4d5c54;
   border-radius: 2px; vertical-align: -2px; margin-right: .5rem; }
 .scheda table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-.scheda th, .scheda td { border: 1px solid #93a39a; padding: .3rem .4rem; }
+.scheda th, .scheda td { border: 1px solid #93a39a; padding: .35rem .5rem; }
 .scheda td { height: 1.9rem; }
 .scheda section { break-inside: avoid; page-break-inside: avoid; }
 .scheda-marchio { font-stretch: 82%; font-size: 1.05rem; color: #1d3b30; line-height: 1.2; }
 
 /* ---------- Stampa --------------------------------------------------------- */
 @media print {
-  .dc-rail, .dc-topbar, .dc-footer, .btn, .no-print, .dc-skip { display: none !important; }
+  .dc-rail, .dc-topbar, .dc-footer, .btn, .no-print, .dc-skip, .alert, .breadcrumb { display: none !important; }
   .dc-shell, .dc-main { display: block; }
   .dc-content { padding: 0 !important; max-width: none; }
   body { background: #fff; color: #16211b; }
   .card { box-shadow: none; border: 1px solid #c9d3c8; }
-  .scheda { padding: 0; max-width: none; }
+  .scheda { padding: 0; max-width: none; border: 0 !important; }
   .nastro { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .lezione, .evidenza, .trattativa { break-inside: avoid; }
   .table-responsive { overflow: visible; }
@@ -589,4 +589,22 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 }
 @media (horizontal-viewport-segments: 2) and (min-width: 992px) {
   :root { --dc-x: 17rem; --dc-pr: 2rem; }
+}
+
+/* ---------- Schede compilate nel cliente ----------------------------------- */
+.scheda .risposta { white-space: pre-line; margin: .15rem 0 .6rem; padding-bottom: .35rem; border-bottom: 1px solid #93a39a; font-size: .95rem; }
+.scheda .campo .valore { white-space: pre-line; }
+.scheda .check .casella.spuntata { background: #1d3b30; border-color: #1d3b30; position: relative; }
+.scheda .check .casella.spuntata::after {
+  content: ""; position: absolute; left: .26rem; top: .06rem; width: .3rem; height: .55rem;
+  border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.scheda-form-azioni {
+  position: sticky; bottom: 0; z-index: 5; display: flex; gap: .5rem;
+  padding: .75rem 0; background: var(--dc-ground); border-top: 1px solid var(--dc-line);
+}
+.tabella-compilabile th[scope="col"] { min-width: 8rem; }
+.tabella-compilabile th[scope="row"] { white-space: nowrap; font-size: .9rem; }
+@media print {
+  .scheda .check .casella.spuntata { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }

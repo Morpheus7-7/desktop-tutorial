@@ -73,8 +73,12 @@ organizzazione personale.
 - **Schede da stampare**: raccolta informazioni (privato e azienda), documenti
   da dare al cliente, preparazione dell'appuntamento, diario della trattativa,
   piano di negoziazione, registro obiezioni, griglia di role-play, revisione
-  annuale, mappa delle referenze, piano settimanale e KPI, post-vendita. Dalla
-  scheda cliente si stampano già intestate.
+  annuale, mappa delle referenze, piano settimanale e KPI, post-vendita.
+- **Schede compilate nel cliente**: dalla scheda del cliente («Compila scheda»)
+  le schede che riguardano il cliente si compilano direttamente nel gestionale,
+  con anagrafica e polizze in essere già scritte. Restano salvate nella scheda
+  **Schede** del cliente con data e consulente, si possono modificare e
+  stampare compilate. Resta disponibile anche la versione vuota da stampare.
 
 I contenuti sono in `gestionale/academy.py`. I riferimenti normativi (IDD,
 Regolamenti IVASS, privacy) sono indicazioni formative: verifica sempre le
