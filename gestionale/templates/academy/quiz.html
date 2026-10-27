@@ -5,8 +5,8 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
-    <div class="small text-muted">Settimana {{ modulo.numero }}</div>
-    <h1 class="h3 mb-0"><i class="bi bi-ui-checks me-2"></i>Quiz — {{ modulo.titolo }}</h1>
+    <h1 class="h3 mb-1"><i class="bi bi-ui-checks me-2"></i>Quiz — {{ modulo.titolo }}</h1>
+    <div class="small text-muted">Settimana {{ modulo.numero }} · obiettivo: almeno il 70% di risposte corrette</div>
   </div>
   <a class="btn btn-outline-secondary" href="{{ url_for('academy.module', modulo_id=modulo.id) }}"><i class="bi bi-arrow-left"></i> Torna al modulo</a>
 </div>

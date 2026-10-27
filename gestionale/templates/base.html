@@ -10,12 +10,12 @@
   <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark ga-navbar shadow-sm">
+<nav class="navbar navbar-expand-xl navbar-dark ga-navbar shadow-sm">
   <div class="container-fluid px-4">
-    <a class="navbar-brand fw-bold" href="{{ url_for('main.dashboard') }}">
-      <i class="bi bi-shield-check me-1"></i> Gestionale Assicurativo
+    <a class="navbar-brand fw-bold" href="{{ url_for('main.dashboard') }}" aria-label="Gestionale Assicurativo, vai alla dashboard">
+      <i class="bi bi-shield-check me-1"></i> <span class="ga-brand-text">Gestionale Assicurativo</span>
     </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-controls="navMain" aria-expanded="false" aria-label="Apri il menu">
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navMain">
@@ -31,17 +31,17 @@
         <li class="nav-item"><a class="nav-link {% if request.blueprint == 'academy' %}active{% endif %}" href="{{ url_for('academy.index') }}"><i class="bi bi-mortarboard"></i> Accademia</a></li>
       </ul>
 
-      <form class="ga-search me-lg-3 my-2 my-lg-0" method="get" action="{{ url_for('main.search') }}" role="search">
+      <form class="ga-search me-xl-2 my-2 my-xl-0" method="get" action="{{ url_for('main.search') }}" role="search">
         <div class="input-group">
           <span class="input-group-text bg-transparent border-0 text-white-50"><i class="bi bi-search"></i></span>
-          <input class="form-control" type="search" name="q" placeholder="Cerca clienti o polizze…"
+          <input class="form-control" type="search" name="q" placeholder="Cerca…"
                  value="{{ request.args.get('q', '') if request.endpoint == 'main.search' else '' }}"
-                 aria-label="Cerca" style="min-width: 12rem;">
+                 aria-label="Cerca">
         </div>
       </form>
 
       <div class="d-flex align-items-center gap-2">
-        <a class="btn btn-outline-light position-relative" href="{{ url_for('notifications.list_notifications') }}" title="Notifiche">
+        <a class="btn btn-outline-light position-relative" href="{{ url_for('notifications.list_notifications') }}" title="Notifiche" aria-label="Notifiche">
           <i class="bi bi-bell"></i>
           {% if notifiche_non_lette %}
           <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
@@ -49,7 +49,7 @@
           </span>
           {% endif %}
         </a>
-        <a class="btn btn-outline-light" href="{{ url_for('settings.edit') }}" title="Impostazioni">
+        <a class="btn btn-outline-light" href="{{ url_for('settings.edit') }}" title="Impostazioni" aria-label="Impostazioni">
           <i class="bi bi-gear"></i>
         </a>
       </div>

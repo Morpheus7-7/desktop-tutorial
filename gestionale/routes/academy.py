@@ -56,6 +56,7 @@ def module(modulo_id):
     return render_template(
         "academy/module.html",
         modulo=modulo,
+        totale_moduli=len(ac.MODULI),
         completate=_completate(),
         miglior_quiz=_migliori_quiz().get(modulo_id),
         precedente=ac.MODULI[idx - 1] if idx > 0 else None,

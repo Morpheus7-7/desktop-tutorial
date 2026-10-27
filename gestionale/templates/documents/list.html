@@ -19,6 +19,7 @@
 <div class="card">
   <div class="card-body p-0">
     {% if documenti %}
+    <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr><th>Documento</th><th>Cliente</th><th>Categoria</th><th>Polizza</th><th>Dim.</th><th>Caricato il</th><th></th></tr></thead>
       <tbody>
@@ -44,6 +45,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted p-4 mb-0">Nessun documento. I documenti si caricano dalla scheda del cliente.</p>
     {% endif %}

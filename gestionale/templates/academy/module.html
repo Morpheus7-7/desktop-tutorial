@@ -7,9 +7,9 @@
   <div class="d-flex gap-3 align-items-start">
     <span class="modulo-icona"><i class="bi {{ modulo.icona }}"></i></span>
     <div>
-      <div class="small text-muted">Settimana {{ modulo.numero }} · {{ modulo.area }}</div>
       <h1 class="h3 mb-1">{{ modulo.titolo }}</h1>
-      <div class="text-muted">{{ modulo.obiettivo }}</div>
+      <div class="small text-muted mb-2">Settimana {{ modulo.numero }} di {{ totale_moduli }} · {{ modulo.area }}</div>
+      <p class="text-muted misura mb-0">{{ modulo.obiettivo }}</p>
     </div>
   </div>
   <div class="d-flex gap-2">
@@ -25,7 +25,7 @@
     {% set fatta = lez.id in completate %}
     <div class="card lezione mb-4 {% if fatta %}completata{% endif %}" id="{{ lez.id }}">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span>{{ modulo.numero }}.{{ loop.index }} — {{ lez.titolo }}</span>
+        <h2 class="h6 mb-0">{{ modulo.numero }}.{{ loop.index }} — {{ lez.titolo }}</h2>
         <form method="post" action="{{ url_for('academy.toggle_lesson', lezione_id=lez.id) }}" class="no-print">
           {% if fatta %}
           <button class="btn btn-sm btn-success"><i class="bi bi-check2-circle"></i> Completata</button>
@@ -40,9 +40,9 @@
         <ul>
           {% for p in lez.punti %}<li>{{ p }}</li>{% endfor %}
         </ul>
-        <div class="box-esempio mb-3"><i class="bi bi-chat-quote me-1"></i>{{ lez.esempio }}</div>
-        <div class="box-esercizio"><strong><i class="bi bi-pencil me-1"></i>Esercizio sul campo:</strong> {{ lez.esercizio }}</div>
+        <blockquote class="box-esempio mb-0"><i class="bi bi-chat-quote" aria-hidden="true"></i>{{ lez.esempio }}</blockquote>
       </div>
+      <div class="card-footer box-esercizio"><strong><i class="bi bi-pencil me-1"></i>Esercizio sul campo:</strong> {{ lez.esercizio }}</div>
     </div>
     {% endfor %}
 
@@ -59,7 +59,7 @@
         <p class="small text-muted">Cosa dice la ricerca sulle tecniche di questo modulo, e quanto sono solide le prove.</p>
         {% for e in modulo.evidenze %}
         {% set lv = livelli[e.livello] %}
-        <div class="evidenza evidenza-{{ e.livello | replace(' ', '-') }}">
+        <div class="evidenza">
           <span class="badge bg-{{ lv[1] }} mb-1">{{ lv[0] }}</span>
           <div class="small">{{ e.tesi }}</div>
           <div class="small text-muted fst-italic">{{ e.fonte }}</div>

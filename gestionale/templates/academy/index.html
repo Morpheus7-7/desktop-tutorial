@@ -30,10 +30,12 @@
     </div></div>
   </div>
   <div class="col-lg-6">
-    <div class="card h-100 trattativa m-0">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="trattativa-title"><i class="bi bi-lightning-charge"></i> Obiezione del giorno</span>
+        <span class="badge bg-light text-dark border">{{ categorie[pillola.categoria] }}</span>
+      </div>
       <div class="card-body">
-        <div class="trattativa-title mb-1"><i class="bi bi-lightning-charge"></i> Obiezione del giorno
-          <span class="badge bg-light text-dark ms-1">{{ categorie[pillola.categoria] }}</span></div>
         <div class="fs-5 fw-semibold">«{{ pillola.obiezione }}»</div>
         <div class="small text-muted mb-2">Prima di leggere la risposta, prova a formularne una ad alta voce.</div>
         <a class="btn btn-sm btn-warning" href="{{ url_for('academy.drill', id=pillola.id) }}"><i class="bi bi-play-fill"></i> Allenati</a>
@@ -63,8 +65,8 @@
           <div class="d-flex gap-3 align-items-start">
             <span class="modulo-icona"><i class="bi {{ m.icona }}"></i></span>
             <div class="flex-grow-1">
+              <h3 class="h6 fw-semibold mb-1">{{ m.titolo }}</h3>
               <div class="small text-muted">Settimana {{ m.numero }} · {{ m.area }}</div>
-              <div class="fw-semibold">{{ m.titolo }}</div>
             </div>
           </div>
           <p class="small text-muted mt-2 mb-2">{{ m.obiettivo }}</p>

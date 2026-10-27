@@ -6,7 +6,7 @@
 <div class="row justify-content-center">
   <div class="col-lg-8">
     <h1 class="h3 mb-3"><i class="bi bi-lightning-charge me-2"></i>Allenamento sulle obiezioni</h1>
-    <p class="text-muted">Leggi l'obiezione, rispondi <strong>ad alta voce</strong> come faresti con un cliente (meglio se ti registri),
+    <p class="text-muted misura">Leggi l'obiezione, rispondi <strong>ad alta voce</strong> come faresti con un cliente (meglio se ti registri),
       poi confronta con la soluzione. La pratica ripetuta con feedback immediato è il modo più efficace per trasformare una tecnica in abitudine.</p>
 
     <div class="card flashcard mb-3">
@@ -22,7 +22,7 @@
       <div class="card-body">
         <p><strong>Cosa può nascondere:</strong> {{ o.cosa_nasconde }}</p>
         <p><strong>Tecnica:</strong> <span class="badge bg-primary">{{ o.tecnica }}</span></p>
-        <div class="box-esempio mb-2">{{ o.risposta }}</div>
+        <blockquote class="box-esempio mb-2">{{ o.risposta }}</blockquote>
         <p><strong>Rilancio:</strong> {{ o.rilancio }}</p>
         <div class="trattativa"><span class="trattativa-title"><i class="bi bi-lightbulb"></i> Pensiero laterale:</span> {{ o.laterale }}</div>
         <hr>

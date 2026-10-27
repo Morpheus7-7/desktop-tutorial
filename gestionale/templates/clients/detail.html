@@ -81,7 +81,7 @@
           {% endif %}
         </dl>
         <h2 class="h6 text-uppercase text-muted">Descrizione attività</h2>
-        <p class="border rounded p-3 bg-light">{{ client.descrizione_attivita or 'Nessuna descrizione inserita: aggiungila per poter eseguire l\'analisi automatica dei rischi.' }}</p>
+        <p class="descrizione-attivita">{{ client.descrizione_attivita or 'Nessuna descrizione inserita: aggiungila per poter eseguire l\'analisi automatica dei rischi.' }}</p>
         {% if client.note %}
         <h2 class="h6 text-uppercase text-muted">Note interne</h2>
         <p>{{ client.note }}</p>
@@ -93,6 +93,7 @@
   <!-- ============ POLIZZE ============ -->
   <div class="tab-pane fade" id="tab-polizze">
     {% if client.polizze %}
+    <div class="table-responsive">
     <table class="table table-hover align-middle">
       <thead><tr><th>Numero</th><th>Compagnia</th><th>Ramo</th><th>Premio</th><th>Decorrenza</th><th>Scadenza</th><th>Stato</th><th></th></tr></thead>
       <tbody>
@@ -123,6 +124,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted">Nessuna polizza registrata per questo cliente.</p>
     {% endif %}
@@ -195,6 +197,7 @@
   <!-- ============ DOCUMENTI ============ -->
   <div class="tab-pane fade" id="tab-documenti">
     {% if client.documenti %}
+    <div class="table-responsive">
     <table class="table table-hover align-middle">
       <thead><tr><th>Documento</th><th>Categoria</th><th>Polizza collegata</th><th>Dim.</th><th>Caricato il</th><th></th></tr></thead>
       <tbody>
@@ -218,6 +221,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted">Nessun documento caricato per questo cliente.</p>
     {% endif %}
@@ -267,6 +271,7 @@
       </a>
     </div>
     {% if client.opportunita %}
+    <div class="table-responsive">
     <table class="table table-hover align-middle">
       <thead><tr><th>Titolo</th><th>Ramo</th><th>Fase</th><th>Premio stimato</th><th>Origine</th><th></th></tr></thead>
       <tbody>
@@ -297,6 +302,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted">Nessuna opportunità per questo cliente. Puoi crearle anche dalle coperture scoperte nel report di analisi rischi.</p>
     {% endif %}
@@ -305,6 +311,7 @@
   <!-- ============ FOLLOW-UP ============ -->
   <div class="tab-pane fade" id="tab-followup">
     {% if client.followups %}
+    <div class="table-responsive">
     <table class="table table-hover align-middle">
       <thead><tr><th>Data</th><th>Attività</th><th>Tipo</th><th>Priorità</th><th>Stato</th><th></th></tr></thead>
       <tbody>
@@ -334,6 +341,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted">Nessun follow-up per questo cliente.</p>
     {% endif %}
@@ -390,6 +398,7 @@
       <div class="col-lg-7">
         <h2 class="h6 text-uppercase text-muted">Storico analisi</h2>
         {% if client.analisi %}
+        <div class="table-responsive">
         <table class="table table-hover align-middle">
           <thead><tr><th>Data</th><th>Rischi rilevati</th><th>Rami scoperti</th><th></th></tr></thead>
           <tbody>
@@ -412,6 +421,7 @@
           {% endfor %}
           </tbody>
         </table>
+        </div>
         {% else %}
         <p class="text-muted">Nessuna analisi eseguita finora.</p>
         {% endif %}

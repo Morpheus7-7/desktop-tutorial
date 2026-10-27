@@ -68,6 +68,7 @@
       </div>
       <div class="card-body p-0">
         {% if prossime_scadenze %}
+        <div class="table-responsive">
         <table class="table table-sm mb-0">
           <thead><tr><th>Cliente</th><th>Polizza</th><th>Ramo</th><th>Scadenza</th></tr></thead>
           <tbody>
@@ -84,6 +85,7 @@
           {% endfor %}
           </tbody>
         </table>
+        </div>
         {% else %}
         <p class="text-muted p-3 mb-0">Nessuna polizza in scadenza nei prossimi 60 giorni.</p>
         {% endif %}
@@ -99,6 +101,7 @@
       </div>
       <div class="card-body p-0">
         {% if prossimi_followup %}
+        <div class="table-responsive">
         <table class="table table-sm mb-0">
           <thead><tr><th>Cliente</th><th>Attività</th><th>Data</th><th></th></tr></thead>
           <tbody>
@@ -117,6 +120,7 @@
           {% endfor %}
           </tbody>
         </table>
+        </div>
         {% else %}
         <p class="text-muted p-3 mb-0">Nessun follow-up aperto.</p>
         {% endif %}

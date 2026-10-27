@@ -17,6 +17,7 @@
 <div class="card">
   <div class="card-body p-0">
     {% if followups %}
+    <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr><th>Data</th><th>Cliente</th><th>Attività</th><th>Tipo</th><th>Priorità</th><th>Stato</th><th></th></tr></thead>
       <tbody>
@@ -52,6 +53,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted p-4 mb-0">Nessun follow-up in questo stato. I follow-up si pianificano dalla scheda del cliente.</p>
     {% endif %}
