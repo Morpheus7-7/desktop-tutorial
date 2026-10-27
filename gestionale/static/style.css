@@ -119,9 +119,61 @@ body {
 .tipo-professionista { background: var(--ga-success) !important; }
 .tipo-dipendente { background: #7c3aed !important; }
 
+/* ---------- Accademia ----------------------------------------------------- */
+.academy-nav .nav-link { color: #475569; }
+.academy-nav .nav-link.active { background: var(--ga-primary); color: #fff; }
+.modulo-card { transition: transform .12s ease, box-shadow .12s ease; }
+.modulo-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16,24,40,.10); }
+.modulo-icona {
+  width: 2.6rem; height: 2.6rem; border-radius: .6rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #e8eefc; color: var(--ga-primary); font-size: 1.25rem;
+}
+.lezione.completata { border-left: 4px solid var(--ga-success); }
+.lezione .teoria { line-height: 1.65; }
+.box-esempio {
+  background: #f0f7ff; border-left: 4px solid var(--ga-primary-2);
+  border-radius: .4rem; padding: .7rem .9rem; font-style: italic;
+}
+.box-esercizio {
+  background: #f0fdf4; border-left: 4px solid var(--ga-success);
+  border-radius: .4rem; padding: .7rem .9rem;
+}
+.evidenza { border-left: 4px solid #cbd5e1; padding-left: .75rem; margin-bottom: .9rem; }
+.evidenza-solida { border-left-color: var(--ga-success); }
+.evidenza-moderata { border-left-color: var(--ga-primary-2); }
+.evidenza-limitata { border-left-color: #94a3b8; }
+.evidenza-non-supportata { border-left-color: var(--ga-danger); }
+.flashcard { min-height: 14rem; }
+.flashcard .obiezione-testo { font-size: 1.6rem; font-weight: 600; color: var(--ga-primary); }
+.quiz-opzione.giusta { background: #dcfce7; }
+.quiz-opzione.sbagliata { background: #fee2e2; }
+
+/* Schede da stampare */
+.scheda { background: #fff; max-width: 60rem; margin: 0 auto; padding: 2rem; }
+.scheda h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--ga-primary); border-bottom: 2px solid var(--ga-primary); padding-bottom: .2rem; margin-top: 1.4rem; }
+.scheda .campo { display: flex; gap: .6rem; align-items: flex-end; margin: .55rem 0; }
+.scheda .campo .etichetta { white-space: nowrap; font-size: .9rem; }
+.scheda .campo .riga { flex: 1; border-bottom: 1px solid #94a3b8; min-height: 1.3rem; }
+.scheda .campo .valore { flex: 1; border-bottom: 1px solid #94a3b8; font-weight: 600; }
+.scheda .domanda { margin: .6rem 0 .2rem; font-size: .92rem; }
+.scheda .spazio { border-bottom: 1px solid #94a3b8; height: 1.6rem; }
+.scheda .check { margin: .3rem 0; font-size: .92rem; }
+.scheda .check .casella { display: inline-block; width: .95rem; height: .95rem; border: 1.5px solid #475569;
+  border-radius: 2px; vertical-align: -2px; margin-right: .5rem; }
+.scheda table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.scheda th, .scheda td { border: 1px solid #94a3b8; padding: .3rem .4rem; }
+.scheda td { height: 1.9rem; }
+.scheda section { break-inside: avoid; page-break-inside: avoid; }
+
 /* ---------- Stampa --------------------------------------------------------- */
 @media print {
   .navbar, footer, .btn, .no-print { display: none !important; }
   .card { box-shadow: none; border: 1px solid #ccc; }
   body { background: #fff; }
+  main { padding: 0 !important; }
+  .scheda { padding: 0; max-width: none; }
+  .scheda h2 { color: #000; border-color: #000; }
+  @page { margin: 14mm; }
 }

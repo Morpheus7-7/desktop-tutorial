@@ -45,6 +45,40 @@ notifiche generate in automatico.
   background controlla le scadenze a intervalli regolabili. Vedi
   [Notifiche via email](#notifiche-via-email).
 - **Dashboard** con indicatori chiave, prossime scadenze e follow-up.
+- **Accademia commerciale**: programma di apprendimento per consulenti
+  assicurativi centrato sul *mestiere* più che sui prodotti. Vedi
+  [Accademia commerciale](#accademia-commerciale).
+
+## Accademia commerciale
+
+Dal menu **Accademia** si accede a un percorso di **16 settimane** (un modulo a
+settimana) che copre psicologia della decisione, comunicazione e PNL,
+prospezione, marketing, primo contatto, raccolta delle informazioni, arte
+delle domande (SPIN, ascolto attivo), pensiero laterale e storytelling,
+proposta e prezzo, obiezioni, negoziazione (metodo Harvard, Voss), chiusura,
+continuità della trattativa, sviluppo del portafoglio dai clienti acquisiti e
+organizzazione personale.
+
+- **Lezioni** con teoria, punti chiave, esempio di dialogo ed esercizio sul
+  campo; si segnano come completate e l'avanzamento è salvato.
+- **Base scientifica** per ogni modulo: cosa conferma la ricerca, cosa è solo
+  pratica professionale e quali miti evitare (es. movimenti oculari o regola
+  7-38-55), con le fonti.
+- **Quiz** con correzione spiegata e storico dei tentativi (soglia 70%).
+- **Libreria delle obiezioni** con cosa nascondono, tecnica, risposta, rilancio
+  e spunto di pensiero laterale; **allenamento quotidiano** a flashcard.
+- **Role-play**: scenari a tre (consulente, cliente, osservatore) con trappole
+  e domande di debrief.
+- **Cassetta degli attrezzi**: le tecniche documentate con fonte e modulo.
+- **Schede da stampare**: raccolta informazioni (privato e azienda), documenti
+  da dare al cliente, preparazione dell'appuntamento, diario della trattativa,
+  piano di negoziazione, registro obiezioni, griglia di role-play, revisione
+  annuale, mappa delle referenze, piano settimanale e KPI, post-vendita. Dalla
+  scheda cliente si stampano già intestate.
+
+I contenuti sono in `gestionale/academy.py`. I riferimenti normativi (IDD,
+Regolamenti IVASS, privacy) sono indicazioni formative: verifica sempre le
+versioni vigenti e le procedure della tua compagnia o intermediario.
 
 ## Applicazione desktop (.exe)
 
@@ -119,17 +153,20 @@ gestionale/
   __init__.py              # application factory, filtri e micro-migrazioni
   models.py                # modelli e vocabolari (rami, categorie, Settings…)
   risk_engine.py           # motore di analisi automatica dei rischi
+  academy.py               # contenuti dell'Accademia commerciale
   notifications.py         # generazione notifiche da scadenze e follow-up
   mailer.py                # invio email (SMTP stdlib) e digest notifiche
   scheduler.py             # thread in background per l'invio automatico
   routes/                  # blueprint: main (dashboard, ricerca, statistiche),
                            #            clients, policies, documents, followups,
-                           #            opportunities, notifications, settings
+                           #            opportunities, notifications, settings,
+                           #            academy
   templates/               # interfaccia (Bootstrap 5)
   static/style.css         # tema grafico
   static/vendor/           # Bootstrap e icone in locale (funziona offline)
 tests/test_app.py          # test funzionali (pytest)
 tests/test_email.py        # test notifiche email e pagina impostazioni
+tests/test_academy.py      # test dell'Accademia commerciale
 .github/workflows/build.yml # CI: test + build eseguibile Windows
 ```
 

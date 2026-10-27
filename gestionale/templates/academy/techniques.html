@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Cassetta degli attrezzi — Accademia{% endblock %}
+{% block content %}
+{% include "academy/_nav.html" %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 mb-1"><i class="bi bi-tools me-2"></i>Cassetta degli attrezzi</h1>
+    <div class="text-muted">I metodi documentati, con la fonte e il modulo dove sono spiegati. Stampala come promemoria da tenere in cartella.</div>
+  </div>
+  <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+</div>
+
+{% for fase in fasi %}
+<h2 class="h5 mt-4">{{ fase }}</h2>
+<div class="table-responsive">
+  <table class="table table-sm bg-white align-middle">
+    <thead><tr><th style="width: 18%">Tecnica</th><th style="width: 17%">Fonte</th><th style="width: 22%">Quando</th><th>Come</th><th class="no-print"></th></tr></thead>
+    <tbody>
+      {% for t in tecniche if t.fase == fase %}
+      <tr>
+        <td class="fw-semibold">{{ t.nome }}</td>
+        <td class="small text-muted">{{ t.fonte }}</td>
+        <td class="small">{{ t.quando }}</td>
+        <td class="small">{{ t.come }}</td>
+        <td class="no-print"><a class="small" href="{{ url_for('academy.module', modulo_id=t.modulo) }}">Modulo {{ moduli[t.modulo].numero }}</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+{% endblock %}

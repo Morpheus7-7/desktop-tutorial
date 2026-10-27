@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Accademia commerciale — Gestionale Assicurativo{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 mb-1"><i class="bi bi-mortarboard me-2"></i>Accademia commerciale</h1>
+    <div class="text-muted">Percorso di {{ moduli | length }} settimane per consulenti assicurativi: domande, pensiero laterale,
+      trattativa, obiezioni, chiusura, continuità e sviluppo del portafoglio — con la base scientifica di ogni tecnica.</div>
+  </div>
+</div>
+
+{% include "academy/_nav.html" %}
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card accent-primary h-100"><div class="card-body">
+      <i class="bi bi-book stat-icon"></i>
+      <div class="text-muted small">Lezioni completate</div>
+      <div class="display-6">{{ completate }}<span class="fs-5 text-muted"> / {{ totale_lezioni }}</span></div>
+      <div class="progress mt-2" style="height: 6px;">
+        <div class="progress-bar bg-primary" style="width: {{ (100 * completate / totale_lezioni) | round | int }}%"></div>
+      </div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card stat-card accent-success h-100"><div class="card-body">
+      <i class="bi bi-patch-check stat-icon"></i>
+      <div class="text-muted small">Quiz superati (≥ 70%)</div>
+      <div class="display-6">{{ quiz_superati }}<span class="fs-5 text-muted"> / {{ moduli | length }}</span></div>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100 trattativa m-0">
+      <div class="card-body">
+        <div class="trattativa-title mb-1"><i class="bi bi-lightning-charge"></i> Obiezione del giorno
+          <span class="badge bg-light text-dark ms-1">{{ categorie[pillola.categoria] }}</span></div>
+        <div class="fs-5 fw-semibold">«{{ pillola.obiezione }}»</div>
+        <div class="small text-muted mb-2">Prima di leggere la risposta, prova a formularne una ad alta voce.</div>
+        <a class="btn btn-sm btn-warning" href="{{ url_for('academy.drill', id=pillola.id) }}"><i class="bi bi-play-fill"></i> Allenati</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if prossima %}
+<div class="alert alert-primary d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div><i class="bi bi-arrow-right-circle me-1"></i> Prossima lezione: <strong>{{ prossima[1].titolo }}</strong>
+    <span class="text-muted">— settimana {{ prossima[0].numero }}, {{ prossima[0].titolo }}</span></div>
+  <a class="btn btn-primary btn-sm" href="{{ url_for('academy.module', modulo_id=prossima[0].id) }}#{{ prossima[1].id }}">Studia ora</a>
+</div>
+{% else %}
+<div class="alert alert-success"><i class="bi bi-trophy me-1"></i> Hai completato tutte le lezioni del percorso. Continua con l'allenamento quotidiano e i role-play.</div>
+{% endif %}
+
+<h2 class="h5 mt-4 mb-3">Il percorso</h2>
+<div class="row g-3">
+  {% for item in moduli %}
+  {% set m = item.m %}
+  <div class="col-md-6 col-xl-4">
+    <a class="text-decoration-none text-reset" href="{{ url_for('academy.module', modulo_id=m.id) }}">
+      <div class="card modulo-card h-100">
+        <div class="card-body">
+          <div class="d-flex gap-3 align-items-start">
+            <span class="modulo-icona"><i class="bi {{ m.icona }}"></i></span>
+            <div class="flex-grow-1">
+              <div class="small text-muted">Settimana {{ m.numero }} · {{ m.area }}</div>
+              <div class="fw-semibold">{{ m.titolo }}</div>
+            </div>
+          </div>
+          <p class="small text-muted mt-2 mb-2">{{ m.obiettivo }}</p>
+          <div class="d-flex justify-content-between small">
+            <span>{{ item.fatte }}/{{ item.totale }} lezioni</span>
+            {% if item.quiz %}
+            <span class="badge {% if item.quiz.percentuale >= 70 %}bg-success{% else %}bg-warning text-dark{% endif %}">Quiz {{ item.quiz.percentuale }}%</span>
+            {% else %}<span class="text-muted">Quiz da fare</span>{% endif %}
+          </div>
+          <div class="progress mt-1" style="height: 5px;">
+            <div class="progress-bar bg-success" style="width: {{ (100 * item.fatte / item.totale) | round | int }}%"></div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card mt-4">
+  <div class="card-header"><i class="bi bi-info-circle me-1"></i> Come usare l'Accademia</div>
+  <div class="card-body small">
+    <ol class="mb-0">
+      <li><strong>Un modulo a settimana.</strong> Leggi le lezioni, svolgi gli esercizi sul campo, poi fai il quiz (obiettivo ≥ 70%).</li>
+      <li><strong>Base scientifica.</strong> Ogni modulo indica cosa è confermato dalla ricerca, cosa è solo pratica professionale e quali miti evitare.</li>
+      <li><strong>10 minuti al giorno</strong> di allenamento sulle obiezioni: rispondi ad alta voce prima di leggere la soluzione.</li>
+      <li><strong>Role-play settimanale</strong> con un collega usando gli scenari e la griglia di osservazione.</li>
+      <li><strong>Schede da stampare</strong> per raccogliere informazioni, preparare gli incontri, negoziare e sviluppare il portafoglio.</li>
+      <li><strong>Applica nel gestionale:</strong> analisi rischi, Pipeline e follow-up sono il campo di allenamento reale.</li>
+    </ol>
+  </div>
+</div>
+{% endblock %}

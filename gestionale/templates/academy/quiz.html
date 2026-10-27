@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Quiz: {{ modulo.titolo }} — Accademia{% endblock %}
+{% block content %}
+{% include "academy/_nav.html" %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <div class="small text-muted">Settimana {{ modulo.numero }}</div>
+    <h1 class="h3 mb-0"><i class="bi bi-ui-checks me-2"></i>Quiz — {{ modulo.titolo }}</h1>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('academy.module', modulo_id=modulo.id) }}"><i class="bi bi-arrow-left"></i> Torna al modulo</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    {% if esito %}
+    <div class="card mb-4"><div class="card-body">
+      <div class="h5 mb-1">Risultato: {{ esito.punteggio }} / {{ esito.totale }}</div>
+      {% if esito.punteggio * 10 >= esito.totale * 7 %}
+      <div class="text-success">Modulo superato. Ora metti in pratica gli esercizi sul campo.</div>
+      {% else %}
+      <div class="text-warning">Ripassa le lezioni e riprova: l'obiettivo è almeno il 70%.</div>
+      {% endif %}
+    </div></div>
+    {% for d in esito.dettaglio %}
+    <div class="card mb-3"><div class="card-body">
+      <div class="fw-semibold mb-2">{{ loop.index }}. {{ d.domanda.domanda }}</div>
+      {% for op in d.domanda.opzioni %}
+      <div class="quiz-opzione rounded px-2 py-1 mb-1 {% if loop.index0 == d.domanda.corretta %}giusta{% elif loop.index0 == d.scelta %}sbagliata{% endif %}">
+        {% if loop.index0 == d.domanda.corretta %}<i class="bi bi-check-circle-fill text-success"></i>{% elif loop.index0 == d.scelta %}<i class="bi bi-x-circle-fill text-danger"></i>{% else %}<i class="bi bi-circle text-muted"></i>{% endif %}
+        {{ op }}
+      </div>
+      {% endfor %}
+      <div class="small text-muted mt-2"><i class="bi bi-lightbulb"></i> {{ d.domanda.spiegazione }}</div>
+    </div></div>
+    {% endfor %}
+    <a class="btn btn-primary" href="{{ url_for('academy.quiz', modulo_id=modulo.id) }}"><i class="bi bi-arrow-repeat"></i> Rifai il quiz</a>
+    {% else %}
+    <form method="post">
+      {% for q in modulo.quiz %}
+      {% set qi = loop.index0 %}
+      <div class="card mb-3"><div class="card-body">
+        <div class="fw-semibold mb-2">{{ loop.index }}. {{ q.domanda }}</div>
+        {% for op in q.opzioni %}
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="q{{ qi }}" id="q{{ qi }}_{{ loop.index0 }}" value="{{ loop.index0 }}" required>
+          <label class="form-check-label" for="q{{ qi }}_{{ loop.index0 }}">{{ op }}</label>
+        </div>
+        {% endfor %}
+      </div></div>
+      {% endfor %}
+      <button class="btn btn-primary"><i class="bi bi-send"></i> Correggi</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-clock-history me-1"></i> Ultimi tentativi</div>
+      <ul class="list-group list-group-flush">
+        {% for t in tentativi %}
+        <li class="list-group-item d-flex justify-content-between small">
+          <span>{{ t.created_at | data_it }}</span>
+          <span class="badge {% if t.percentuale >= 70 %}bg-success{% else %}bg-warning text-dark{% endif %}">{{ t.punteggio }}/{{ t.totale }} · {{ t.percentuale }}%</span>
+        </li>
+        {% else %}
+        <li class="list-group-item small text-muted">Nessun tentativo ancora.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

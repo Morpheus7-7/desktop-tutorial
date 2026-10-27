@@ -3,6 +3,7 @@ from flask import Flask
 
 def register_blueprints(app: Flask) -> None:
     from . import (
+        academy,
         clients,
         documents,
         followups,
@@ -21,3 +22,4 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(notifications.bp)
     app.register_blueprint(opportunities.bp)
     app.register_blueprint(settings.bp)
+    app.register_blueprint(academy.bp)

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Schede da stampare — Accademia{% endblock %}
+{% block content %}
+{% include "academy/_nav.html" %}
+
+<h1 class="h3 mb-1"><i class="bi bi-printer me-2"></i>Schede da stampare</h1>
+<p class="text-muted">Strumenti operativi da usare in appuntamento e in ufficio. Aprile e stampale (anche in PDF dalla finestra di stampa).
+  Dalla scheda di un cliente puoi stamparle già intestate.</p>
+
+<div class="row g-3">
+  {% for s in schede %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex gap-3 align-items-start mb-2">
+          <span class="modulo-icona"><i class="bi {{ s.icona }}"></i></span>
+          <div class="fw-semibold">{{ s.titolo }}</div>
+        </div>
+        <p class="small text-muted flex-grow-1">{{ s.uso }}</p>
+        <div class="d-flex justify-content-between align-items-center">
+          <a class="btn btn-sm btn-primary" href="{{ url_for('academy.sheet', scheda_id=s.id) }}"><i class="bi bi-printer"></i> Apri e stampa</a>
+          <a class="small" href="{{ url_for('academy.module', modulo_id=s.modulo) }}">Modulo {{ moduli[s.modulo].numero }}</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

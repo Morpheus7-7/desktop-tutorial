@@ -28,6 +28,7 @@
         <li class="nav-item"><a class="nav-link {% if request.blueprint == 'followups' %}active{% endif %}" href="{{ url_for('followups.list_followups') }}"><i class="bi bi-check2-square"></i> Follow-up</a></li>
         <li class="nav-item"><a class="nav-link {% if request.blueprint == 'documents' %}active{% endif %}" href="{{ url_for('documents.list_documents') }}"><i class="bi bi-folder2-open"></i> Documenti</a></li>
         <li class="nav-item"><a class="nav-link {% if request.endpoint == 'main.analytics' %}active{% endif %}" href="{{ url_for('main.analytics') }}"><i class="bi bi-bar-chart-line"></i> Statistiche</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.blueprint == 'academy' %}active{% endif %}" href="{{ url_for('academy.index') }}"><i class="bi bi-mortarboard"></i> Accademia</a></li>
       </ul>
 
       <form class="ga-search me-lg-3 my-2 my-lg-0" method="get" action="{{ url_for('main.search') }}" role="search">

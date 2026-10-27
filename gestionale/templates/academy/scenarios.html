@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Role-play — Accademia{% endblock %}
+{% block content %}
+{% include "academy/_nav.html" %}
+
+<h1 class="h3 mb-1"><i class="bi bi-people me-2"></i>Scenari di role-play</h1>
+<p class="text-muted">Simulazioni a tre: uno fa il consulente, uno il cliente (con la scheda del personaggio), uno osserva con la
+  <a href="{{ url_for('academy.sheet', scheda_id='griglia-roleplay') }}">griglia di osservazione</a>. 15 minuti di simulazione, 10 di debrief, poi si scambiano i ruoli.</p>
+
+<div class="row g-3">
+  {% for s in scenari %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <span class="badge {% if s.livello == 'Base' %}bg-success{% elif s.livello == 'Intermedio' %}bg-primary{% else %}bg-danger{% endif %} mb-2">{{ s.livello }}</span>
+        <h2 class="h6">{{ s.titolo }}</h2>
+        <p class="small text-muted mb-2">{{ s.cliente }}</p>
+        <p class="small"><strong>Obiettivo:</strong> {{ s.obiettivo }}</p>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('academy.scenario', scenario_id=s.id) }}">Apri lo scenario</a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

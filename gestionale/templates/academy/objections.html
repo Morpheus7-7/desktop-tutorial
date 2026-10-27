@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Libreria obiezioni — Accademia{% endblock %}
+{% block content %}
+{% include "academy/_nav.html" %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0"><i class="bi bi-shield-exclamation me-2"></i>Libreria delle obiezioni</h1>
+  <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+</div>
+
+<form class="row g-2 mb-4 no-print" method="get">
+  <div class="col-md-6"><input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Cerca nelle obiezioni e nelle risposte…"></div>
+  <div class="col-md-4">
+    <select class="form-select" name="categoria">
+      <option value="">Tutte le categorie</option>
+      {% for val, label in categorie %}<option value="{{ val }}" {% if val == categoria %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2"><button class="btn btn-primary w-100"><i class="bi bi-funnel"></i> Filtra</button></div>
+</form>
+
+{% for o in obiezioni %}
+<div class="card mb-3" id="{{ o.id }}">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span class="fs-6">«{{ o.obiezione }}» <span class="badge bg-secondary ms-1">{{ categorie_labels[o.categoria] }}</span></span>
+    <a class="btn btn-sm btn-outline-warning" href="{{ url_for('academy.drill', id=o.id) }}"><i class="bi bi-lightning-charge"></i> Allenati</a>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="small text-muted text-uppercase">Cosa può nascondere</div>
+        <div class="mb-2">{{ o.cosa_nasconde }}</div>
+        <div class="small text-muted text-uppercase">Tecnica</div>
+        <div><span class="badge bg-primary">{{ o.tecnica }}</span></div>
+      </div>
+      <div class="col-md-6">
+        <div class="small text-muted text-uppercase">Risposta</div>
+        <div class="box-esempio mb-2">{{ o.risposta }}</div>
+        <div class="small text-muted text-uppercase">Domanda di rilancio</div>
+        <div class="mb-2">{{ o.rilancio }}</div>
+      </div>
+    </div>
+    <div class="trattativa"><span class="trattativa-title"><i class="bi bi-lightbulb"></i> Pensiero laterale:</span> {{ o.laterale }}</div>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light">Nessuna obiezione trovata.</div>
+{% endfor %}
+{% endblock %}

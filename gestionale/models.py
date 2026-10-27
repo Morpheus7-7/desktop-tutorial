@@ -434,3 +434,29 @@ class Settings(db.Model):
     def configurato(self) -> bool:
         """True se ci sono i dati minimi per inviare (host + almeno un destinatario)."""
         return bool(self.smtp_host and self.destinatari)
+
+
+class AcademyProgress(db.Model):
+    """Lezione dell'Accademia segnata come completata."""
+
+    __tablename__ = "academy_progress"
+
+    id = db.Column(db.Integer, primary_key=True)
+    lezione_id = db.Column(db.String(80), unique=True, nullable=False)
+    completata_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class QuizAttempt(db.Model):
+    """Tentativo di quiz di un modulo dell'Accademia."""
+
+    __tablename__ = "quiz_attempts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    modulo_id = db.Column(db.String(80), nullable=False, index=True)
+    punteggio = db.Column(db.Integer, nullable=False)
+    totale = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    @property
+    def percentuale(self) -> int:
+        return round(100 * self.punteggio / self.totale) if self.totale else 0

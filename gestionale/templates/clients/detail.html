@@ -15,6 +15,16 @@
     </div>
   </div>
   <div class="d-flex gap-2">
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-printer"></i> Schede</button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="{{ url_for('academy.sheet', scheda_id='raccolta-azienda' if client.tipo in ('azienda', 'professionista') else 'raccolta-privato', cliente=client.id) }}">Raccolta informazioni</a></li>
+        <li><a class="dropdown-item" href="{{ url_for('academy.sheet', scheda_id='preparazione-appuntamento', cliente=client.id) }}">Preparazione appuntamento</a></li>
+        <li><a class="dropdown-item" href="{{ url_for('academy.sheet', scheda_id='revisione-annuale', cliente=client.id) }}">Revisione annuale</a></li>
+        <li><a class="dropdown-item" href="{{ url_for('academy.sheet', scheda_id='mappa-referenze', cliente=client.id) }}">Mappa relazioni e referenze</a></li>
+        <li><a class="dropdown-item" href="{{ url_for('academy.sheet', scheda_id='informazioni-da-dare', cliente=client.id) }}">Check-list documenti da dare</a></li>
+      </ul>
+    </div>
     <a class="btn btn-outline-primary" href="{{ url_for('clients.edit_client', client_id=client.id) }}">
       <i class="bi bi-pencil"></i> Modifica anagrafica
     </a>
