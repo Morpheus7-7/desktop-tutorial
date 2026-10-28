@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ struttura.titolo }} · {{ client.ragione_sociale }} — Deal Combined{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{{ url_for('clients.list_clients') }}">Clienti</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=client.id) }}#schede">{{ client.ragione_sociale }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{% if sc %}Modifica scheda{% else %}Nuova scheda{% endif %}</li>
+  </ol>
+</nav>
+
+<div class="mb-4">
+  <h1 class="h3 mb-1"><i class="bi {{ struttura.icona }} me-2"></i>{{ struttura.titolo }}</h1>
+  <p class="text-muted misura mb-0">{{ struttura.uso }}
+    {% if not sc %}Alcuni campi sono già scritti con i dati del gestionale: controllali e completa il resto.{% endif %}</p>
+</div>
+
+<form method="post" class="scheda-form">
+  <section class="card mb-3">
+    <div class="card-body row g-3">
+      <div class="col-md-4">
+        <label class="form-label" for="data_compilazione">Data</label>
+        <input class="form-control" type="date" id="data_compilazione" name="data_compilazione" value="{{ oggi.isoformat() }}" required>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label" for="consulente">Consulente</label>
+        <input class="form-control" id="consulente" name="consulente" maxlength="120" value="{{ sc.consulente if sc and sc.consulente else '' }}">
+      </div>
+    </div>
+  </section>
+
+  {% for sez in struttura.sezioni %}
+  {% set si = loop.index0 %}
+  <section class="card mb-3" aria-labelledby="sez-{{ si }}">
+    <div class="card-header"><h2 class="h6 mb-0" id="sez-{{ si }}">{{ sez.titolo }}</h2></div>
+    <div class="card-body">
+      {% if sez.tipo == 'campi' %}
+        <div class="row g-3">
+          {% for etichetta in sez.campi %}
+          {% set k = 's%dc%d' % (si, loop.index0) %}
+          <div class="col-md-6">
+            <label class="form-label" for="{{ k }}">{{ etichetta }}</label>
+            <input class="form-control" id="{{ k }}" name="{{ k }}" maxlength="300" value="{{ valori.get(k, '') }}">
+          </div>
+          {% endfor %}
+        </div>
+      {% elif sez.tipo == 'domande' %}
+        {% for domanda in sez.domande %}
+        {% set k = 's%dd%d' % (si, loop.index0) %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ k }}">{{ domanda }}</label>
+          <textarea class="form-control" id="{{ k }}" name="{{ k }}" rows="3" maxlength="3000">{{ valori.get(k, '') }}</textarea>
+        </div>
+        {% endfor %}
+      {% elif sez.tipo == 'check' %}
+        <div class="row g-2">
+          {% for voce in sez.voci %}
+          {% set k = 's%dv%d' % (si, loop.index0) %}
+          <div class="col-md-6">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="{{ k }}" name="{{ k }}" value="1" {% if valori.get(k) %}checked{% endif %}>
+              <label class="form-check-label" for="{{ k }}">{{ voce }}</label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% elif sez.tipo == 'tabella' %}
+        {% set fisse = sez.righe_fisse %}
+        {% set n_righe = (fisse | length) if fisse else sez.righe %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0 tabella-compilabile">
+            <thead><tr>{% for col in sez.colonne %}<th scope="col">{{ col }}</th>{% endfor %}</tr></thead>
+            <tbody>
+              {% for ri in range(n_righe) %}
+              <tr>
+                {% for col in sez.colonne %}
+                {% set ki = loop.index0 %}
+                {% if fisse and ki == 0 %}
+                  <th scope="row" class="fw-semibold">{{ fisse[ri] }}</th>
+                {% else %}
+                  {% set k = 's%dr%dk%d' % (si, ri, ki) %}
+                  <td><input class="form-control form-control-sm" name="{{ k }}" maxlength="200" value="{{ valori.get(k, '') }}"
+                             aria-label="{{ col }}, {% if fisse %}{{ fisse[ri] }}{% else %}riga {{ ri + 1 }}{% endif %}"></td>
+                {% endif %}
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endfor %}
+
+  <section class="card mb-3">
+    <div class="card-header"><h2 class="h6 mb-0"><label for="note" class="mb-0">Note</label></h2></div>
+    <div class="card-body">
+      <textarea class="form-control" id="note" name="note" rows="4" maxlength="3000">{{ valori.get('note', '') }}</textarea>
+    </div>
+  </section>
+
+  <div class="scheda-form-azioni">
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Salva nel cliente</button>
+    <a class="btn btn-outline-secondary" href="{% if sc %}{{ url_for('client_sheets.view_sheet', client_id=client.id, compilata_id=sc.id) }}{% else %}{{ url_for('clients.detail', client_id=client.id) }}#schede{% endif %}">Annulla</a>
+  </div>
+</form>
+{% endblock %}

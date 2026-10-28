@@ -112,7 +112,7 @@ def test_policy_urgency_classes(app):
 def test_dashboard_loads(client):
     resp = client.get("/")
     assert resp.status_code == 200
-    assert "Dashboard".encode() in resp.data
+    assert "Da fare".encode() in resp.data
 
 
 def test_create_client_and_detail(client, app):

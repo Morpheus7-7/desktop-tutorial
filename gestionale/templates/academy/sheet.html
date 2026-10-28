@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ scheda.titolo }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 no-print flex-wrap gap-2">
+  <a class="btn btn-outline-secondary" href="{{ url_for('academy.sheets') }}"><i class="bi bi-arrow-left"></i> Tutte le schede</a>
+  <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+</div>
+
+<div class="scheda card" data-bs-theme="light">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <h1 class="h4 mb-1"><i class="bi {{ scheda.icona }} me-1"></i>{{ scheda.titolo }}</h1>
+      <div class="small text-muted">{{ scheda.uso }}</div>
+    </div>
+    <div class="text-end"><div class="scheda-marchio"><strong>Deal</strong> Combined</div><div class="small text-muted">Accademia commerciale</div></div>
+  </div>
+
+  <div class="campo mt-3">
+    <span class="etichetta">Cliente:</span>
+    {% if cliente %}<span class="valore">{{ cliente.ragione_sociale }}</span>{% else %}<span class="riga"></span>{% endif %}
+    <span class="etichetta">Data:</span><span class="riga" style="max-width: 10rem;"></span>
+    <span class="etichetta">Consulente:</span><span class="riga" style="max-width: 14rem;"></span>
+  </div>
+
+  {% for sez in scheda.sezioni %}
+  <section>
+    <h2>{{ sez.titolo }}</h2>
+    {% if sez.tipo == 'campi' %}
+      {% for c in sez.campi %}
+      <div class="campo"><span class="etichetta">{{ c }}:</span><span class="riga"></span></div>
+      {% endfor %}
+    {% elif sez.tipo == 'domande' %}
+      {% for d in sez.domande %}
+      <div class="domanda">{{ d }}</div>
+      <div class="spazio"></div><div class="spazio"></div>
+      {% endfor %}
+    {% elif sez.tipo == 'check' %}
+      <div class="row">
+        {% for v in sez.voci %}
+        <div class="col-md-6 check"><span class="casella"></span>{{ v }}</div>
+        {% endfor %}
+      </div>
+    {% elif sez.tipo == 'tabella' %}
+      <table>
+        <thead><tr>{% for col in sez.colonne %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% if sez.righe_fisse %}
+            {% for r in sez.righe_fisse %}
+            <tr><td>{{ r }}</td>{% for col in sez.colonne[1:] %}<td></td>{% endfor %}</tr>
+            {% endfor %}
+          {% else %}
+            {% for _ in range(sez.righe) %}
+            <tr>{% for col in sez.colonne %}<td></td>{% endfor %}</tr>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <section>
+    <h2>Note</h2>
+    <div class="spazio"></div><div class="spazio"></div><div class="spazio"></div>
+  </section>
+</div>
+{% endblock %}

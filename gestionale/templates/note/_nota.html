@@ -1,0 +1,32 @@
+{# Una nota del diario. Variabili: n, next, mostra_cliente #}
+<article class="nota" id="nota-{{ n.id }}">
+  <div class="nota-testa">
+    <span class="nota-sezione"><i class="bi {{ n.sezione_icona }}" aria-hidden="true"></i> {{ n.sezione_label }}</span>
+    {% if n.ora %}<span class="nota-ora">{{ n.ora }}</span>{% endif %}
+    {% if mostra_cliente and n.cliente %}<a class="nota-cliente text-truncate" href="{{ url_for('clients.detail', client_id=n.cliente.id) }}">{{ n.cliente.ragione_sociale }}</a>{% endif %}
+  </div>
+  <h3 class="nota-titolo">{{ n.titolo }}</h3>
+  {% if n.testo %}<p class="nota-corpo">{{ n.testo }}</p>{% endif %}
+  {% if n.promemoria_il %}
+  <div class="nota-promemoria {% if n.promemoria_fatto %}fatto{% elif n.promemoria_scaduto %}scaduto{% endif %}">
+    <i class="bi {{ 'bi-check2-circle' if n.promemoria_fatto else 'bi-bell' }}" aria-hidden="true"></i>
+    Promemoria {{ n.promemoria_il.strftime('%d/%m alle %H:%M') }}{% if n.promemoria_email %} · email{% endif %}{% if n.promemoria_fatto %} · fatto{% elif n.promemoria_scaduto %} · scaduto{% endif %}
+  </div>
+  {% endif %}
+  <div class="nota-azioni">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ link_calendar_nota(n) }}" target="_blank" rel="noopener"
+       title="Apre Google Calendar con l'evento già compilato: premi Salva"><i class="bi bi-calendar-plus"></i> Google Calendar</a>
+    {% if n.promemoria_il %}
+    <form method="post" action="{{ url_for('note.done', nota_id=n.id) }}" class="d-inline">
+      <input type="hidden" name="next" value="{{ next }}">
+      <button class="btn btn-sm btn-outline-success">{% if n.promemoria_fatto %}<i class="bi bi-arrow-counterclockwise"></i> Riapri{% else %}<i class="bi bi-check-lg"></i> Fatto{% endif %}</button>
+    </form>
+    {% endif %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('note.edit', nota_id=n.id, next=next) }}" aria-label="Modifica la nota {{ n.titolo }}"><i class="bi bi-pencil"></i></a>
+    <form method="post" action="{{ url_for('note.delete', nota_id=n.id) }}" class="d-inline"
+          onsubmit='return confirm({{ ("Eliminare la nota «" ~ n.titolo ~ "»?") | tojson }});'>
+      <input type="hidden" name="next" value="{{ next }}">
+      <button class="btn btn-sm btn-outline-danger" aria-label="Elimina la nota {{ n.titolo }}"><i class="bi bi-trash"></i></button>
+    </form>
+  </div>
+</article>

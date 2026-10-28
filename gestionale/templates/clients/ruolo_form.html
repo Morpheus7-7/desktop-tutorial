@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Collega a un'azienda · {{ privato.nome_completo }} — Deal Combined{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=privato.id) }}#persone">{{ privato.nome_completo }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Collega a un'azienda</li>
+  </ol>
+</nav>
+<h1 class="h3 mb-4"><i class="bi bi-building-add me-2"></i>{{ privato.nome_completo }} in un'azienda</h1>
+
+{% if not aziende %}
+<div class="alert alert-info">Non hai ancora aziende tra i clienti. <a href="{{ url_for('clients.new_client') }}">Inserisci l'azienda</a> e poi torna qui.</div>
+{% else %}
+<form method="post" class="card">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label" for="azienda_id">Azienda *</label>
+        <select class="form-select" id="azienda_id" name="azienda_id" required>
+          <option value="">— scegli —</option>
+          {% for a in aziende %}<option value="{{ a.id }}" {% if request.form.get('azienda_id') == a.id | string %}selected{% endif %}>{{ a.ragione_sociale }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="ruolo">Ruolo *</label>
+        <select class="form-select" id="ruolo" name="ruolo">
+          {% for valore, etichetta in ruoli if valore not in ('coniuge', 'familiare') %}
+          <option value="{{ valore }}" {% if persona.ruolo == valore %}selected{% endif %}>{{ etichetta }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4" id="riga-ruolo-altro">
+        <label class="form-label" for="ruolo_altro">Specifica il ruolo</label>
+        <input type="text" class="form-control" id="ruolo_altro" name="ruolo_altro" placeholder="es. Direttore tecnico">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="dal">In carica dal</label>
+        <input type="date" class="form-control" id="dal" name="dal">
+      </div>
+      <div class="col-md-4" id="riga-quota">
+        <label class="form-label" for="quota_perc">Quota di partecipazione (%)</label>
+        <input type="text" inputmode="decimal" class="form-control" id="quota_perc" name="quota_perc">
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="note">Note</label>
+        <textarea class="form-control" id="note" name="note" rows="2" placeholder="es. decide lui sulle coperture dell'azienda"></textarea>
+      </div>
+    </div>
+    <p class="small text-muted mt-3 mb-0">Nell'azienda comparirà tra gli amministratori (o tra i dipendenti) con i dati anagrafici di questa scheda.</p>
+  </div>
+  <div class="card-footer d-flex gap-2 flex-wrap">
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Collega</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('clients.detail', client_id=privato.id) }}#persone">Annulla</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    var ruolo = document.getElementById("ruolo");
+    if (!ruolo) return;
+    function aggiorna() {
+      document.getElementById("riga-ruolo-altro").hidden = ruolo.value !== "altro";
+      document.getElementById("riga-quota").hidden = ruolo.value !== "socio";
+    }
+    ruolo.addEventListener("change", aggiorna);
+    aggiorna();
+  })();
+</script>
+{% endblock %}

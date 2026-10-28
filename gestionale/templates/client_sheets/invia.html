@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Invia per email · {{ sc.titolo }} — Deal Combined{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=client.id) }}#schede">{{ client.ragione_sociale }}</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('client_sheets.view_sheet', client_id=client.id, compilata_id=sc.id) }}">{{ sc.titolo }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Invia per email</li>
+  </ol>
+</nav>
+<h1 class="h3 mb-3"><i class="bi bi-envelope me-2"></i>Invia la scheda per email</h1>
+<div class="row g-4">
+  <div class="col-lg-8">
+    <form method="post" class="card">
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label" for="destinatario">A</label>
+          <input class="form-control" type="email" id="destinatario" name="destinatario" value="{{ destinatario }}" required>
+          {% if not client.email %}<div class="form-text">Il cliente non ha un'email in anagrafica: scrivila qui.</div>{% endif %}
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="oggetto">Oggetto</label>
+          <input class="form-control" id="oggetto" name="oggetto" maxlength="200" value="{{ oggetto }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="testo">Messaggio</label>
+          <textarea class="form-control" id="testo" name="testo" rows="9" required>{{ testo }}</textarea>
+        </div>
+        <p class="small text-muted mb-3"><i class="bi bi-paperclip"></i> Allegato: il PDF della scheda «{{ sc.titolo }}».</p>
+        <button class="btn btn-primary"><i class="bi bi-send"></i> Invia</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('client_sheets.view_sheet', client_id=client.id, compilata_id=sc.id) }}">Annulla</a>
+      </div>
+    </form>
+  </div>
+  <div class="col-lg-4">
+    <p class="small text-muted misura">L'email parte dall'account configurato in <a href="{{ url_for('settings.google') }}">Impostazioni → Google</a>
+      (Gmail con una «password per le app») e la ritrovi in «Posta inviata».</p>
+  </div>
+</div>
+{% endblock %}

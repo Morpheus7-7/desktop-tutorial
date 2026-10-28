@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Sblocca — Deal Combined{% endblock %}
+{% block content %}
+<div class="sblocco">
+  <div class="sblocco-marchio"><span class="dc-brand-deal">Deal</span> <span class="dc-brand-combined">Combined</span></div>
+  <form method="post" class="card sblocco-card" autocomplete="off">
+    <div class="card-body p-4">
+      <h1 class="h5 mb-1"><i class="bi bi-lock me-1" aria-hidden="true"></i> Inserisci il PIN</h1>
+      <p class="small text-muted mb-3">Il gestionale è bloccato per proteggere i dati dei clienti.</p>
+      <input type="hidden" name="next" value="{{ dest }}">
+      {% if secondi %}
+      <div class="alert alert-warning small mb-3" role="status">Troppi tentativi: riprova tra <span id="attesa">{{ secondi }}</span> secondi.</div>
+      {% endif %}
+      <label class="visually-hidden" for="pin">PIN</label>
+      <input class="form-control form-control-lg text-center numeri mb-3" type="password" id="pin" name="pin"
+             inputmode="numeric" pattern="[0-9]*" maxlength="12" required autofocus {% if secondi %}disabled{% endif %}>
+      <button class="btn btn-primary w-100" {% if secondi %}disabled{% endif %}>Sblocca</button>
+      <p class="small mt-3 mb-0 text-center"><a href="{{ url_for('privacy.recover') }}">Ho dimenticato il PIN</a></p>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+{% if secondi %}
+<script>
+  (function () {
+    var s = {{ secondi }}, el = document.getElementById("attesa");
+    var t = setInterval(function () { s -= 1; el.textContent = s; if (s <= 0) { clearInterval(t); location.reload(); } }, 1000);
+  })();
+</script>
+{% endif %}
+{% endblock %}

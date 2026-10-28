@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ client.ragione_sociale }} — Gestionale Assicurativo{% endblock %}
+{% block title %}{{ client.ragione_sociale }} — Deal Combined{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
@@ -15,6 +15,21 @@
     </div>
   </div>
   <div class="d-flex gap-2">
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-clipboard-plus"></i> Compila scheda</button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        {% set raccolta = 'raccolta-privato' if client.tipo == 'dipendente' else 'raccolta-azienda' %}
+        <li><span class="dropdown-header">Compila e salva nel cliente</span></li>
+        {% for s in schede_cliente if s.id == raccolta %}
+        <li><a class="dropdown-item fw-semibold" href="{{ url_for('client_sheets.new_sheet', client_id=client.id, scheda_id=s.id) }}"><i class="bi {{ s.icona }} me-1"></i>{{ s.titolo }}</a></li>
+        {% endfor %}
+        {% for s in schede_cliente if s.id != raccolta %}
+        <li><a class="dropdown-item" href="{{ url_for('client_sheets.new_sheet', client_id=client.id, scheda_id=s.id) }}"><i class="bi {{ s.icona }} me-1"></i>{{ s.titolo }}</a></li>
+        {% endfor %}
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{{ url_for('academy.sheet', scheda_id=raccolta, cliente=client.id) }}"><i class="bi bi-printer me-1"></i>Stampa vuota da compilare a mano</a></li>
+      </ul>
+    </div>
     <a class="btn btn-outline-primary" href="{{ url_for('clients.edit_client', client_id=client.id) }}">
       <i class="bi bi-pencil"></i> Modifica anagrafica
     </a>
@@ -25,12 +40,23 @@
   </div>
 </div>
 
+{% if prossimo_followup %}
+{% set f = prossimo_followup %}
+<div class="nastro mb-3" role="note">
+  <i class="bi bi-bookmark-fill" aria-hidden="true"></i> Prossimo passo
+  <span class="nastro-dettaglio">· {{ f.titolo }} · {{ f.data_scadenza | data_it }}{% if f.in_ritardo %}, in ritardo{% endif %}</span>
+</div>
+{% endif %}
+
 <ul class="nav nav-tabs" role="tablist">
   <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-info">Anagrafica</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-persone">{{ 'Amministratori' if client.tipo == 'azienda' else 'Collegamenti' }} <span class="badge bg-secondary">{{ (client.persone | length) + (client.ruoli_in_aziende | length) }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-polizze">Polizze <span class="badge bg-secondary">{{ client.polizze | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-documenti">Documenti <span class="badge bg-secondary">{{ client.documenti | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-opportunita">Opportunità <span class="badge bg-secondary">{{ client.opportunita | selectattr('aperta') | list | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-followup">Follow-up <span class="badge bg-secondary">{{ client.followups | selectattr('stato', 'equalto', 'aperto') | list | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-note">Note <span class="badge bg-secondary">{{ client.diario | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-schede">Schede <span class="badge bg-secondary">{{ client.schede | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-analisi">Analisi rischi <span class="badge bg-secondary">{{ client.analisi | length }}</span></button></li>
 </ul>
 
@@ -40,6 +66,27 @@
   <div class="tab-pane fade show active" id="tab-info">
     <div class="row g-4">
       <div class="col-md-6">
+        {% if client.persona_fisica %}
+        <h2 class="h6 text-uppercase text-muted">Dati personali</h2>
+        <dl class="row mb-4">
+          <dt class="col-sm-4">Nome e cognome</dt><dd class="col-sm-8">{{ client.nome_completo }}</dd>
+          <dt class="col-sm-4">Nascita</dt>
+          <dd class="col-sm-8">{% if client.data_nascita %}{{ client.data_nascita | data_it }} ({{ client.eta }} anni){% else %}—{% endif %}{% if client.luogo_nascita %}, {{ client.luogo_nascita }}{% endif %}</dd>
+          <dt class="col-sm-4">Residenza</dt>
+          <dd class="col-sm-8">{% if client.residenza_indirizzo or client.residenza_citta %}{{ client.residenza_indirizzo or '' }}{% if client.residenza_cap %}, {{ client.residenza_cap }}{% endif %}
+            {{ client.residenza_citta or '' }}{% if client.residenza_provincia %} ({{ client.residenza_provincia }}){% endif %}{% else %}come l'indirizzo{% endif %}</dd>
+          <dt class="col-sm-4">Stato civile</dt><dd class="col-sm-8">{{ client.stato_civile or '—' }}</dd>
+          <dt class="col-sm-4">Nucleo familiare</dt><dd class="col-sm-8">{{ client.nucleo_familiare or '—' }}</dd>
+          <dt class="col-sm-4">Interessi</dt><dd class="col-sm-8 text-break">{{ client.interessi or '—' }}</dd>
+        </dl>
+        {% endif %}
+        {% if client.tipo == 'professionista' %}
+        <h2 class="h6 text-uppercase text-muted">Iscrizione all'albo</h2>
+        <dl class="row mb-4">
+          <dt class="col-sm-4">Albo</dt><dd class="col-sm-8">{{ client.albo or '—' }}{% if client.albo_provincia %} di {{ client.albo_provincia }}{% endif %}</dd>
+          <dt class="col-sm-4">N. iscrizione</dt><dd class="col-sm-8">{{ client.albo_numero or '—' }}{% if client.albo_data_iscrizione %} dal {{ client.albo_data_iscrizione | data_it }}{% endif %}</dd>
+        </dl>
+        {% endif %}
         <h2 class="h6 text-uppercase text-muted">Dati fiscali</h2>
         <dl class="row mb-4">
           <dt class="col-sm-4">Partita IVA</dt><dd class="col-sm-8">{{ client.partita_iva or '—' }}</dd>
@@ -47,7 +94,7 @@
           <dt class="col-sm-4">Codice ATECO</dt><dd class="col-sm-8">{{ client.codice_ateco or '—' }}</dd>
           <dt class="col-sm-4">Referente</dt><dd class="col-sm-8">{{ client.referente or '—' }}</dd>
         </dl>
-        <h2 class="h6 text-uppercase text-muted">Contatti</h2>
+        <h2 class="h6 text-uppercase text-muted">{{ 'Contatti e sede' if client.tipo == 'azienda' else ('Contatti e studio' if client.tipo == 'professionista' else 'Contatti e domicilio') }}</h2>
         <dl class="row">
           <dt class="col-sm-4">Indirizzo</dt>
           <dd class="col-sm-8">{{ client.indirizzo or '—' }}{% if client.cap %}, {{ client.cap }}{% endif %}
@@ -71,7 +118,7 @@
           {% endif %}
         </dl>
         <h2 class="h6 text-uppercase text-muted">Descrizione attività</h2>
-        <p class="border rounded p-3 bg-light">{{ client.descrizione_attivita or 'Nessuna descrizione inserita: aggiungila per poter eseguire l\'analisi automatica dei rischi.' }}</p>
+        <p class="descrizione-attivita">{{ client.descrizione_attivita or 'Nessuna descrizione inserita: aggiungila per poter eseguire l\'analisi automatica dei rischi.' }}</p>
         {% if client.note %}
         <h2 class="h6 text-uppercase text-muted">Note interne</h2>
         <p>{{ client.note }}</p>
@@ -83,6 +130,7 @@
   <!-- ============ POLIZZE ============ -->
   <div class="tab-pane fade" id="tab-polizze">
     {% if client.polizze %}
+    <div class="table-responsive">
     <table class="table table-hover align-middle">
       <thead><tr><th>Numero</th><th>Compagnia</th><th>Ramo</th><th>Premio</th><th>Decorrenza</th><th>Scadenza</th><th>Stato</th><th></th></tr></thead>
       <tbody>
@@ -113,6 +161,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted">Nessuna polizza registrata per questo cliente.</p>
     {% endif %}
@@ -185,6 +234,7 @@
   <!-- ============ DOCUMENTI ============ -->
   <div class="tab-pane fade" id="tab-documenti">
     {% if client.documenti %}
+    <div class="table-responsive">
     <table class="table table-hover align-middle">
       <thead><tr><th>Documento</th><th>Categoria</th><th>Polizza collegata</th><th>Dim.</th><th>Caricato il</th><th></th></tr></thead>
       <tbody>
@@ -208,6 +258,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted">Nessun documento caricato per questo cliente.</p>
     {% endif %}
@@ -251,42 +302,64 @@
   <!-- ============ OPPORTUNITÀ ============ -->
   <div class="tab-pane fade" id="tab-opportunita">
     <div class="d-flex justify-content-between align-items-center mb-2">
-      <h2 class="h6 text-uppercase text-muted mb-0">Opportunità di vendita</h2>
+      <h2 class="h6 text-uppercase text-muted mb-0">Proposte e preventivi</h2>
       <a class="btn btn-sm btn-primary" href="{{ url_for('opportunities.new_opportunity', client_id=client.id) }}">
         <i class="bi bi-plus-lg"></i> Nuova opportunità
       </a>
     </div>
     {% if client.opportunita %}
+    <div class="table-responsive">
     <table class="table table-hover align-middle">
-      <thead><tr><th>Titolo</th><th>Ramo</th><th>Fase</th><th>Premio stimato</th><th>Origine</th><th></th></tr></thead>
+      <thead><tr><th>Titolo</th><th class="d-none d-md-table-cell">Ramo</th><th>Fase</th><th class="d-none d-sm-table-cell">Premio stimato</th><th class="d-none d-md-table-cell">Origine</th><th><span class="visually-hidden">Azioni</span></th></tr></thead>
       <tbody>
       {% for o in client.opportunita %}
         <tr>
-          <td class="fw-semibold">{{ o.titolo }}</td>
-          <td class="small">{{ o.ramo_label }}</td>
+          <td class="fw-semibold">{{ o.titolo }}{% if o.premio_stimato %}<div class="small fw-normal d-sm-none">{{ o.premio_stimato | euro }}</div>{% endif %}</td>
+          <td class="small d-none d-md-table-cell">{{ o.ramo_label }}</td>
           <td>
             <form method="post" action="{{ url_for('opportunities.change_stage', opportunity_id=o.id) }}">
               <input type="hidden" name="next" value="{{ url_for('clients.detail', client_id=client.id) }}#opportunita">
-              <select class="form-select form-select-sm" name="fase" onchange="this.form.submit()" style="min-width: 9rem;">
+              <select class="form-select form-select-sm" name="fase" onchange="this.form.submit()" style="min-width: 8rem;" aria-label="Fase della proposta">
                 {% for f, lab in [('lead','Lead'),('contatto','Contattato'),('preventivo','Preventivo inviato'),('trattativa','In trattativa'),('vinta','Vinta'),('persa','Persa')] %}
                 <option value="{{ f }}" {% if o.fase == f %}selected{% endif %}>{{ lab }}</option>{% endfor %}
               </select>
             </form>
           </td>
-          <td>{{ o.premio_stimato | euro }}{% if o.provvigione_stimata %}<br><span class="small text-success">prov. {{ o.provvigione_stimata | euro }}</span>{% endif %}</td>
-          <td class="small">{% if o.origine == 'analisi_rischi' %}<span class="badge bg-light text-dark border"><i class="bi bi-magic"></i> analisi</span>{% else %}{{ o.origine or '—' }}{% endif %}</td>
-          <td class="text-end text-nowrap">
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('opportunities.edit_opportunity', opportunity_id=o.id) }}"><i class="bi bi-pencil"></i></a>
-            <form class="d-inline" method="post" action="{{ url_for('opportunities.delete_opportunity', opportunity_id=o.id) }}"
+          <td class="d-none d-sm-table-cell">{{ o.premio_stimato | euro }}{% if o.provvigione_stimata %}<br><span class="small text-success">prov. {{ o.provvigione_stimata | euro }}</span>{% endif %}</td>
+          <td class="small d-none d-md-table-cell">{% if o.origine == 'analisi_rischi' %}<span class="badge bg-light text-dark border"><i class="bi bi-magic"></i> analisi</span>{% else %}{{ o.origine or '—' }}{% endif %}</td>
+          <td class="text-end"><div class="d-flex flex-wrap gap-1 justify-content-end">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('opportunities.new_quote', opportunity_id=o.id, next=url_for('clients.detail', client_id=client.id) ~ '#opportunita') }}"><i class="bi bi-file-earmark-plus" aria-hidden="true"></i><span class="d-none d-sm-inline"> Preventivo</span><span class="visually-hidden d-sm-none">Aggiungi preventivo</span></a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('opportunities.edit_opportunity', opportunity_id=o.id) }}" aria-label="Modifica la proposta {{ o.titolo }}"><i class="bi bi-pencil"></i></a>
+            <form method="post" action="{{ url_for('opportunities.delete_opportunity', opportunity_id=o.id) }}"
                   onsubmit="return confirm('Eliminare l\'opportunità?');">
               <input type="hidden" name="next" value="{{ url_for('clients.detail', client_id=client.id) }}#opportunita">
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-sm btn-outline-danger" aria-label="Elimina la proposta {{ o.titolo }}"><i class="bi bi-trash"></i></button>
             </form>
+          </div></td>
+        </tr>
+        {% if o.preventivi %}
+        <tr class="riga-preventivi">
+          <td colspan="6" class="pt-0">
+            <ul class="preventivi">
+              {% for q in o.preventivi %}
+              <li>
+                <a class="preventivo-titolo" href="{{ url_for('opportunities.edit_quote', preventivo_id=q.id, next=url_for('clients.detail', client_id=client.id) ~ '#opportunita') }}">
+                  <i class="bi bi-file-earmark-text" aria-hidden="true"></i> Preventivo {{ q.compagnia or '' }}</a>
+                {% if q.premio is not none %}<span class="fw-semibold">{{ q.premio | euro }}</span>{% endif %}
+                <span class="text-muted">del {{ q.data | data_it }}{% if q.valido_fino %} · valido fino al {{ q.valido_fino | data_it }}{% endif %}</span>
+                <span class="badge {{ 'text-bg-success' if q.esito == 'accettato' else ('text-bg-secondary' if q.esito == 'rifiutato' else ('text-bg-danger' if q.scaduto else 'text-bg-light border')) }}">{{ 'Scaduto' if q.scaduto else q.esito_label }}</span>
+                {% if q.descrizione %}<span class="d-block small text-muted">{{ q.descrizione }}</span>{% endif %}
+                {% if q.documento %}<a class="small" href="{{ url_for('documents.download', document_id=q.documento.id) }}"><i class="bi bi-paperclip" aria-hidden="true"></i> {{ q.documento.original_name }}</a>{% endif %}
+              </li>
+              {% endfor %}
+            </ul>
           </td>
         </tr>
+        {% endif %}
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted">Nessuna opportunità per questo cliente. Puoi crearle anche dalle coperture scoperte nel report di analisi rischi.</p>
     {% endif %}
@@ -295,6 +368,7 @@
   <!-- ============ FOLLOW-UP ============ -->
   <div class="tab-pane fade" id="tab-followup">
     {% if client.followups %}
+    <div class="table-responsive">
     <table class="table table-hover align-middle">
       <thead><tr><th>Data</th><th>Attività</th><th>Tipo</th><th>Priorità</th><th>Stato</th><th></th></tr></thead>
       <tbody>
@@ -324,6 +398,7 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <p class="text-muted">Nessun follow-up per questo cliente.</p>
     {% endif %}
@@ -362,6 +437,127 @@
   </div>
 
   <!-- ============ ANALISI RISCHI ============ -->
+  <!-- ============ AMMINISTRATORI / COLLEGAMENTI ============ -->
+  <div class="tab-pane fade" id="tab-persone">
+    {% set azienda = client.tipo == 'azienda' %}
+    {% set dipendenti = client.persone | selectattr('ruolo', 'equalto', 'dipendente') | list %}
+    {% set figure = client.persone | rejectattr('ruolo', 'equalto', 'dipendente') | list %}
+
+    {% if not azienda %}
+    <section class="mb-4" aria-labelledby="t-ruoli">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 class="h6 text-uppercase text-muted mb-0" id="t-ruoli">Ruoli nelle aziende</h2>
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('clients.new_role', client_id=client.id) }}"><i class="bi bi-building-add"></i> Collega a un'azienda</a>
+      </div>
+      {% if client.ruoli_in_aziende %}
+      <ul class="list-group mb-0">
+        {% for r in client.ruoli_in_aziende %}
+        <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span><strong>{{ r.ruolo_label }}</strong>{% if r.ruolo == 'socio' and r.quota_perc is not none %} ({{ '%g' | format(r.quota_perc) }}%){% endif %} di
+            <a href="{{ url_for('clients.detail', client_id=r.client_id) }}#persone">{{ r.cliente.ragione_sociale }}</a>{% if r.dal %} <span class="text-muted small">dal {{ r.dal | data_it }}</span>{% endif %}</span>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('clients.edit_person', client_id=r.client_id, persona_id=r.id) }}" aria-label="Modifica il ruolo in {{ r.cliente.ragione_sociale }}"><i class="bi bi-pencil"></i></a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-muted small mb-0">Non risulta amministratore, socio o dipendente di aziende tue clienti. Collegalo per vedere tutto il suo mondo assicurativo: le sue polizze private e quelle delle aziende in cui lavora o decide.</p>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section aria-labelledby="t-persone">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 class="h6 text-uppercase text-muted mb-0" id="t-persone">{{ 'Amministratori e figure societarie' if azienda else 'Persone collegate' }}</h2>
+        <div class="dropdown">
+          <button class="btn btn-outline-primary btn-sm dropdown-toggle text-wrap text-start" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-plus"></i> {{ 'Aggiungi amministratore / consigliere / altro' if azienda else 'Aggiungi familiare / socio / altro' }}
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% set principali = ruoli_societari if azienda else ('coniuge', 'familiare', 'socio') %}
+            {% for valore, etichetta in ruoli if valore in principali %}
+            <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo=valore) }}">{{ etichetta }}</a></li>
+            {% endfor %}
+            {% if azienda %}
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo='dipendente') }}">Dipendente</a></li>
+            {% endif %}
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo='altro') }}">Altro…</a></li>
+          </ul>
+        </div>
+      </div>
+      {% if figure %}
+        {% with persone=figure %}{% include "clients/_persone.html" %}{% endwith %}
+      {% else %}
+      <p class="text-muted small">{% if azienda %}Nessun amministratore inserito. Aggiungi amministratori, consiglieri, soci e titolari effettivi: chi decide sulle coperture e chi va tutelato (D&amp;O, Key Man, TCM).{% else %}Nessuna persona collegata: aggiungi coniuge, familiari o soci dello studio.{% endif %}</p>
+      {% endif %}
+    </section>
+
+    {% if azienda %}
+    <section class="mt-4" aria-labelledby="t-dipendenti">
+      <h2 class="h6 text-uppercase text-muted mb-3" id="t-dipendenti">Dipendenti</h2>
+      {% if dipendenti %}
+        {% with persone=dipendenti %}{% include "clients/_persone.html" %}{% endwith %}
+      {% else %}
+      <p class="text-muted small mb-0">Nessun dipendente collegato. Aggiungilo da qui («Dipendente» nel menu qui sopra) oppure, nella scheda di un cliente privato, scegli quest'azienda in «Lavora presso».</p>
+      {% endif %}
+    </section>
+    {% endif %}
+  </div>
+
+  <!-- ============ NOTE ============ -->
+  <div class="tab-pane fade" id="tab-note">
+    {% set qui = url_for('clients.detail', client_id=client.id) ~ '#note' %}
+    <h2 class="h6 text-uppercase text-muted">Nuova nota su {{ client.ragione_sociale }}</h2>
+    {% with nota=None, sezioni=sezioni_note, cliente_fisso=client, azione=url_for('note.new'), next=qui, id_prefisso='cn', annulla=None %}
+    {% include "note/_modulo.html" %}
+    {% endwith %}
+    <hr class="my-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <h2 class="h6 text-uppercase text-muted mb-0">Diario del cliente</h2>
+      <a class="small" href="{{ url_for('note.index', cliente=client.id, periodo='tutte') }}">Apri nelle Note</a>
+    </div>
+    {% for n in client.diario[:50] %}
+      {% if loop.first or n.giorno != loop.previtem.giorno %}<h3 class="note-data">{{ n.giorno | giorno_lungo | capitalize }} <span>{{ n.giorno | data_it }}</span></h3>{% endif %}
+      {% with next=qui, mostra_cliente=False %}{% include "note/_nota.html" %}{% endwith %}
+    {% else %}
+      <p class="text-muted small mb-0">Nessuna nota per questo cliente: annota qui chiamate, incontri ed esiti.</p>
+    {% endfor %}
+  </div>
+
+  <div class="tab-pane fade" id="tab-schede">
+    {% if client.schede %}
+    <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Scheda</th><th>Data</th><th>Consulente</th><th>Compilazione</th><th></th></tr></thead>
+      <tbody>
+      {% for sc in client.schede %}
+        {% set pieni, totali = sc.compilazione %}
+        <tr>
+          <td><a class="fw-semibold" href="{{ url_for('client_sheets.view_sheet', client_id=client.id, compilata_id=sc.id) }}">{{ sc.titolo }}</a></td>
+          <td>{{ sc.data_compilazione | data_it }}</td>
+          <td>{{ sc.consulente or '—' }}</td>
+          <td class="numeri small">{{ pieni }} campi su {{ totali }}</td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('client_sheets.edit_sheet', client_id=client.id, compilata_id=sc.id) }}" title="Modifica" aria-label="Modifica {{ sc.titolo }}"><i class="bi bi-pencil"></i></a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('client_sheets.view_sheet', client_id=client.id, compilata_id=sc.id) }}"><i class="bi bi-eye"></i> Apri</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="py-3">
+      <p class="mb-2">Nessuna scheda compilata per questo cliente.</p>
+      <p class="text-muted small misura">Compila le schede direttamente qui: restano salvate nella pratica, si possono modificare e stampare.
+        I dati già presenti nel gestionale (anagrafica, polizze in essere) vengono scritti in automatico.</p>
+      {% set raccolta = 'raccolta-privato' if client.tipo == 'dipendente' else 'raccolta-azienda' %}
+      <a class="btn btn-primary" href="{{ url_for('client_sheets.new_sheet', client_id=client.id, scheda_id=raccolta) }}"><i class="bi bi-clipboard-plus"></i> Compila la raccolta informazioni</a>
+    </div>
+    {% endif %}
+  </div>
+
   <div class="tab-pane fade" id="tab-analisi">
     <div class="row g-4">
       <div class="col-lg-5">
@@ -380,6 +576,7 @@
       <div class="col-lg-7">
         <h2 class="h6 text-uppercase text-muted">Storico analisi</h2>
         {% if client.analisi %}
+        <div class="table-responsive">
         <table class="table table-hover align-middle">
           <thead><tr><th>Data</th><th>Rischi rilevati</th><th>Rami scoperti</th><th></th></tr></thead>
           <tbody>
@@ -402,6 +599,7 @@
           {% endfor %}
           </tbody>
         </table>
+        </div>
         {% else %}
         <p class="text-muted">Nessuna analisi eseguita finora.</p>
         {% endif %}
@@ -417,7 +615,8 @@
   document.addEventListener('DOMContentLoaded', function () {
     const map = {
       polizze: '#tab-polizze', documenti: '#tab-documenti',
-      opportunita: '#tab-opportunita', followup: '#tab-followup', analisi: '#tab-analisi'
+      opportunita: '#tab-opportunita', followup: '#tab-followup', analisi: '#tab-analisi',
+      schede: '#tab-schede', note: '#tab-note', persone: '#tab-persone'
     };
     const target = map[window.location.hash.replace('#', '')];
     if (target) {

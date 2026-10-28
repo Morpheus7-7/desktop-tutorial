@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Programma — Deal Combined{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h3 mb-0"><i class="bi bi-gear me-2"></i>Impostazioni</h1>
+</div>
+{% include "settings/_nav.html" %}
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <section class="card" aria-labelledby="t-versione">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-versione"><i class="bi bi-arrow-repeat me-1"></i> Versione del programma</h2></div>
+      <div class="card-body">
+        <p class="mb-1">Versione installata: <strong>{{ versione }}</strong></p>
+        <p class="small text-muted mb-3">
+          {% if controllato %}Ultimo controllo: {{ controllato.strftime('%d/%m/%Y alle %H:%M') }}.{% else %}Nessun controllo ancora fatto in questa sessione.{% endif %}
+          {% if errore %}<span class="text-danger">Non è stato possibile raggiungere GitHub ({{ errore }}).</span>{% endif %}
+          {% if nessuna_release %}Su GitHub non c'è ancora nessuna versione pubblicata: per ora gli aggiornamenti si installano a mano con il nuovo installatore.{% endif %}
+        </p>
+
+        {% if nuova %}
+        <div class="border rounded p-3 mb-3">
+          <h3 class="h6 mb-2"><i class="bi bi-stars text-success me-1"></i>È disponibile la versione {{ nuova.versione }}</h3>
+          {% if nuova.note %}<details class="small mb-3"><summary>Cosa cambia</summary><pre class="small mb-0 mt-2" style="white-space: pre-wrap;">{{ nuova.note }}</pre></details>{% endif %}
+          {% if installabile and nuova.installatore %}
+          <p class="small text-muted misura">Prima di installare viene fatto un backup del database. L'installatore scaricato
+            viene controllato con la sua impronta SHA-256; il programma si chiude, si aggiorna e si riapre da solo.
+            I dati non vengono toccati.</p>
+          <form method="post" action="{{ url_for('settings.install_update') }}" class="d-inline"
+                onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Scarico e controllo…';">
+            <button class="btn btn-primary"><i class="bi bi-download"></i> Scarica e installa</button>
+          </form>
+          {% endif %}
+          <a class="btn btn-outline-secondary" href="{{ nuova.pagina }}" target="_blank" rel="noopener">Pagina della versione</a>
+          {% if not (installabile and nuova.installatore) %}
+          <p class="small text-muted mt-2 mb-0">{% if not installabile %}L'installazione automatica è disponibile nel programma installato su Windows.{% else %}Questa versione non ha l'impronta SHA-256: scaricala dalla pagina della versione.{% endif %}</p>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <form method="post">
+          <input type="hidden" name="azione" value="controlla">
+          <button class="btn btn-outline-primary"><i class="bi bi-search"></i> Controlla adesso</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <div class="col-lg-5">
+    {% if avvio is not none %}
+    <section class="card mb-4" aria-labelledby="t-avvio">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-avvio"><i class="bi bi-bell me-1"></i> Promemoria e avvio con Windows</h2></div>
+      <div class="card-body">
+        <p class="small misura">Chiudendo la finestra, Deal Combined resta come icona vicino all'orologio e ti avvisa con una
+          notifica di Windows dei follow-up di oggi (o in ritardo) e delle polizze che scadono entro 7 giorni.
+          Per chiuderlo del tutto: tasto destro sull'icona → <strong>Esci</strong>.</p>
+        <form method="post">
+          <input type="hidden" name="azione" value="avvio">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="avvio" name="avvio" value="1" {% if avvio %}checked{% endif %}>
+            <label class="form-check-label" for="avvio">Avvia con Windows (solo l'icona, senza aprire la finestra)</label>
+          </div>
+          <button class="btn btn-outline-primary btn-sm">Salva</button>
+        </form>
+        <p class="small text-muted mt-3 mb-0">Con la finestra chiusa l'archivio risulta libero: se lo usi da due PC, puoi aprirlo sull'altro.</p>
+      </div>
+    </section>
+    {% endif %}
+    {% if desktop_mode %}
+    <section class="card mb-4" aria-labelledby="t-automatico">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-automatico"><i class="bi bi-clock-history me-1"></i> Controllo automatico</h2></div>
+      <div class="card-body">
+        <form method="post">
+          <input type="hidden" name="azione" value="automatico">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="automatico" name="automatico" value="1" {% if automatico %}checked{% endif %}>
+            <label class="form-check-label" for="automatico">Controlla all'avvio se c'è una versione nuova</label>
+          </div>
+          <button class="btn btn-outline-primary btn-sm">Salva</button>
+        </form>
+        <p class="small text-muted mt-3 mb-0">Il controllo legge solo l'elenco pubblico delle versioni su GitHub: non invia dati dei clienti. Niente si installa senza la tua conferma.</p>
+      </div>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

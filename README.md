@@ -1,4 +1,4 @@
-# Gestionale Assicurativo
+# Deal Combined
 
 Gestionale web per intermediari assicurativi che seguono **professionisti e
 aziende**. Permette di raccogliere in un unico posto anagrafiche, polizze e
@@ -11,7 +11,25 @@ notifiche generate in automatico.
 - **Anagrafica clienti** — aziende, professionisti **e lavoratori dipendenti**
   (con datore di lavoro e mansione): dati fiscali, contatti, sede, settore,
   dipendenti, fatturato e descrizione dettagliata dell'attività. Il form adatta
-  i campi al tipo di cliente selezionato.
+  i campi al tipo di cliente selezionato. Per professionisti e privati:
+  **nome e cognome**, nascita, **residenza**, stato civile, nucleo familiare e
+  interessi; per i professionisti anche l'**iscrizione all'albo** (ordine,
+  sede, numero, data).
+- **Note (diario delle attività)**: ogni attività del giorno come nota singola,
+  divisa per sezione (chiamate, appuntamenti, preventivi, pratiche, nuovi
+  contatti, amministrazione, formazione, personale), collegabile a un cliente.
+  Ogni nota può avere un **promemoria**: email dal proprio Gmail all'ora
+  scelta, pulsante che apre **Google Calendar** con l'evento compilato,
+  notifica di Windows e voce nell'agenda di «Oggi».
+- **Amministratori e persone collegate**: dal pulsante *Aggiungi amministratore
+  / consigliere / altro* si registrano amministratori, consiglieri, soci (con
+  quota), legali rappresentanti, titolari effettivi, familiari o altre figure,
+  con dati anagrafici, residenza e contatti. La ricerca trova un'azienda anche
+  dal nome di un suo amministratore. Ogni persona si può **gestire anche come
+  cliente privato** (sue polizze, sua anagrafica): i dati restano uno solo e
+  dalla scheda privata si vede di quali aziende è amministratore, socio o
+  dipendente. I **dipendenti** si collegano all'azienda cliente per cui
+  lavorano (scheda *Amministratori → Dipendenti* dell'azienda).
 - **Polizze**: compagnia, ramo, massimale, premio, **percentuale di provvigione**,
   frazionamento, decorrenza, scadenza, tacito rinnovo e stato; oltre 20 rami
   precompilati.
@@ -30,6 +48,11 @@ notifiche generate in automatico.
 - **Pipeline commerciale (opportunità)**: gestione delle opportunità di vendita
   a fasi in stile CRM (lead → contatto → preventivo → trattativa → vinta/persa),
   con premio e provvigione stimati, alimentabile direttamente dai gap di copertura.
+- **Preventivi nelle proposte**: ogni proposta (opportunità) del cliente
+  conserva i suoi preventivi, con compagnia, cosa prevedono, premio, data,
+  validità ed esito, e il file (PDF, Word, Excel, immagine) salvato anche tra
+  i documenti del cliente. Il primo preventivo porta la proposta a
+  «Preventivo inviato»; quelli scaduti senza risposta sono segnalati.
 - **Statistiche di portafoglio**: cruscotto con premi e provvigioni per ramo,
   clienti per tipo, valore della pipeline e premi in scadenza nei 12 mesi.
 - **Ricerca globale** di clienti e polizze dalla barra in alto.
@@ -45,14 +68,81 @@ notifiche generate in automatico.
   background controlla le scadenze a intervalli regolabili. Vedi
   [Notifiche via email](#notifiche-via-email).
 - **Dashboard** con indicatori chiave, prossime scadenze e follow-up.
+- **Accademia commerciale**: programma di apprendimento per consulenti
+  assicurativi centrato sul *mestiere* più che sui prodotti. Vedi
+  [Accademia commerciale](#accademia-commerciale).
 
-## Applicazione desktop (.exe)
+## Accademia commerciale
 
-Vuoi provarla senza installare Python? È possibile impacchettare il gestionale
-in un **eseguibile unico** (`GestionaleAssicurativo.exe` su Windows) che avvia il
-server locale e apre il browser da solo. Il modo più semplice per ottenere il
-`.exe` è la build automatica su GitHub Actions. Tutti i dettagli in
-**[PACKAGING.md](PACKAGING.md)**.
+Dal menu **Accademia** si accede a un percorso di **16 settimane** (un modulo a
+settimana) che copre psicologia della decisione, comunicazione e PNL,
+prospezione, marketing, primo contatto, raccolta delle informazioni, arte
+delle domande (SPIN, ascolto attivo), pensiero laterale e storytelling,
+proposta e prezzo, obiezioni, negoziazione (metodo Harvard, Voss), chiusura,
+continuità della trattativa, sviluppo del portafoglio dai clienti acquisiti e
+organizzazione personale.
+
+- **Lezioni** con teoria, punti chiave, esempio di dialogo ed esercizio sul
+  campo; si segnano come completate e l'avanzamento è salvato.
+- **Base scientifica** per ogni modulo: cosa conferma la ricerca, cosa è solo
+  pratica professionale e quali miti evitare (es. movimenti oculari o regola
+  7-38-55), con le fonti.
+- **Quiz** con correzione spiegata e storico dei tentativi (soglia 70%).
+- **Libreria delle obiezioni** con cosa nascondono, tecnica, risposta, rilancio
+  e spunto di pensiero laterale; **allenamento quotidiano** a flashcard.
+- **Role-play**: scenari a tre (consulente, cliente, osservatore) con trappole
+  e domande di debrief.
+- **Cassetta degli attrezzi**: le tecniche documentate con fonte e modulo.
+- **Schede da stampare**: raccolta informazioni (privato e azienda), documenti
+  da dare al cliente, preparazione dell'appuntamento, diario della trattativa,
+  piano di negoziazione, registro obiezioni, griglia di role-play, revisione
+  annuale, mappa delle referenze, piano settimanale e KPI, post-vendita.
+- **Schede compilate nel cliente**: dalla scheda del cliente («Compila scheda»)
+  le schede che riguardano il cliente si compilano direttamente nel gestionale,
+  con anagrafica e polizze in essere già scritte. Restano salvate nella scheda
+  **Schede** del cliente con data e consulente, si possono modificare e
+  stampare compilate. Resta disponibile anche la versione vuota da stampare.
+
+I contenuti sono in `gestionale/academy.py`. I riferimenti normativi (IDD,
+Regolamenti IVASS, privacy) sono indicazioni formative: verifica sempre le
+versioni vigenti e le procedure della tua compagnia o intermediario.
+
+## Grafica, temi e dispositivi
+
+La grafica segue il mondo dell'**agenda del consulente**, descritto in
+[DESIGN.md](DESIGN.md): barra laterale verde come copertina, pagina «Oggi» con
+la data in grande e un unico **nastro rosso** che segna il prossimo passo (la
+prossima attività, la trattativa da muovere, il prossimo follow-up del cliente,
+la prossima lezione dell'Accademia).
+
+- **Tema chiaro e scuro**: all'apertura segue il sistema; il pulsante nella
+  barra superiore alterna automatico → chiaro → scuro e la scelta resta nel
+  browser. Le stampe escono sempre chiare.
+- **Dispositivi**: computer, tablet, telefono e pieghevoli. Sui pieghevoli con
+  cerniera (due pannelli affiancati) la pagina «Oggi» mette la lista su un
+  pannello e trattative/portafoglio sull'altro, lasciando libera la piega
+  (CSS *viewport segments*).
+- **Carattere**: Archivo (SIL Open Font License, `gestionale/static/vendor/fonts/Archivo-OFL.txt`),
+  servito in locale per funzionare anche offline.
+- Il contesto di prodotto per chi lavora alla grafica è in [PRODUCT.md](PRODUCT.md);
+  la skill di design [Impeccable](https://github.com/pbakaus/impeccable) è inclusa
+  in `.claude/skills/impeccable/`.
+
+## Programma installato sul PC (Windows)
+
+Deal Combined si installa come un normale programma, con
+`Installa-DealCombined.exe`: icona sul desktop e nel menu Start, finestra
+propria, funziona senza internet. I dati stanno in `Documenti\Deal Combined`,
+con un backup automatico a ogni avvio. Da *Impostazioni → Dati e backup* si
+esporta o importa l'archivio e si può spostare la cartella dati in OneDrive o
+Google Drive per usarlo da **due PC**: un avviso impedisce di aprirlo su
+entrambi nello stesso momento. In più: **icona vicino all'orologio** con le
+notifiche di Windows per follow-up e scadenze e avvio con Windows, **PIN** con
+blocco per inattività, **PDF** delle schede salvati in Google Drive o inviati
+al cliente con **Gmail**, follow-up in **Google Calendar**, **import da Excel**
+di clienti e polizze e **aggiornamenti automatici** verificati.
+L'installatore si crea con `build_windows.bat`.
+Tutti i dettagli in **[PACKAGING.md](PACKAGING.md)**.
 
 ## Requisiti
 
@@ -112,24 +202,32 @@ d'ambiente, che **hanno la precedenza** su quanto salvato nel database:
 
 ```
 app.py                     # entry point (server di sviluppo)
-run_desktop.py             # avvio «desktop»: server + browser (usato dall'exe)
+run_desktop.py             # avvio del programma installato: finestra propria, dati in Documenti
 seed_demo.py               # dati di esempio
 gestionale.spec            # ricetta PyInstaller per l'eseguibile
+build_windows.bat          # crea DealCombined.exe e l'installatore
+installer/                 # installatore Inno Setup e icona
 gestionale/
   __init__.py              # application factory, filtri e micro-migrazioni
   models.py                # modelli e vocabolari (rami, categorie, Settings…)
   risk_engine.py           # motore di analisi automatica dei rischi
+  academy.py               # contenuti dell'Accademia commerciale
+  schede.py                # schede compilabili: campi, precompilazione
+  desktop.py               # programma installato: cartella dati, backup, blocco tra PC
+  archivio.py              # esporta/importa l'archivio .zip
   notifications.py         # generazione notifiche da scadenze e follow-up
   mailer.py                # invio email (SMTP stdlib) e digest notifiche
   scheduler.py             # thread in background per l'invio automatico
   routes/                  # blueprint: main (dashboard, ricerca, statistiche),
                            #            clients, policies, documents, followups,
-                           #            opportunities, notifications, settings
+                           #            opportunities, notifications, settings,
+                           #            academy
   templates/               # interfaccia (Bootstrap 5)
   static/style.css         # tema grafico
   static/vendor/           # Bootstrap e icone in locale (funziona offline)
 tests/test_app.py          # test funzionali (pytest)
 tests/test_email.py        # test notifiche email e pagina impostazioni
+tests/test_academy.py      # test dell'Accademia commerciale
 .github/workflows/build.yml # CI: test + build eseguibile Windows
 ```
 

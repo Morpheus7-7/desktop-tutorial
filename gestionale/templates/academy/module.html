@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}{{ modulo.titolo }} — Accademia{% endblock %}
+{% block content %}
+{% include "academy/_nav.html" %}
+
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div class="d-flex gap-3 align-items-start">
+    <span class="modulo-icona"><i class="bi {{ modulo.icona }}"></i></span>
+    <div>
+      <h1 class="h3 mb-1">{{ modulo.titolo }}</h1>
+      <div class="small text-muted mb-2">Settimana {{ modulo.numero }} di {{ totale_moduli }} · {{ modulo.area }}</div>
+      <p class="text-muted misura mb-0">{{ modulo.obiettivo }}</p>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa dispensa</button>
+    <a class="btn btn-primary" href="{{ url_for('academy.quiz', modulo_id=modulo.id) }}"><i class="bi bi-ui-checks"></i> Quiz
+      {% if miglior_quiz %}<span class="badge bg-light text-dark ms-1">{{ miglior_quiz.percentuale }}%</span>{% endif %}</a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    {% for lez in modulo.lezioni %}
+    {% set fatta = lez.id in completate %}
+    <div class="card lezione mb-4 {% if fatta %}completata{% endif %}" id="{{ lez.id }}">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0">{{ modulo.numero }}.{{ loop.index }} — {{ lez.titolo }}</h2>
+        <form method="post" action="{{ url_for('academy.toggle_lesson', lezione_id=lez.id) }}" class="no-print">
+          {% if fatta %}
+          <button class="btn btn-sm btn-success"><i class="bi bi-check2-circle"></i> Completata</button>
+          {% else %}
+          <button class="btn btn-sm btn-outline-success"><i class="bi bi-circle"></i> Segna come completata</button>
+          {% endif %}
+        </form>
+      </div>
+      <div class="card-body">
+        <p class="teoria">{{ lez.teoria }}</p>
+        <h3 class="h6 mt-3"><i class="bi bi-key me-1"></i>Punti chiave</h3>
+        <ul>
+          {% for p in lez.punti %}<li>{{ p }}</li>{% endfor %}
+        </ul>
+        <blockquote class="box-esempio mb-0"><i class="bi bi-chat-quote" aria-hidden="true"></i>{{ lez.esempio }}</blockquote>
+      </div>
+      <div class="card-footer box-esercizio"><strong><i class="bi bi-pencil me-1"></i>Esercizio sul campo:</strong> {{ lez.esercizio }}</div>
+    </div>
+    {% endfor %}
+
+    <div class="d-flex justify-content-between no-print">
+      {% if precedente %}<a class="btn btn-outline-secondary" href="{{ url_for('academy.module', modulo_id=precedente.id) }}"><i class="bi bi-arrow-left"></i> {{ precedente.titolo }}</a>{% else %}<span></span>{% endif %}
+      {% if successivo %}<a class="btn btn-outline-primary" href="{{ url_for('academy.module', modulo_id=successivo.id) }}">{{ successivo.titolo }} <i class="bi bi-arrow-right"></i></a>{% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-4">
+      <div class="card-header"><i class="bi bi-clipboard2-pulse me-1"></i> Base scientifica</div>
+      <div class="card-body">
+        <p class="small text-muted">Cosa dice la ricerca sulle tecniche di questo modulo, e quanto sono solide le prove.</p>
+        {% for e in modulo.evidenze %}
+        {% set lv = livelli[e.livello] %}
+        <div class="evidenza">
+          <span class="badge bg-{{ lv[1] }} mb-1">{{ lv[0] }}</span>
+          <div class="small">{{ e.tesi }}</div>
+          <div class="small text-muted fst-italic">{{ e.fonte }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if tecniche %}
+    <div class="card mb-4">
+      <div class="card-header"><i class="bi bi-tools me-1"></i> Tecniche del modulo</div>
+      <ul class="list-group list-group-flush">
+        {% for t in tecniche %}
+        <li class="list-group-item small"><strong>{{ t.nome }}</strong> <span class="text-muted">({{ t.fonte }})</span><br>{{ t.come }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if schede %}
+    <div class="card mb-4 no-print">
+      <div class="card-header"><i class="bi bi-printer me-1"></i> Schede da stampare</div>
+      <ul class="list-group list-group-flush">
+        {% for s in schede %}
+        <li class="list-group-item"><a href="{{ url_for('academy.sheet', scheda_id=s.id) }}"><i class="bi {{ s.icona }} me-1"></i>{{ s.titolo }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-bookmark me-1"></i> Per approfondire</div>
+      <ul class="list-group list-group-flush">
+        {% for f in modulo.fonti %}<li class="list-group-item small">{{ f }}</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

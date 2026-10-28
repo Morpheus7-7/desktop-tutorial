@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% set nuova = not persona.id %}
+{% block title %}{{ 'Aggiungi persona' if nuova else persona.nome_completo }} · {{ client.ragione_sociale }} — Deal Combined{% endblock %}
+{% macro v(campo) %}{{ persona[campo] or '' }}{% endmacro %}
+{% macro d(campo) %}{{ persona[campo].isoformat() if persona[campo] else '' }}{% endmacro %}
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=client.id) }}#persone">{{ client.ragione_sociale }}</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ 'Aggiungi' if nuova else 'Modifica' }}</li>
+  </ol>
+</nav>
+<h1 class="h3 mb-4"><i class="bi bi-person-badge me-2"></i>{% if nuova %}Aggiungi amministratore, consigliere o altra figura{% else %}{{ persona.nome_completo }}{% endif %}</h1>
+
+<form method="post" class="card">
+  <div class="card-body">
+    <h2 class="h6 text-uppercase text-muted">Ruolo</h2>
+    <div class="row g-3 mb-4">
+      <div class="col-md-5">
+        <label class="form-label" for="ruolo">Ruolo *</label>
+        <select class="form-select" id="ruolo" name="ruolo">
+          {% for valore, etichetta in ruoli %}
+          <option value="{{ valore }}" {% if persona.ruolo == valore %}selected{% endif %}>{{ etichetta }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4" id="riga-ruolo-altro">
+        <label class="form-label" for="ruolo_altro">Specifica il ruolo</label>
+        <input type="text" class="form-control" id="ruolo_altro" name="ruolo_altro" placeholder="es. Direttore tecnico" value="{{ v('ruolo_altro') }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="dal">In carica dal</label>
+        <input type="date" class="form-control" id="dal" name="dal" value="{{ d('dal') }}">
+      </div>
+      <div class="col-md-3" id="riga-quota">
+        <label class="form-label" for="quota_perc">Quota di partecipazione (%)</label>
+        <input type="text" inputmode="decimal" class="form-control" id="quota_perc" name="quota_perc"
+               value="{{ persona.quota_perc if persona.quota_perc is not none else '' }}">
+      </div>
+    </div>
+
+    {% if persona.persona_client_id %}
+    <h2 class="h6 text-uppercase text-muted">Dati anagrafici</h2>
+    <p class="misura mb-2"><i class="bi bi-person-vcard me-1" aria-hidden="true"></i>{{ persona.nome_completo }} è anche tuo <strong>cliente privato</strong>:
+      nome, codice fiscale, residenza e contatti si modificano nella sua scheda e valgono ovunque.</p>
+    <p class="mb-4"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('clients.detail', client_id=persona.persona_client_id) }}">Apri la scheda privata</a></p>
+    {% else %}
+    <h2 class="h6 text-uppercase text-muted">Dati anagrafici</h2>
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <label class="form-label" for="nome">Nome</label>
+        <input type="text" class="form-control" id="nome" name="nome" value="{{ v('nome') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="cognome">Cognome *</label>
+        <input type="text" class="form-control" id="cognome" name="cognome" required value="{{ v('cognome') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="codice_fiscale">Codice fiscale</label>
+        <input type="text" class="form-control" id="codice_fiscale" name="codice_fiscale" maxlength="16" value="{{ v('codice_fiscale') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="data_nascita">Data di nascita</label>
+        <input type="date" class="form-control" id="data_nascita" name="data_nascita" value="{{ d('data_nascita') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="luogo_nascita">Luogo di nascita</label>
+        <input type="text" class="form-control" id="luogo_nascita" name="luogo_nascita" value="{{ v('luogo_nascita') }}">
+      </div>
+    </div>
+
+    <h2 class="h6 text-uppercase text-muted">Residenza e contatti</h2>
+    <div class="row g-3 mb-4">
+      <div class="col-md-5">
+        <label class="form-label" for="indirizzo">Indirizzo di residenza</label>
+        <input type="text" class="form-control" id="indirizzo" name="indirizzo" value="{{ v('indirizzo') }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="citta">Città</label>
+        <input type="text" class="form-control" id="citta" name="citta" value="{{ v('citta') }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="cap">CAP</label>
+        <input type="text" class="form-control" id="cap" name="cap" maxlength="5" value="{{ v('cap') }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="provincia">Provincia</label>
+        <input type="text" class="form-control" id="provincia" name="provincia" maxlength="2" value="{{ v('provincia') }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="email">Email</label>
+        <input type="email" class="form-control" id="email" name="email" value="{{ v('email') }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="telefono">Telefono</label>
+        <input type="text" class="form-control" id="telefono" name="telefono" value="{{ v('telefono') }}">
+      </div>
+    </div>
+
+    {% endif %}
+
+    <label class="form-label" for="note">Informazioni e note</label>
+    <textarea class="form-control" id="note" name="note" rows="3"
+              placeholder="es. decide lui sulle assicurazioni, preferisce essere chiamato la mattina, ha due figli">{{ v('note') }}</textarea>
+  </div>
+  <div class="card-footer d-flex gap-2 flex-wrap">
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Salva</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('clients.detail', client_id=client.id) }}#persone">Annulla</a>
+  </div>
+</form>
+{% if persona.persona_client_id %}
+<form method="post" action="{{ url_for('clients.link_person', client_id=client.id, persona_id=persona.id) }}" class="mt-3"
+      onsubmit="return confirm('Scollegare la scheda di cliente privato? Entrambe le schede restano.');">
+  <input type="hidden" name="persona_client_id" value="">
+  <button class="btn btn-sm btn-link text-danger px-0"><i class="bi bi-link-45deg"></i> Scollega dalla scheda di cliente privato</button>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+  // «Specifica il ruolo» solo per «Altro», la quota solo per i soci.
+  (function () {
+    var ruolo = document.getElementById("ruolo");
+    function aggiorna() {
+      document.getElementById("riga-ruolo-altro").hidden = ruolo.value !== "altro";
+      document.getElementById("riga-quota").hidden = ruolo.value !== "socio";
+    }
+    ruolo.addEventListener("change", aggiorna);
+    aggiorna();
+  })();
+</script>
+{% endblock %}

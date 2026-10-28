@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ s.titolo }} — Role-play{% endblock %}
+{% block content %}
+{% include "academy/_nav.html" %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 mb-1">{{ s.titolo }}</h1>
+    <span class="badge bg-secondary">Livello {{ s.livello | lower }}</span>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Stampa</button>
+    <a class="btn btn-outline-primary" href="{{ url_for('academy.sheet', scheda_id='griglia-roleplay') }}"><i class="bi bi-clipboard-check"></i> Griglia osservatore</a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card mb-4">
+      <div class="card-header"><i class="bi bi-person me-1"></i> Il cliente (per chi interpreta il cliente)</div>
+      <div class="card-body">
+        <p><strong>{{ s.cliente }}</strong></p>
+        <p>{{ s.contesto }}</p>
+        <div class="small text-muted text-uppercase mb-1">Obiezioni da usare durante la simulazione</div>
+        <ul>
+          {% for o in obiezioni %}<li>«{{ o.obiezione }}»</li>{% endfor %}
+        </ul>
+        <div class="small text-muted">Cedi solo se il consulente ascolta, esplora e risponde alla vera causa.</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card mb-4">
+      <div class="card-header"><i class="bi bi-briefcase me-1"></i> Il consulente</div>
+      <div class="card-body">
+        <p><strong>Obiettivo:</strong> {{ s.obiettivo }}</p>
+        <div class="small text-muted text-uppercase mb-1">Fasi suggerite</div>
+        <ol>{% for f in s.fasi %}<li>{{ f }}</li>{% endfor %}</ol>
+        <div class="small text-muted text-uppercase mb-1">Trappole da evitare</div>
+        <ul class="text-danger">{% for t in s.trappole %}<li><span class="text-body">{{ t }}</span></li>{% endfor %}</ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-chat-dots me-1"></i> Debrief (per l'osservatore)</div>
+  <div class="card-body">
+    <ul class="mb-0">{% for d in s.debrief %}<li>{{ d }}</li>{% endfor %}</ul>
+  </div>
+</div>
+
+<div class="card no-print">
+  <div class="card-header"><i class="bi bi-shield-exclamation me-1"></i> Risposte modello alle obiezioni dello scenario</div>
+  <div class="card-body">
+    {% for o in obiezioni %}
+    <details class="mb-2">
+      <summary>«{{ o.obiezione }}» — <span class="text-muted">{{ o.tecnica }}</span></summary>
+      <blockquote class="box-esempio my-2">{{ o.risposta }}</blockquote>
+      <div class="small">{{ o.rilancio }}</div>
+    </details>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

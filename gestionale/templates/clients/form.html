@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{% block title %}{% if client %}Modifica cliente{% else %}Nuovo cliente{% endif %} — Gestionale Assicurativo{% endblock %}
+{% block title %}{% if client %}Modifica cliente{% else %}Nuovo cliente{% endif %} — Deal Combined{% endblock %}
+{% macro v(campo) %}{{ (client[campo] or '') if client else '' }}{% endmacro %}
+{% macro d(campo) %}{{ client[campo].isoformat() if client and client[campo] else '' }}{% endmacro %}
 {% block content %}
 <h1 class="h3 mb-4">
   <i class="bi bi-person-plus me-2"></i>
@@ -18,12 +20,23 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-5">
-        <label class="form-label" id="label-nome">Ragione sociale / Nominativo *</label>
-        <input type="text" class="form-control" name="ragione_sociale" required
+      <div class="col-md-5 campo-azienda">
+        <label class="form-label" for="ragione_sociale">Ragione sociale *</label>
+        <input type="text" class="form-control" id="ragione_sociale" name="ragione_sociale"
                value="{{ client.ragione_sociale if client else '' }}">
       </div>
-      <div class="col-md-4">
+      {# Persone: nome e cognome separati; se mancano (clienti inseriti prima) si propone la divisione del nominativo #}
+      {% set diviso = (client.ragione_sociale or '').split(' ', 1) if client and client.persona_fisica and not (client.nome or client.cognome) else [] %}
+      <div class="col-md-3 campo-persona">
+        <label class="form-label" for="nome">Nome *</label>
+        <input type="text" class="form-control" id="nome" name="nome" value="{{ client.nome or (diviso[0] if diviso else '') if client else '' }}">
+      </div>
+      <div class="col-md-3 campo-persona">
+        <label class="form-label" for="cognome">Cognome *</label>
+        <input type="text" class="form-control" id="cognome" name="cognome" value="{{ client.cognome or (diviso[1] if diviso | length > 1 else '') if client else '' }}">
+        {% if diviso %}<div class="form-text text-warning-emphasis">Controlla: nome e cognome sono stati ricavati dal nominativo «{{ client.ragione_sociale }}».</div>{% endif %}
+      </div>
+      <div class="col-md-3 campo-azienda">
         <label class="form-label">Referente</label>
         <input type="text" class="form-control" name="referente" value="{{ client.referente or '' if client else '' }}">
       </div>
@@ -44,12 +57,75 @@
         <input type="text" class="form-control" name="professione" placeholder="es. Ingegnere civile" value="{{ client.professione or '' if client else '' }}">
       </div>
       <div class="col-md-3 campo-dipendente">
-        <label class="form-label">Datore di lavoro</label>
-        <input type="text" class="form-control" name="datore_lavoro" placeholder="es. Acme S.p.A." value="{{ client.datore_lavoro or '' if client else '' }}">
+        <label class="form-label" for="datore_lavoro_id">Lavora presso (tuo cliente)</label>
+        <select class="form-select" id="datore_lavoro_id" name="datore_lavoro_id">
+          <option value="">— non è un mio cliente —</option>
+          {% for a in aziende %}
+          <option value="{{ a.id }}" {% if datore and datore.client_id == a.id %}selected{% endif %}>{{ a.ragione_sociale }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 campo-dipendente" id="riga-datore-testo">
+        <label class="form-label" for="datore_lavoro">Datore di lavoro</label>
+        <input type="text" class="form-control" id="datore_lavoro" name="datore_lavoro" placeholder="es. Acme S.p.A." value="{{ client.datore_lavoro or '' if client else '' }}">
+      </div>
+      <div class="col-md-3 campo-persona">
+        <label class="form-label" for="data_nascita">Data di nascita</label>
+        <input type="date" class="form-control" id="data_nascita" name="data_nascita" value="{{ d('data_nascita') }}">
+      </div>
+      <div class="col-md-3 campo-persona">
+        <label class="form-label" for="luogo_nascita">Luogo di nascita</label>
+        <input type="text" class="form-control" id="luogo_nascita" name="luogo_nascita" value="{{ v('luogo_nascita') }}">
       </div>
     </div>
 
-    <h2 class="h6 text-uppercase text-muted">Contatti e sede</h2>
+    <section class="mb-4" aria-labelledby="t-persone-modulo">
+      <h2 class="h6 text-uppercase text-muted" id="t-persone-modulo">
+        <span class="campo-azienda">Amministratori e figure societarie</span><span class="campo-persona">Familiari e persone collegate</span>
+      </h2>
+      {% if client and client.persone %}
+      <ul class="list-unstyled small mb-2">
+        {% for p in client.persone %}<li><strong>{{ p.ruolo_label }}</strong> · {{ p.nome_completo }}</li>{% endfor %}
+      </ul>
+      <p class="small text-muted">Per modificarli o eliminarli usa la scheda <a href="{{ url_for('clients.detail', client_id=client.id) }}#persone">{{ 'Amministratori' if client.tipo == 'azienda' else 'Collegamenti' }}</a> del cliente. Qui puoi aggiungerne altri.</p>
+      {% endif %}
+      <div id="righe-persone">
+        {% if not client %}{% set prima_riga = True %}{% include "clients/_riga_persona.html" %}{% endif %}
+      </div>
+      <button type="button" class="btn btn-outline-primary btn-sm" id="aggiungi-persona">
+        <i class="bi bi-person-plus"></i> <span class="campo-azienda">Aggiungi amministratore / consigliere / altro</span><span class="campo-persona">Aggiungi familiare / socio / altro</span>
+      </button>
+      <div class="form-text">Basta il cognome; data di nascita, residenza e gli altri dati li completi poi dalla scheda del cliente.
+        Ogni persona si può gestire anche come cliente privato.</div>
+      <template id="modello-persona">{% set prima_riga = False %}{% include "clients/_riga_persona.html" %}</template>
+    </section>
+
+    <div class="campo-professionista">
+      <h2 class="h6 text-uppercase text-muted">Iscrizione all'albo</h2>
+      <div class="row g-3 mb-4">
+        <div class="col-md-5">
+          <label class="form-label" for="albo">Albo / Ordine professionale</label>
+          <input type="text" class="form-control" id="albo" name="albo" list="albi" placeholder="es. Ordine degli Ingegneri" value="{{ v('albo') }}">
+          <datalist id="albi">
+            {% for a in ["Ordine degli Avvocati", "Ordine dei Dottori Commercialisti e degli Esperti Contabili", "Ordine degli Ingegneri", "Ordine degli Architetti, P.P.C.", "Ordine dei Medici Chirurghi e degli Odontoiatri", "Ordine dei Farmacisti", "Ordine dei Notai (Consiglio Notarile)", "Ordine dei Consulenti del Lavoro", "Collegio dei Geometri e Geometri Laureati", "Ordine dei Geologi", "Ordine degli Psicologi", "Ordine dei Veterinari", "Ordine delle Professioni Infermieristiche (OPI)", "Ordine dei Periti Industriali", "Ordine degli Agronomi e Forestali", "Registro dei Revisori Legali", "Registro Unico degli Intermediari (RUI)"] %}<option value="{{ a }}">{% endfor %}
+          </datalist>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="albo_provincia">Sede dell'ordine</label>
+          <input type="text" class="form-control" id="albo_provincia" name="albo_provincia" placeholder="es. Milano" value="{{ v('albo_provincia') }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label" for="albo_numero">N. iscrizione</label>
+          <input type="text" class="form-control" id="albo_numero" name="albo_numero" value="{{ v('albo_numero') }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label" for="albo_data_iscrizione">Iscritto dal</label>
+          <input type="date" class="form-control" id="albo_data_iscrizione" name="albo_data_iscrizione" value="{{ d('albo_data_iscrizione') }}">
+        </div>
+      </div>
+    </div>
+
+    <h2 class="h6 text-uppercase text-muted" id="titolo-indirizzo">Contatti e sede</h2>
     <div class="row g-3 mb-4">
       <div class="col-md-5">
         <label class="form-label">Indirizzo</label>
@@ -78,6 +154,50 @@
       <div class="col-md-4">
         <label class="form-label">Telefono</label>
         <input type="text" class="form-control" name="telefono" value="{{ client.telefono or '' if client else '' }}">
+      </div>
+    </div>
+
+    <div class="campo-persona">
+      <h2 class="h6 text-uppercase text-muted">Residenza <span class="text-lowercase fw-normal">(se diversa dall'indirizzo qui sopra)</span></h2>
+      <div class="row g-3 mb-4">
+        <div class="col-md-5">
+          <label class="form-label" for="residenza_indirizzo">Indirizzo di residenza</label>
+          <input type="text" class="form-control" id="residenza_indirizzo" name="residenza_indirizzo" value="{{ v('residenza_indirizzo') }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="residenza_citta">Città</label>
+          <input type="text" class="form-control" id="residenza_citta" name="residenza_citta" value="{{ v('residenza_citta') }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label" for="residenza_cap">CAP</label>
+          <input type="text" class="form-control" id="residenza_cap" name="residenza_cap" maxlength="5" value="{{ v('residenza_cap') }}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label" for="residenza_provincia">Provincia</label>
+          <input type="text" class="form-control" id="residenza_provincia" name="residenza_provincia" maxlength="2" value="{{ v('residenza_provincia') }}">
+        </div>
+      </div>
+
+      <h2 class="h6 text-uppercase text-muted">Informazioni personali</h2>
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <label class="form-label" for="stato_civile">Stato civile</label>
+          <select class="form-select" id="stato_civile" name="stato_civile">
+            <option value="">—</option>
+            {% for sc in stati_civili %}<option {% if client and client.stato_civile == sc %}selected{% endif %}>{{ sc }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label" for="nucleo_familiare">Nucleo familiare</label>
+          <input type="text" class="form-control" id="nucleo_familiare" name="nucleo_familiare"
+                 placeholder="es. sposato con Laura, 2 figli (8 e 12 anni), madre a carico" value="{{ v('nucleo_familiare') }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="interessi">Interessi e abitudini</label>
+          <textarea class="form-control" id="interessi" name="interessi" rows="2"
+                    placeholder="es. corre maratone, viaggia spesso all'estero, casa al mare in Liguria, cane di grossa taglia">{{ v('interessi') }}</textarea>
+          <div class="form-text">Utili in trattativa: sport, viaggi, seconde case e animali sono anche bisogni assicurativi.</div>
+        </div>
       </div>
     </div>
 
@@ -132,7 +252,10 @@
   // Mostra solo i campi pertinenti al tipo di cliente selezionato.
   (function () {
     const select = document.getElementById('tipo-cliente');
-    const nomeLabel = document.getElementById('label-nome');
+    const ragione = document.getElementById('ragione_sociale');
+    const nome = document.getElementById('nome');
+    const cognome = document.getElementById('cognome');
+    const titoloIndirizzo = document.getElementById('titolo-indirizzo');
     function aggiorna() {
       const tipo = select.value;
       const regole = {
@@ -140,18 +263,49 @@
         'campo-professionista': tipo === 'professionista',
         'campo-dipendente': tipo === 'dipendente',
         'campo-impresa': tipo === 'azienda' || tipo === 'professionista',
+        'campo-persona': tipo !== 'azienda',
       };
       for (const [cls, mostra] of Object.entries(regole)) {
         document.querySelectorAll('.' + cls).forEach(function (el) {
           el.style.display = mostra ? '' : 'none';
         });
       }
-      nomeLabel.textContent = tipo === 'azienda'
-        ? 'Ragione sociale *'
-        : (tipo === 'dipendente' ? 'Nome e cognome *' : 'Nominativo *');
+      // Obbligatori solo i campi visibili: ragione sociale o nome e cognome.
+      ragione.required = tipo === 'azienda';
+      nome.required = cognome.required = tipo !== 'azienda';
+      titoloIndirizzo.textContent = tipo === 'azienda' ? 'Contatti e sede'
+        : (tipo === 'professionista' ? 'Contatti e studio' : 'Contatti e domicilio (dove abita)');
     }
     select.addEventListener('change', aggiorna);
     aggiorna();
+
+    // Amministratori / persone collegate: righe aggiunte al volo.
+    const righe = document.getElementById('righe-persone');
+    const modello = document.getElementById('modello-persona');
+    function ruoloPredefinito(riga) {
+      const s = riga.querySelector('select');
+      if (s && !s.dataset.toccato) s.value = select.value === 'azienda' ? 'amministratore_unico' : 'coniuge';
+    }
+    document.getElementById('aggiungi-persona').addEventListener('click', function () {
+      const riga = modello.content.firstElementChild.cloneNode(true);
+      righe.appendChild(riga);
+      ruoloPredefinito(riga);
+      riga.querySelector('input[name="persona_cognome"]').focus();
+    });
+    righe.addEventListener('change', function (e) { if (e.target.tagName === 'SELECT') e.target.dataset.toccato = '1'; });
+    righe.addEventListener('click', function (e) {
+      const via = e.target.closest('.rimuovi-persona');
+      if (via) via.closest('.riga-persona').remove();
+    });
+    select.addEventListener('change', function () { righe.querySelectorAll('.riga-persona').forEach(ruoloPredefinito); });
+    righe.querySelectorAll('.riga-persona').forEach(ruoloPredefinito);
+
+    // Con l'azienda scelta tra i clienti il nome del datore si compila da solo.
+    const datore = document.getElementById('datore_lavoro_id');
+    const testoDatore = document.getElementById('riga-datore-testo');
+    function aggiornaDatore() { testoDatore.hidden = !!datore.value; }
+    datore.addEventListener('change', aggiornaDatore);
+    aggiornaDatore();
   })();
 </script>
 {% endblock %}

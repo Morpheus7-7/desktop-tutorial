@@ -1,0 +1,7 @@
+<ul class="nav nav-pills academy-nav mb-4">
+  <li class="nav-item"><a class="nav-link {% if request.endpoint in ('settings.edit',) %}active{% endif %}" href="{{ url_for('settings.edit') }}"><i class="bi bi-envelope-at"></i> Notifiche email</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'settings.data' %}active{% endif %}" href="{{ url_for('settings.data') }}"><i class="bi bi-hdd"></i> Dati e backup</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'settings.google' %}active{% endif %}" href="{{ url_for('settings.google') }}"><i class="bi bi-google"></i> Google</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'privacy.settings' %}active{% endif %}" href="{{ url_for('privacy.settings') }}"><i class="bi bi-lock"></i> Privacy</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'settings.updates' %}active{% endif %}" href="{{ url_for('settings.updates') }}"><i class="bi bi-window-desktop"></i> Programma</a></li>
+</ul>

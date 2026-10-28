@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Anteprima importazione — Deal Combined{% endblock %}
+{% macro problemi(r) -%}
+  {% for e in r.errori %}<div class="text-danger"><i class="bi bi-x-circle" aria-hidden="true"></i> {{ e }}</div>{% endfor %}
+  {% for w in r.avvisi %}<div class="text-warning-emphasis"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> {{ w }}</div>{% endfor %}
+{%- endmacro %}
+{% macro esito(r) -%}
+  {% if r.esito in ('nuovo', 'nuova') %}<span class="badge text-bg-success">{{ 'Nuova' if r.esito == 'nuova' else 'Nuovo' }}</span>
+  {% elif r.esito == 'esistente' %}<span class="badge text-bg-secondary">Già presente</span>
+  {% elif r.esito == 'doppione' %}<span class="badge text-bg-secondary">Ripetuto nel file</span>
+  {% else %}<span class="badge text-bg-danger">Errore</span>{% endif %}
+{%- endmacro %}
+{% macro quanti(n, uno, molti) %}{{ n }} {{ uno if n == 1 else molti }}{% endmacro %}
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{{ url_for('clients.list_clients') }}">Clienti</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('importazione.start') }}">Importa da Excel</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Anteprima</li>
+  </ol>
+</nav>
+<h1 class="h3 mb-1">Anteprima dell'importazione</h1>
+<p class="text-muted mb-4 text-break">{{ nome_file }}</p>
+
+{% set c = a.conteggi %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <section class="card h-100"><div class="card-body">
+      <h2 class="h6">Clienti</h2>
+      <p class="mb-0"><strong>{{ quanti(c.clienti_nuovi, 'nuovo', 'nuovi') }}</strong> · {{ c.clienti_esistenti }} già present{{ 'e' if c.clienti_esistenti == 1 else 'i' }}{% if c.clienti_errori %} · <span class="text-danger">{{ c.clienti_errori }} con errori</span>{% endif %}</p>
+    </div></section>
+  </div>
+  <div class="col-sm-4">
+    <section class="card h-100"><div class="card-body">
+      <h2 class="h6">Polizze</h2>
+      <p class="mb-0"><strong>{{ quanti(c.polizze_nuove, 'nuova', 'nuove') }}</strong> · {{ c.polizze_esistenti }} già present{{ 'e' if c.polizze_esistenti == 1 else 'i' }}{% if c.polizze_errori %} · <span class="text-danger">{{ c.polizze_errori }} con errori</span>{% endif %}</p>
+    </div></section>
+  </div>
+  <div class="col-sm-4">
+    <section class="card h-100"><div class="card-body">
+      <h2 class="h6">Amministratori e persone</h2>
+      <p class="mb-0"><strong>{{ quanti(c.persone_nuove, 'nuova', 'nuove') }}</strong> · {{ c.persone_esistenti }} già present{{ 'e' if c.persone_esistenti == 1 else 'i' }}{% if c.persone_errori %} · <span class="text-danger">{{ c.persone_errori }} con errori</span>{% endif %}</p>
+    </div></section>
+  </div>
+</div>
+
+{% if a.ignorati %}<div class="alert alert-info">Fogli non riconosciuti e non letti: {{ a.ignorati | join(', ') }}.</div>{% endif %}
+{% if c.clienti_errori or c.polizze_errori or c.persone_errori %}
+<div class="alert alert-warning">Le righe con errori vengono saltate. Puoi correggerle nel file e ricaricarlo, oppure importare intanto le altre.</div>
+{% endif %}
+
+<div class="d-flex gap-2 flex-wrap mb-4">
+  {% if c.clienti_nuovi or c.polizze_nuove or c.persone_nuove or c.clienti_esistenti %}
+  <form method="post" action="{{ url_for('importazione.confirm') }}"
+        onsubmit="this.querySelector('button').disabled = true;">
+    <input type="hidden" name="token" value="{{ token }}">
+    <button class="btn btn-primary"><i class="bi bi-check2-circle"></i> Importa {{ quanti(c.clienti_nuovi, 'cliente', 'clienti') }}, {{ quanti(c.polizze_nuove, 'polizza', 'polizze') }}{% if c.persone_nuove %} e {{ quanti(c.persone_nuove, 'persona', 'persone') }}{% endif %}</button>
+  </form>
+  {% endif %}
+  <form method="post" action="{{ url_for('importazione.cancel') }}">
+    <button class="btn btn-outline-secondary">Annulla</button>
+  </form>
+</div>
+
+{% if a.clienti %}
+<section class="card mb-4" aria-labelledby="t-clienti">
+  <div class="card-header"><h2 class="h6 mb-0" id="t-clienti">Clienti nel file</h2></div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th scope="col">Riga</th><th scope="col">Esito</th><th scope="col">Nome</th><th scope="col">P.IVA / CF</th><th scope="col">Città</th><th scope="col">Note</th></tr></thead>
+      <tbody>
+        {% for r in a.clienti[:500] %}
+        <tr>
+          <td class="text-muted small">{{ r.foglio }} {{ r.riga }}</td>
+          <td>{{ esito(r) }}</td>
+          <td>{{ r.dati.ragione_sociale or '—' }}{% if r.da_polizza %} <span class="small text-muted">(da {{ r.foglio }})</span>{% endif %}
+            {% if r.dati.tipo and r.dati.tipo != 'azienda' %}<div class="small text-muted">{{ 'Professionista' if r.dati.tipo == 'professionista' else 'Privato' }}</div>{% endif %}</td>
+          <td class="small">{{ r.dati.partita_iva or r.dati.codice_fiscale or '' }}</td>
+          <td class="small">{{ r.dati.citta or '' }}</td>
+          <td class="small">{{ problemi(r) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if a.clienti | length > 500 %}<div class="card-footer small text-muted">Mostrate le prime 500 righe su {{ a.clienti | length }}.</div>{% endif %}
+</section>
+{% endif %}
+
+{% if a.polizze %}
+<section class="card" aria-labelledby="t-polizze">
+  <div class="card-header"><h2 class="h6 mb-0" id="t-polizze">Polizze nel file</h2></div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th scope="col">Riga</th><th scope="col">Esito</th><th scope="col">Cliente</th><th scope="col">Compagnia</th><th scope="col">Numero</th><th scope="col">Ramo</th><th scope="col">Scadenza</th><th scope="col" class="text-end">Premio</th><th scope="col">Note</th></tr></thead>
+      <tbody>
+        {% for r in a.polizze[:500] %}
+        <tr>
+          <td class="text-muted small">{{ r.foglio }} {{ r.riga }}</td>
+          <td>{{ esito(r) }}</td>
+          <td>{{ r.nome_cliente or r.dati.cliente or '—' }}</td>
+          <td>{{ r.dati.compagnia or '—' }}</td>
+          <td class="small">{{ r.dati.numero_polizza or '—' }}</td>
+          <td class="small">{{ rami.get(r.dati.ramo, '') if r.dati.ramo else '' }}</td>
+          <td class="small text-nowrap">{{ r.dati.data_scadenza | data_it if r.dati.data_scadenza else '' }}</td>
+          <td class="small text-end text-nowrap">{{ r.dati.premio_annuo | euro if r.dati.premio_annuo is not none else '' }}</td>
+          <td class="small">{{ problemi(r) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if a.polizze | length > 500 %}<div class="card-footer small text-muted">Mostrate le prime 500 righe su {{ a.polizze | length }}.</div>{% endif %}
+</section>
+{% endif %}
+
+{% if a.persone %}
+<section class="card mt-4" aria-labelledby="t-persone">
+  <div class="card-header"><h2 class="h6 mb-0" id="t-persone">Amministratori e persone nel file</h2></div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th scope="col">Riga</th><th scope="col">Esito</th><th scope="col">Cliente</th><th scope="col">Ruolo</th><th scope="col">Nome e cognome</th><th scope="col">Codice fiscale</th><th scope="col">Note</th></tr></thead>
+      <tbody>
+        {% for r in a.persone[:500] %}
+        <tr>
+          <td class="text-muted small">{{ r.foglio }} {{ r.riga }}</td>
+          <td>{{ esito(r) }}</td>
+          <td>{{ r.nome_cliente or r.dati.cliente or '—' }}</td>
+          <td class="small">{{ r.dati.ruolo_altro or ruoli.get(r.dati.ruolo, '') }}</td>
+          <td>{{ [r.dati.nome, r.dati.cognome] | select | join(' ') or '—' }}</td>
+          <td class="small">{{ r.dati.codice_fiscale or '' }}</td>
+          <td class="small">{{ problemi(r) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

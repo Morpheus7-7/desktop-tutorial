@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Google — Deal Combined{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h3 mb-0"><i class="bi bi-gear me-2"></i>Impostazioni</h1>
+</div>
+{% include "settings/_nav.html" %}
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <section class="card mb-4" aria-labelledby="t-gmail">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-gmail"><i class="bi bi-envelope me-1"></i> Gmail: invio delle schede ai clienti</h2></div>
+      <div class="card-body">
+        {% if gmail_attivo %}<p class="text-success fw-semibold"><i class="bi bi-check-circle"></i> Invio tramite Gmail impostato ({{ s.smtp_user or 'utente da indicare' }}).</p>{% endif %}
+        <ol class="small misura ps-3">
+          <li>Sul tuo account Google attiva la <strong>verifica in due passaggi</strong> (myaccount.google.com → Sicurezza).</li>
+          <li>Crea una <strong>password per le app</strong> (myaccount.google.com → Sicurezza → Password per le app): Google ti mostra 16 lettere.</li>
+          <li>Scrivi qui la tua email Gmail e quella password, poi premi «Usa Gmail».</li>
+        </ol>
+        <form method="post" class="row g-3" autocomplete="off">
+          <input type="hidden" name="azione" value="gmail">
+          <div class="col-md-6"><label class="form-label" for="gmail">Indirizzo Gmail</label>
+            <input class="form-control" type="email" id="gmail" name="gmail" value="{{ s.smtp_user or '' }}" placeholder="nome@gmail.com"></div>
+          <div class="col-md-6"><label class="form-label" for="password">Password per le app</label>
+            <input class="form-control" type="password" id="password" name="password" placeholder="{% if s.smtp_password %}già salvata: lascia vuoto{% else %}xxxx xxxx xxxx xxxx{% endif %}"></div>
+          <div class="col-12"><button class="btn btn-primary"><i class="bi bi-google"></i> Usa Gmail</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('settings.edit') }}">Altre opzioni email</a></div>
+        </form>
+        <p class="small text-muted mt-3 mb-0">Le email inviate dal gestionale compaiono anche nella cartella «Posta inviata» di Gmail.</p>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="t-drive">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-drive"><i class="bi bi-folder2 me-1"></i> Google Drive: archivio dei PDF</h2></div>
+      <div class="card-body">
+        <p class="small misura">Con <strong>Google Drive per desktop</strong> installato, Drive è una cartella del PC (di solito <code>G:\Il mio Drive</code>).
+          I PDF delle schede si salvano in <code>Deal Combined\Clienti\&lt;nome cliente&gt;</code> e Drive li carica da solo.
+          Questa impostazione vale solo per questo PC.</p>
+        {% if drive_ok %}<p class="text-success fw-semibold small"><i class="bi bi-check-circle"></i> In uso: <code>{{ cartella_drive }}</code></p>
+        {% elif cartella_drive %}<p class="text-danger small"><i class="bi bi-exclamation-triangle"></i> La cartella <code>{{ cartella_drive }}</code> non è raggiungibile: Google Drive per desktop è avviato?</p>{% endif %}
+        <form method="post" class="row g-2 align-items-end">
+          <input type="hidden" name="azione" value="drive">
+          <div class="col-md-9"><label class="form-label" for="cartella_drive">Cartella di Google Drive</label>
+            <input class="form-control" id="cartella_drive" name="cartella_drive" list="drive-trovati"
+                   value="{{ cartella_drive or (candidati[0] if candidati else '') }}" placeholder="G:\Il mio Drive"></div>
+          <datalist id="drive-trovati">{% for c in candidati %}<option value="{{ c }}">{% endfor %}</datalist>
+          <div class="col-md-3"><button class="btn btn-outline-primary w-100">Salva</button></div>
+        </form>
+        {% if candidati %}<p class="small text-muted mt-2 mb-0">Trovata su questo PC: {% for c in candidati %}<code>{{ c }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+      </div>
+    </section>
+  </div>
+  <div class="col-lg-5">
+    <section class="card" aria-labelledby="t-cal">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-cal"><i class="bi bi-calendar3 me-1"></i> Google Calendar</h2></div>
+      <div class="card-body small">
+        <p>Accanto a ogni follow-up trovi <i class="bi bi-calendar-plus"></i> <strong>Aggiungi a Google Calendar</strong>: si apre Calendar con l'evento già scritto, premi Salva.</p>
+        <p class="mb-2">Per portare tutti i follow-up aperti in una volta:</p>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('followups.calendar_ics') }}"><i class="bi bi-download"></i> Scarica il calendario (.ics)</a>
+        <p class="text-muted mt-2 mb-0">In Google Calendar: Impostazioni → Importa ed esporta → Importa.</p>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

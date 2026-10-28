@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Recupero PIN — Deal Combined{% endblock %}
+{% block content %}
+<div class="sblocco">
+  <div class="sblocco-marchio"><span class="dc-brand-deal">Deal</span> <span class="dc-brand-combined">Combined</span></div>
+  <form method="post" class="card sblocco-card" autocomplete="off">
+    <div class="card-body p-4">
+      <h1 class="h5 mb-1">Codice di recupero</h1>
+      <p class="small text-muted mb-3">È il codice di 12 caratteri (es. ABCD-EFGH-JKLM) mostrato quando hai impostato il PIN.
+        Il PIN verrà rimosso e potrai sceglierne uno nuovo.</p>
+      <label class="visually-hidden" for="codice">Codice di recupero</label>
+      <input class="form-control text-center text-uppercase numeri mb-3" id="codice" name="codice" maxlength="20" required autofocus>
+      <button class="btn btn-primary w-100">Rimuovi il PIN</button>
+      <p class="small mt-3 mb-0 text-center"><a href="{{ url_for('privacy.unlock') }}">Torna al PIN</a></p>
+    </div>
+  </form>
+</div>
+{% endblock %}

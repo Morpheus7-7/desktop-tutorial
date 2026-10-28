@@ -30,6 +30,8 @@ jobs:
     name: Build eseguibile Windows (.exe)
     needs: test
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -45,13 +47,36 @@ jobs:
       - name: Verifica che l'eseguibile esista
         shell: pwsh
         run: |
-          if (-not (Test-Path "dist/GestionaleAssicurativo.exe")) {
+          if (-not (Test-Path "dist/DealCombined.exe")) {
             throw "Eseguibile non trovato in dist/"
           }
-          Get-Item "dist/GestionaleAssicurativo.exe" | Format-List Name, Length
-      - name: Carica l'eseguibile come artifact
+          Get-Item "dist/DealCombined.exe" | Format-List Name, Length
+      - name: Crea l'installatore (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $versione = python -c "import gestionale; print(gestionale.__version__)"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DVersioneApp=$versione" installer\DealCombined.iss
+      - name: Impronta SHA-256 dell'installatore
+        shell: pwsh
+        run: |
+          $h = (Get-FileHash dist/Installa-DealCombined.exe -Algorithm SHA256).Hash.ToLower()
+          "$h  Installa-DealCombined.exe" | Set-Content -Encoding ascii dist/Installa-DealCombined.exe.sha256
+      - name: Carica eseguibile e installatore come artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GestionaleAssicurativo-windows
-          path: dist/GestionaleAssicurativo.exe
+          name: DealCombined-windows
+          path: |
+            dist/DealCombined.exe
+            dist/Installa-DealCombined.exe
+            dist/Installa-DealCombined.exe.sha256
           if-no-files-found: error
+      # Su un tag (es. v2.1.0) pubblica la Release: i programmi installati la
+      # trovano da soli in Impostazioni → Aggiornamenti.
+      - name: Pubblica la Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Installa-DealCombined.exe
+            dist/Installa-DealCombined.exe.sha256

@@ -1,77 +1,196 @@
 <!doctype html>
-<html lang="it">
+<html lang="it" data-bs-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Gestionale Assicurativo{% endblock %}</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%231e3a8a' d='M8 0l6 2v5c0 4-2.7 6.7-6 9-3.3-2.3-6-5-6-9V2z'/%3E%3Cpath fill='%23fff' d='M11.4 5.6l-4 4-2-2 .9-.9 1.1 1.1 3.1-3.1z'/%3E%3C/svg%3E">
+  <title>{% block title %}Deal Combined{% endblock %}</title>
+  <script>
+    /* Tema: "auto" segue il sistema; la scelta manuale resta nel browser. Gira prima del CSS per evitare il lampo. */
+    (function () {
+      var scelta = "auto";
+      try { scelta = localStorage.getItem("dc-tema") || "auto"; } catch (e) {}
+      var scuro = scelta === "dark" || (scelta === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-bs-theme", scuro ? "dark" : "light");
+      document.documentElement.dataset.tema = scelta;
+    })();
+  </script>
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231d3b30'/%3E%3Cpath d='M19 0h6v20l-3-2.6L19 20z' fill='%23be123c'/%3E%3Cpath d='M8 9h4.5c3.6 0 6 2.6 6 7s-2.4 7-6 7H8z' fill='none' stroke='%23e8efe9' stroke-width='2.4'/%3E%3C/svg%3E">
+  <link rel="preload" href="{{ url_for('static', filename='vendor/fonts/archivo-latin.woff2') }}" as="font" type="font/woff2" crossorigin>
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='vendor/bootstrap-icons.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark ga-navbar shadow-sm">
-  <div class="container-fluid px-4">
-    <a class="navbar-brand fw-bold" href="{{ url_for('main.dashboard') }}">
-      <i class="bi bi-shield-check me-1"></i> Gestionale Assicurativo
-    </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navMain">
-      <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}" href="{{ url_for('main.dashboard') }}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.blueprint == 'clients' %}active{% endif %}" href="{{ url_for('clients.list_clients') }}"><i class="bi bi-people"></i> Clienti</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.blueprint == 'policies' %}active{% endif %}" href="{{ url_for('policies.list_policies') }}"><i class="bi bi-file-earmark-text"></i> Polizze</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'main.scadenzario' %}active{% endif %}" href="{{ url_for('main.scadenzario') }}"><i class="bi bi-calendar-event"></i> Scadenzario</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.blueprint == 'opportunities' %}active{% endif %}" href="{{ url_for('opportunities.board') }}"><i class="bi bi-funnel"></i> Pipeline</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.blueprint == 'followups' %}active{% endif %}" href="{{ url_for('followups.list_followups') }}"><i class="bi bi-check2-square"></i> Follow-up</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.blueprint == 'documents' %}active{% endif %}" href="{{ url_for('documents.list_documents') }}"><i class="bi bi-folder2-open"></i> Documenti</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'main.analytics' %}active{% endif %}" href="{{ url_for('main.analytics') }}"><i class="bi bi-bar-chart-line"></i> Statistiche</a></li>
-      </ul>
+<a class="dc-skip" href="#contenuto">Vai al contenuto</a>
 
-      <form class="ga-search me-lg-3 my-2 my-lg-0" method="get" action="{{ url_for('main.search') }}" role="search">
-        <div class="input-group">
-          <span class="input-group-text bg-transparent border-0 text-white-50"><i class="bi bi-search"></i></span>
-          <input class="form-control" type="search" name="q" placeholder="Cerca clienti o polizze…"
-                 value="{{ request.args.get('q', '') if request.endpoint == 'main.search' else '' }}"
-                 aria-label="Cerca" style="min-width: 12rem;">
-        </div>
-      </form>
+<div class="dc-shell">
+  {% set ep = request.endpoint or '' %}
+  {% set bp = request.blueprint or '' %}
+  {# Con lo schermo bloccato dal PIN non si mostra niente dell'archivio. #}
+  {% set bloccato = ep in ('privacy.unlock', 'privacy.recover') %}
+  <aside class="dc-rail offcanvas-lg offcanvas-start" id="dc-rail" tabindex="-1" aria-label="Navigazione principale" {% if bloccato %}hidden{% endif %}>
+    <div class="dc-rail-inner">
+      <div class="d-flex align-items-center justify-content-between">
+        <a class="dc-brand" href="{{ url_for('main.dashboard') }}" aria-label="Deal Combined, vai a Oggi">
+          <span class="dc-brand-deal">Deal</span><span class="dc-brand-combined">Combined</span>
+        </a>
+        <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#dc-rail" aria-label="Chiudi il menu"></button>
+      </div>
 
-      <div class="d-flex align-items-center gap-2">
-        <a class="btn btn-outline-light position-relative" href="{{ url_for('notifications.list_notifications') }}" title="Notifiche">
-          <i class="bi bi-bell"></i>
-          {% if notifiche_non_lette %}
-          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-            {{ notifiche_non_lette }}
-          </span>
-          {% endif %}
-        </a>
-        <a class="btn btn-outline-light" href="{{ url_for('settings.edit') }}" title="Impostazioni">
-          <i class="bi bi-gear"></i>
-        </a>
+      <nav class="dc-nav">
+        <div class="dc-nav-group" id="nav-lavoro">Lavoro</div>
+        <ul class="nav flex-column" aria-labelledby="nav-lavoro">
+          <li><a class="nav-link {% if ep == 'main.dashboard' %}active{% endif %}" {% if ep == 'main.dashboard' %}aria-current="page"{% endif %} href="{{ url_for('main.dashboard') }}"><i class="bi bi-journal-bookmark"></i> Oggi</a></li>
+          <li><a class="nav-link {% if bp == 'followups' %}active{% endif %}" {% if bp == 'followups' %}aria-current="page"{% endif %} href="{{ url_for('followups.list_followups') }}"><i class="bi bi-check2-square"></i> Follow-up</a></li>
+          <li><a class="nav-link {% if bp == 'note' %}active{% endif %}" {% if bp == 'note' %}aria-current="page"{% endif %} href="{{ url_for('note.index') }}"><i class="bi bi-journal-text"></i> Note</a></li>
+          <li><a class="nav-link {% if ep == 'main.scadenzario' %}active{% endif %}" {% if ep == 'main.scadenzario' %}aria-current="page"{% endif %} href="{{ url_for('main.scadenzario') }}"><i class="bi bi-calendar3"></i> Scadenzario</a></li>
+          <li><a class="nav-link {% if bp == 'opportunities' %}active{% endif %}" {% if bp == 'opportunities' %}aria-current="page"{% endif %} href="{{ url_for('opportunities.board') }}"><i class="bi bi-kanban"></i> Pipeline</a></li>
+        </ul>
+        <div class="dc-nav-group" id="nav-archivio">Archivio</div>
+        <ul class="nav flex-column" aria-labelledby="nav-archivio">
+          <li><a class="nav-link {% if bp == 'clients' %}active{% endif %}" {% if bp == 'clients' %}aria-current="page"{% endif %} href="{{ url_for('clients.list_clients') }}"><i class="bi bi-people"></i> Clienti</a></li>
+          <li><a class="nav-link {% if bp == 'policies' %}active{% endif %}" {% if bp == 'policies' %}aria-current="page"{% endif %} href="{{ url_for('policies.list_policies') }}"><i class="bi bi-file-earmark-text"></i> Polizze</a></li>
+          <li><a class="nav-link {% if ep == 'main.analytics' %}active{% endif %}" {% if ep == 'main.analytics' %}aria-current="page"{% endif %} href="{{ url_for('main.analytics') }}"><i class="bi bi-bar-chart-line"></i> Statistiche</a></li>
+        </ul>
+        <div class="dc-nav-group" id="nav-formazione">Formazione</div>
+        <ul class="nav flex-column" aria-labelledby="nav-formazione">
+          <li><a class="nav-link {% if bp == 'academy' %}active{% endif %}" {% if bp == 'academy' %}aria-current="page"{% endif %} href="{{ url_for('academy.index') }}"><i class="bi bi-mortarboard"></i> Accademia</a></li>
+        </ul>
+      </nav>
+
+      <div class="dc-rail-foot">
+        <a class="nav-link {% if bp == 'settings' %}active{% endif %}" href="{{ url_for('settings.edit') }}"><i class="bi bi-gear"></i> Impostazioni</a>
+        {% if config.DC_DESKTOP and not config.DC_FINESTRA %}
+        <button class="nav-link w-100 text-start border-0 bg-transparent" type="button" id="dc-esci"><i class="bi bi-power"></i> Chiudi Deal Combined</button>
+        {% endif %}
       </div>
     </div>
-  </div>
-</nav>
+  </aside>
 
-<main class="container-fluid px-4 py-4">
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% for category, message in messages %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  <div class="dc-main">
+    <header class="dc-topbar">
+      {% if not bloccato %}
+      <button class="btn dc-icon-btn d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#dc-rail" aria-controls="dc-rail" aria-label="Apri il menu">
+        <i class="bi bi-list"></i>
+      </button>
+      <a class="dc-brand dc-brand-compact d-lg-none" href="{{ url_for('main.dashboard') }}" aria-label="Deal Combined, vai a Oggi"><span class="dc-brand-deal">Deal</span><span class="dc-brand-combined">Combined</span></a>
+
+      <form class="dc-search" method="get" action="{{ url_for('main.search') }}" role="search">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input class="form-control" type="search" name="q" placeholder="Cerca clienti e polizze"
+               value="{{ request.args.get('q', '') if ep == 'main.search' else '' }}" aria-label="Cerca clienti e polizze">
+      </form>
+      {% else %}<span class="me-auto"></span>{% endif %}
+
+      <div class="dc-topbar-actions">
+        <button class="btn dc-icon-btn" type="button" id="dc-tema" aria-label="Tema: automatico" title="Tema: automatico">
+          <i class="bi bi-circle-half" aria-hidden="true"></i>
+        </button>
+        {% if config.DC_AGGIORNAMENTO and not bloccato %}
+        <a class="btn dc-icon-btn dc-aggiorna" href="{{ url_for('settings.updates') }}"
+           aria-label="Disponibile la versione {{ config.DC_AGGIORNAMENTO.versione }}" title="Disponibile la versione {{ config.DC_AGGIORNAMENTO.versione }}">
+          <i class="bi bi-arrow-up-circle" aria-hidden="true"></i>
+        </a>
+        {% endif %}
+        {% if dc_pin_minuti and not bloccato %}
+        <form method="post" action="{{ url_for('privacy.lock_now') }}" class="d-inline">
+          <button class="btn dc-icon-btn" aria-label="Blocca ora" title="Blocca ora"><i class="bi bi-lock" aria-hidden="true"></i></button>
+        </form>
+        {% endif %}
+        {% if not bloccato %}
+        <a class="btn dc-icon-btn position-relative" href="{{ url_for('notifications.list_notifications') }}"
+           aria-label="Notifiche{% if notifiche_non_lette %}: {{ notifiche_non_lette }} da leggere{% endif %}" title="Notifiche">
+          <i class="bi bi-bell" aria-hidden="true"></i>
+          {% if notifiche_non_lette %}<span class="dc-count">{{ notifiche_non_lette }}</span>{% endif %}
+        </a>
+        {% endif %}
       </div>
-    {% endfor %}
-  {% endwith %}
-  {% block content %}{% endblock %}
-</main>
+    </header>
 
-<footer class="text-center text-muted small pb-4">
-  Gestionale Assicurativo — clienti, polizze, documenti, analisi rischi, scadenze e follow-up
-</footer>
+    <main class="dc-content" id="contenuto">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Chiudi"></button>
+          </div>
+        {% endfor %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="dc-footer">
+      Deal Combined · clienti, polizze, scadenze, trattative e formazione commerciale
+    </footer>
+  </div>
+</div>
+
 <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+<script>
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById("dc-tema");
+    var media = window.matchMedia("(prefers-color-scheme: dark)");
+    var ordine = ["auto", "light", "dark"];
+    var nomi = { auto: "automatico", light: "chiaro", dark: "scuro" };
+    var icone = { auto: "bi-circle-half", light: "bi-sun", dark: "bi-moon-stars" };
+
+    function applica(scelta) {
+      var scuro = scelta === "dark" || (scelta === "auto" && media.matches);
+      root.setAttribute("data-bs-theme", scuro ? "dark" : "light");
+      root.dataset.tema = scelta;
+      btn.querySelector("i").className = "bi " + icone[scelta];
+      btn.setAttribute("aria-label", "Tema: " + nomi[scelta] + ". Cambia tema");
+      btn.title = "Tema: " + nomi[scelta];
+    }
+    applica(root.dataset.tema || "auto");
+
+    btn.addEventListener("click", function () {
+      var prossima = ordine[(ordine.indexOf(root.dataset.tema) + 1) % ordine.length];
+      try { localStorage.setItem("dc-tema", prossima); } catch (e) {}
+      applica(prossima);
+    });
+    media.addEventListener("change", function () { if (root.dataset.tema === "auto") applica("auto"); });
+
+    /* La carta stampata è sempre chiara, qualunque tema sia a schermo. */
+    var temaPrimaDiStampare = null;
+    window.addEventListener("beforeprint", function () {
+      temaPrimaDiStampare = root.getAttribute("data-bs-theme");
+      root.setAttribute("data-bs-theme", "light");
+    });
+    window.addEventListener("afterprint", function () {
+      if (temaPrimaDiStampare) root.setAttribute("data-bs-theme", temaPrimaDiStampare);
+    });
+  })();
+</script>
+{% if config.DC_DESKTOP and not config.DC_FINESTRA %}
+<script>
+  document.getElementById("dc-esci").addEventListener("click", function () {
+    if (!confirm("Chiudere Deal Combined? I dati sono già salvati.")) return;
+    fetch("{{ url_for('settings.shutdown') }}", { method: "POST", headers: { "X-DC-Azione": "chiudi" } })
+      .finally(function () { document.body.innerHTML = '<main class="p-5"><h1 class="h4">Deal Combined è stato chiuso.</h1><p>Puoi chiudere questa scheda del browser.</p></main>'; });
+  });
+</script>
+{% endif %}
+{% if dc_pin_minuti and not bloccato %}
+<script>
+  /* Blocco per inattività: dopo i minuti scelti torna alla schermata del PIN. */
+  (function () {
+    var limite = {{ dc_pin_minuti }} * 60 * 1000, timer;
+    function riarma() {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        location.href = "{{ url_for('privacy.unlock') }}?next=" + encodeURIComponent(location.pathname + location.search);
+      }, limite);
+    }
+    ["mousemove", "keydown", "pointerdown", "scroll", "touchstart"].forEach(function (e) {
+      window.addEventListener(e, riarma, { passive: true });
+    });
+    riarma();
+  })();
+</script>
+{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

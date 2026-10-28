@@ -89,7 +89,7 @@ def email_attive(settings: Settings | None = None) -> bool:
 def _build_message(cfg: MailConfig, subject: str, text_body: str, html_body: str) -> EmailMessage:
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = formataddr(("Gestionale Assicurativo", cfg.mittente or cfg.user))
+    msg["From"] = formataddr(("Deal Combined", cfg.mittente or cfg.user))
     msg["To"] = ", ".join(cfg.destinatari)
     msg.set_content(text_body)
     msg.add_alternative(html_body, subtype="html")
@@ -122,20 +122,46 @@ def send_test_email(settings: Settings | None = None) -> tuple[bool, str]:
         return False, "Configurazione incompleta: servono almeno server SMTP e un destinatario."
     ora = datetime.now().strftime("%d/%m/%Y %H:%M")
     text_body = (
-        "Email di prova dal Gestionale Assicurativo.\n\n"
+        "Email di prova da Deal Combined.\n\n"
         f"Se leggi questo messaggio la configurazione SMTP funziona ({ora})."
     )
     html_body = _wrap_html(
         "Email di prova",
         f"<p>Se leggi questo messaggio la configurazione SMTP del "
-        f"<strong>Gestionale Assicurativo</strong> funziona correttamente.</p>"
+        f"<strong>Deal Combined</strong> funziona correttamente.</p>"
         f"<p class='muted'>Inviata il {ora}.</p>",
     )
     try:
-        _send(cfg, _build_message(cfg, "Gestionale Assicurativo — email di prova", text_body, html_body))
+        _send(cfg, _build_message(cfg, "Deal Combined — email di prova", text_body, html_body))
         return True, f"Email di prova inviata a {', '.join(cfg.destinatari)}."
     except Exception as exc:  # noqa: BLE001 — mostriamo l'errore all'utente
         return False, f"Invio non riuscito: {exc}"
+
+
+def invia_al_cliente(destinatario: str, oggetto: str, testo: str,
+                     allegati: list[tuple[str, bytes, str]] | None = None,
+                     settings: Settings | None = None) -> None:
+    """Invia un'email al cliente con gli allegati indicati (nome, dati, mime).
+
+    Usa il server configurato in Impostazioni (per Gmail: smtp.gmail.com con
+    una «password per le app»): l'email compare anche in «Posta inviata».
+    Solleva ValueError se manca la configurazione o l'indirizzo.
+    """
+    cfg = effective_config(settings)
+    if not cfg.host or not (cfg.mittente or cfg.user):
+        raise ValueError("Configura prima l'invio email in Impostazioni → Notifiche email (server e mittente).")
+    destinatario = (destinatario or "").strip()
+    if "@" not in destinatario or any(c in destinatario for c in "\r\n,;<>"):
+        raise ValueError("Indirizzo email del destinatario non valido.")
+    msg = EmailMessage()
+    msg["Subject"] = oggetto.replace("\r", " ").replace("\n", " ").strip()[:200]
+    msg["From"] = cfg.mittente or cfg.user
+    msg["To"] = destinatario
+    msg.set_content(testo)
+    for nome, dati, mime in allegati or []:
+        principale, _, secondario = mime.partition("/")
+        msg.add_attachment(dati, maintype=principale, subtype=secondario, filename=nome)
+    _send(cfg, msg)
 
 
 # ----------------------------------------------------------------------
@@ -159,14 +185,14 @@ def _wrap_html(titolo: str, corpo: str) -> str:
 <body style="margin:0;background:#f4f6fb;font-family:Segoe UI,Arial,sans-serif;color:#1f2933;">
   <div style="max-width:640px;margin:0 auto;padding:24px;">
     <div style="background:#0d6efd;color:#fff;padding:16px 20px;border-radius:10px 10px 0 0;">
-      <div style="font-size:18px;font-weight:700;">🛡️ Gestionale Assicurativo</div>
+      <div style="font-size:18px;font-weight:700;">Deal Combined</div>
       <div style="opacity:.85;font-size:13px;">{titolo}</div>
     </div>
     <div style="background:#fff;padding:20px;border-radius:0 0 10px 10px;border:1px solid #e5e9f2;border-top:none;">
       {corpo}
     </div>
     <p style="color:#9aa5b1;font-size:12px;text-align:center;margin-top:16px;">
-      Messaggio automatico del Gestionale Assicurativo.
+      Messaggio automatico di Deal Combined.
     </p>
   </div>
 </body></html>"""
@@ -178,7 +204,7 @@ def build_digest(notifiche: list[Notification]) -> tuple[str, str, str]:
     n = len(notifiche)
     urgenti = sum(1 for x in notifiche if x.livello == "danger")
 
-    subject = f"Gestionale Assicurativo — {n} notific{'a' if n == 1 else 'he'}"
+    subject = f"Deal Combined — {n} notific{'a' if n == 1 else 'he'}"
     if urgenti:
         subject += f" ({urgenti} urgent{'e' if urgenti == 1 else 'i'})"
 
@@ -188,7 +214,7 @@ def build_digest(notifiche: list[Notification]) -> tuple[str, str, str]:
     )
 
     # --- testo semplice ---
-    righe = ["Riepilogo notifiche dal Gestionale Assicurativo:", ""]
+    righe = ["Riepilogo notifiche da Deal Combined:", ""]
     etichetta = {"danger": "[URGENTE]", "warning": "[ATTENZIONE]", "info": "[INFO]"}
     for x in ordinate:
         righe.append(f"{etichetta.get(x.livello, '[INFO]')} {x.messaggio}")
