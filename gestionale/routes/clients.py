@@ -1,5 +1,6 @@
 """Anagrafica clienti (professionisti e aziende) e analisi rischi."""
 import json
+from datetime import date
 
 from flask import (
     Blueprint,
@@ -19,7 +20,12 @@ from ..models import (
     PAYMENT_FREQUENCIES,
     POLICY_BRANCHES,
     POLICY_STATUSES,
+    RUOLI_PERSONA,
+    RUOLI_PERSONA_LABELS,
+    RUOLI_SOCIETARI,
+    STATI_CIVILI,
     Client,
+    PersonaCollegata,
     RiskAnalysis,
     db,
 )
@@ -44,9 +50,41 @@ def _float_or_none(value):
         return None
 
 
+def _date_or_none(value):
+    try:
+        return date.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
+def _testo(form, campo, maiuscolo=False):
+    valore = (form.get(campo) or "").strip()
+    return (valore.upper() if maiuscolo else valore) or None
+
+
 def _populate_from_form(client: Client, form) -> None:
     client.tipo = form.get("tipo", "azienda")
     client.ragione_sociale = form.get("ragione_sociale", "").strip()
+    if client.tipo in ("professionista", "dipendente"):
+        client.nome = _testo(form, "nome")
+        client.cognome = _testo(form, "cognome")
+        if client.nome or client.cognome:
+            # Per le persone il nominativo è sempre «Nome Cognome».
+            client.ragione_sociale = " ".join(x for x in (client.nome, client.cognome) if x)
+        client.data_nascita = _date_or_none(form.get("data_nascita"))
+        client.luogo_nascita = _testo(form, "luogo_nascita")
+        client.stato_civile = _testo(form, "stato_civile")
+        client.nucleo_familiare = _testo(form, "nucleo_familiare")
+        client.interessi = _testo(form, "interessi")
+        client.residenza_indirizzo = _testo(form, "residenza_indirizzo")
+        client.residenza_citta = _testo(form, "residenza_citta")
+        client.residenza_cap = _testo(form, "residenza_cap")
+        client.residenza_provincia = _testo(form, "residenza_provincia", maiuscolo=True)
+    if client.tipo == "professionista":
+        client.albo = _testo(form, "albo")
+        client.albo_provincia = _testo(form, "albo_provincia")
+        client.albo_numero = _testo(form, "albo_numero")
+        client.albo_data_iscrizione = _date_or_none(form.get("albo_data_iscrizione"))
     client.referente = form.get("referente", "").strip() or None
     client.codice_fiscale = form.get("codice_fiscale", "").strip().upper() or None
     client.partita_iva = form.get("partita_iva", "").strip() or None
@@ -67,6 +105,13 @@ def _populate_from_form(client: Client, form) -> None:
     client.note = form.get("note", "").strip() or None
 
 
+def _persona_cercata(like):
+    """Un'azienda si trova anche cercando il nome di un amministratore."""
+    completo = db.func.coalesce(PersonaCollegata.nome, "") + " " + PersonaCollegata.cognome
+    return db.or_(completo.ilike(like), PersonaCollegata.cognome.ilike(like),
+                  PersonaCollegata.codice_fiscale.ilike(like))
+
+
 @bp.route("/")
 def list_clients():
     q = request.args.get("q", "").strip()
@@ -81,6 +126,7 @@ def list_clients():
                 Client.codice_fiscale.ilike(like),
                 Client.citta.ilike(like),
                 Client.settore.ilike(like),
+                Client.persone.any(_persona_cercata(like)),
             )
         )
     if tipo in {t for t, _ in CLIENT_TYPES}:
@@ -108,7 +154,7 @@ def new_client():
                 )
             return redirect(url_for("clients.detail", client_id=client.id))
     return render_template(
-        "clients/form.html", client=None, client_types=CLIENT_TYPES
+        "clients/form.html", client=None, client_types=CLIENT_TYPES, stati_civili=STATI_CIVILI
     )
 
 
@@ -128,6 +174,8 @@ def detail(client_id):
         document_categories=DOCUMENT_CATEGORIES,
         followup_types=FOLLOWUP_TYPES,
         followup_priorities=FOLLOWUP_PRIORITIES,
+        ruoli=RUOLI_PERSONA,
+        ruoli_societari=RUOLI_SOCIETARI,
     )
 
 
@@ -143,8 +191,86 @@ def edit_client(client_id):
             flash("Anagrafica aggiornata.", "success")
             return redirect(url_for("clients.detail", client_id=client.id))
     return render_template(
-        "clients/form.html", client=client, client_types=CLIENT_TYPES
+        "clients/form.html", client=client, client_types=CLIENT_TYPES, stati_civili=STATI_CIVILI
     )
+
+
+# ----------------------------------------------------------------------
+# Persone collegate: amministratori, consiglieri, soci, familiari…
+# ----------------------------------------------------------------------
+def _persona_or_404(client_id: int, persona_id: int) -> PersonaCollegata:
+    persona = db.get_or_404(PersonaCollegata, persona_id)
+    if persona.client_id != client_id:
+        abort(404)
+    return persona
+
+
+def _compila_persona(p: PersonaCollegata, form) -> str | None:
+    """Riempie la persona dal modulo; restituisce un errore o None."""
+    ruolo = form.get("ruolo", "altro")
+    p.ruolo = ruolo if ruolo in RUOLI_PERSONA_LABELS else "altro"
+    p.ruolo_altro = _testo(form, "ruolo_altro") if p.ruolo == "altro" else None
+    p.nome = _testo(form, "nome")
+    p.cognome = _testo(form, "cognome")
+    p.codice_fiscale = _testo(form, "codice_fiscale", maiuscolo=True)
+    p.data_nascita = _date_or_none(form.get("data_nascita"))
+    p.luogo_nascita = _testo(form, "luogo_nascita")
+    p.indirizzo = _testo(form, "indirizzo")
+    p.citta = _testo(form, "citta")
+    p.cap = _testo(form, "cap")
+    p.provincia = _testo(form, "provincia", maiuscolo=True)
+    p.email = _testo(form, "email")
+    p.telefono = _testo(form, "telefono")
+    p.quota_perc = _float_or_none(form.get("quota_perc"))
+    p.dal = _date_or_none(form.get("dal"))
+    p.note = _testo(form, "note")
+    if not p.cognome:
+        return "Il cognome è obbligatorio."
+    if p.quota_perc is not None and not 0 <= p.quota_perc <= 100:
+        return "La quota deve essere una percentuale tra 0 e 100."
+    return None
+
+
+@bp.route("/<int:client_id>/persone/nuova", methods=["GET", "POST"])
+def new_person(client_id):
+    client = db.get_or_404(Client, client_id)
+    persona = PersonaCollegata(client_id=client.id, ruolo=request.args.get("ruolo", "amministratore_unico"))
+    if persona.ruolo not in RUOLI_PERSONA_LABELS:
+        persona.ruolo = "altro"
+    if request.method == "POST":
+        errore = _compila_persona(persona, request.form)
+        if errore:
+            flash(errore, "danger")
+        else:
+            db.session.add(persona)
+            db.session.commit()
+            flash(f"{persona.ruolo_label} «{persona.nome_completo}» aggiunto.", "success")
+            return redirect(url_for("clients.detail", client_id=client.id) + "#persone")
+    return render_template("clients/persona_form.html", client=client, persona=persona, ruoli=RUOLI_PERSONA)
+
+
+@bp.route("/<int:client_id>/persone/<int:persona_id>/modifica", methods=["GET", "POST"])
+def edit_person(client_id, persona_id):
+    client = db.get_or_404(Client, client_id)
+    persona = _persona_or_404(client_id, persona_id)
+    if request.method == "POST":
+        errore = _compila_persona(persona, request.form)
+        if errore:
+            flash(errore, "danger")
+        else:
+            db.session.commit()
+            flash("Dati aggiornati.", "success")
+            return redirect(url_for("clients.detail", client_id=client.id) + "#persone")
+    return render_template("clients/persona_form.html", client=client, persona=persona, ruoli=RUOLI_PERSONA)
+
+
+@bp.route("/<int:client_id>/persone/<int:persona_id>/elimina", methods=["POST"])
+def delete_person(client_id, persona_id):
+    persona = _persona_or_404(client_id, persona_id)
+    db.session.delete(persona)
+    db.session.commit()
+    flash(f"«{persona.nome_completo}» rimosso.", "success")
+    return redirect(url_for("clients.detail", client_id=client_id) + "#persone")
 
 
 @bp.route("/<int:client_id>/elimina", methods=["POST"])

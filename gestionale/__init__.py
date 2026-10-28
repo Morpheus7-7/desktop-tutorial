@@ -36,6 +36,13 @@ def _ensure_schema() -> None:
         },
         "clients": {
             "datore_lavoro": "ALTER TABLE clients ADD COLUMN datore_lavoro VARCHAR(200)",
+            **{col: f"ALTER TABLE clients ADD COLUMN {col} {tipo}" for col, tipo in {
+                "nome": "VARCHAR(80)", "cognome": "VARCHAR(80)", "data_nascita": "DATE",
+                "luogo_nascita": "VARCHAR(100)", "stato_civile": "VARCHAR(30)", "nucleo_familiare": "TEXT",
+                "interessi": "TEXT", "residenza_indirizzo": "VARCHAR(200)", "residenza_citta": "VARCHAR(100)",
+                "residenza_cap": "VARCHAR(5)", "residenza_provincia": "VARCHAR(2)", "albo": "VARCHAR(150)",
+                "albo_provincia": "VARCHAR(60)", "albo_numero": "VARCHAR(40)", "albo_data_iscrizione": "DATE",
+            }.items()},
         },
         "policies": {
             "provvigione_perc": "ALTER TABLE policies ADD COLUMN provvigione_perc FLOAT",

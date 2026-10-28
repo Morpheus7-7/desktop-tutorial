@@ -11,7 +11,15 @@ notifiche generate in automatico.
 - **Anagrafica clienti** — aziende, professionisti **e lavoratori dipendenti**
   (con datore di lavoro e mansione): dati fiscali, contatti, sede, settore,
   dipendenti, fatturato e descrizione dettagliata dell'attività. Il form adatta
-  i campi al tipo di cliente selezionato.
+  i campi al tipo di cliente selezionato. Per professionisti e privati:
+  **nome e cognome**, nascita, **residenza**, stato civile, nucleo familiare e
+  interessi; per i professionisti anche l'**iscrizione all'albo** (ordine,
+  sede, numero, data).
+- **Amministratori e persone collegate**: dal pulsante *Aggiungi amministratore
+  / consigliere / altro* si registrano amministratori, consiglieri, soci (con
+  quota), legali rappresentanti, titolari effettivi, familiari o altre figure,
+  con dati anagrafici, residenza e contatti. La ricerca trova un'azienda anche
+  dal nome di un suo amministratore.
 - **Polizze**: compagnia, ramo, massimale, premio, **percentuale di provvigione**,
   frazionamento, decorrenza, scadenza, tacito rinnovo e stato; oltre 20 rami
   precompilati.

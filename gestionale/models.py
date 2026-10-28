@@ -94,6 +94,29 @@ DOCUMENT_CATEGORIES = [
 ]
 DOCUMENT_CATEGORY_LABELS = dict(DOCUMENT_CATEGORIES)
 
+# Ruoli delle persone collegate a un cliente (amministratori, soci, familiari…)
+RUOLI_PERSONA = [
+    ("amministratore_unico", "Amministratore unico"),
+    ("amministratore_delegato", "Amministratore delegato"),
+    ("presidente_cda", "Presidente del CdA"),
+    ("consigliere", "Consigliere"),
+    ("legale_rappresentante", "Legale rappresentante"),
+    ("socio", "Socio"),
+    ("procuratore", "Procuratore"),
+    ("sindaco", "Sindaco / Revisore"),
+    ("titolare_effettivo", "Titolare effettivo"),
+    ("coniuge", "Coniuge / Convivente"),
+    ("familiare", "Familiare"),
+    ("altro", "Altro"),
+]
+RUOLI_PERSONA_LABELS = dict(RUOLI_PERSONA)
+# I ruoli proposti per primi sul pulsante delle aziende
+RUOLI_SOCIETARI = ("amministratore_unico", "amministratore_delegato", "presidente_cda", "consigliere",
+                   "legale_rappresentante", "socio", "procuratore", "sindaco", "titolare_effettivo")
+
+STATI_CIVILI = ["Celibe / Nubile", "Coniugato/a", "Unito/a civilmente", "Convivente",
+                "Separato/a", "Divorziato/a", "Vedovo/a"]
+
 # Fasi della pipeline commerciale (opportunità di vendita), stile CRM.
 OPPORTUNITY_STAGES = [
     ("lead", "Lead"),
@@ -114,6 +137,24 @@ class Client(db.Model):
     tipo = db.Column(db.String(20), nullable=False, default="azienda")
     ragione_sociale = db.Column(db.String(200), nullable=False)
     referente = db.Column(db.String(120))
+    # Persone (professionisti e privati): il nominativo è «Nome Cognome»
+    nome = db.Column(db.String(80))
+    cognome = db.Column(db.String(80))
+    data_nascita = db.Column(db.Date)
+    luogo_nascita = db.Column(db.String(100))
+    stato_civile = db.Column(db.String(30))
+    nucleo_familiare = db.Column(db.Text)  # coniuge, figli ed età, persone a carico
+    interessi = db.Column(db.Text)  # hobby, sport, abitudini: utili in trattativa
+    # Residenza (se diversa dall'indirizzo principale)
+    residenza_indirizzo = db.Column(db.String(200))
+    residenza_citta = db.Column(db.String(100))
+    residenza_cap = db.Column(db.String(5))
+    residenza_provincia = db.Column(db.String(2))
+    # Iscrizione all'albo (professionisti)
+    albo = db.Column(db.String(150))  # es. Ordine degli Ingegneri
+    albo_provincia = db.Column(db.String(60))
+    albo_numero = db.Column(db.String(40))
+    albo_data_iscrizione = db.Column(db.Date)
     codice_fiscale = db.Column(db.String(16))
     partita_iva = db.Column(db.String(11))
     codice_ateco = db.Column(db.String(10))
@@ -157,6 +198,13 @@ class Client(db.Model):
         lazy=True,
         order_by="Opportunity.created_at.desc()",
     )
+    persone = db.relationship(
+        "PersonaCollegata",
+        backref="cliente",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="PersonaCollegata.id",
+    )
     schede = db.relationship(
         "SchedaCompilata",
         backref="cliente",
@@ -174,6 +222,21 @@ class Client(db.Model):
         return CLIENT_TYPE_BADGES.get(self.tipo, "bg-secondary")
 
     @property
+    def persona_fisica(self):
+        return self.tipo in ("professionista", "dipendente")
+
+    @property
+    def nome_completo(self):
+        """«Nome Cognome» per le persone, altrimenti la ragione sociale."""
+        if self.persona_fisica and (self.nome or self.cognome):
+            return " ".join(x for x in (self.nome, self.cognome) if x)
+        return self.ragione_sociale
+
+    @property
+    def eta(self):
+        return _eta(self.data_nascita)
+
+    @property
     def polizze_attive(self):
         return [p for p in self.polizze if p.stato in ("attiva", "in_rinnovo")]
 
@@ -183,6 +246,53 @@ class Client(db.Model):
 
     def __repr__(self):  # pragma: no cover
         return f"<Client {self.ragione_sociale!r}>"
+
+
+def _eta(nascita):
+    if not nascita:
+        return None
+    oggi = date.today()
+    return oggi.year - nascita.year - ((oggi.month, oggi.day) < (nascita.month, nascita.day))
+
+
+class PersonaCollegata(db.Model):
+    """Amministratori, consiglieri, soci, familiari… di un cliente."""
+
+    __tablename__ = "client_persons"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True)
+    ruolo = db.Column(db.String(40), nullable=False, default="amministratore_unico")
+    ruolo_altro = db.Column(db.String(100))  # testo libero se ruolo = «altro»
+    nome = db.Column(db.String(80))
+    cognome = db.Column(db.String(80), nullable=False)
+    codice_fiscale = db.Column(db.String(16))
+    data_nascita = db.Column(db.Date)
+    luogo_nascita = db.Column(db.String(100))
+    indirizzo = db.Column(db.String(200))
+    citta = db.Column(db.String(100))
+    cap = db.Column(db.String(5))
+    provincia = db.Column(db.String(2))
+    email = db.Column(db.String(120))
+    telefono = db.Column(db.String(30))
+    quota_perc = db.Column(db.Float)  # quota di partecipazione dei soci
+    dal = db.Column(db.Date)  # in carica dal
+    note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def nome_completo(self):
+        return " ".join(x for x in (self.nome, self.cognome) if x)
+
+    @property
+    def ruolo_label(self):
+        if self.ruolo == "altro" and self.ruolo_altro:
+            return self.ruolo_altro
+        return RUOLI_PERSONA_LABELS.get(self.ruolo, self.ruolo)
+
+    @property
+    def eta(self):
+        return _eta(self.data_nascita)
 
 
 class Policy(db.Model):

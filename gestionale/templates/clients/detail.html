@@ -64,6 +64,27 @@
   <div class="tab-pane fade show active" id="tab-info">
     <div class="row g-4">
       <div class="col-md-6">
+        {% if client.persona_fisica %}
+        <h2 class="h6 text-uppercase text-muted">Dati personali</h2>
+        <dl class="row mb-4">
+          <dt class="col-sm-4">Nome e cognome</dt><dd class="col-sm-8">{{ client.nome_completo }}</dd>
+          <dt class="col-sm-4">Nascita</dt>
+          <dd class="col-sm-8">{% if client.data_nascita %}{{ client.data_nascita | data_it }} ({{ client.eta }} anni){% else %}—{% endif %}{% if client.luogo_nascita %}, {{ client.luogo_nascita }}{% endif %}</dd>
+          <dt class="col-sm-4">Residenza</dt>
+          <dd class="col-sm-8">{% if client.residenza_indirizzo or client.residenza_citta %}{{ client.residenza_indirizzo or '' }}{% if client.residenza_cap %}, {{ client.residenza_cap }}{% endif %}
+            {{ client.residenza_citta or '' }}{% if client.residenza_provincia %} ({{ client.residenza_provincia }}){% endif %}{% else %}come l'indirizzo{% endif %}</dd>
+          <dt class="col-sm-4">Stato civile</dt><dd class="col-sm-8">{{ client.stato_civile or '—' }}</dd>
+          <dt class="col-sm-4">Nucleo familiare</dt><dd class="col-sm-8">{{ client.nucleo_familiare or '—' }}</dd>
+          <dt class="col-sm-4">Interessi</dt><dd class="col-sm-8 text-break">{{ client.interessi or '—' }}</dd>
+        </dl>
+        {% endif %}
+        {% if client.tipo == 'professionista' %}
+        <h2 class="h6 text-uppercase text-muted">Iscrizione all'albo</h2>
+        <dl class="row mb-4">
+          <dt class="col-sm-4">Albo</dt><dd class="col-sm-8">{{ client.albo or '—' }}{% if client.albo_provincia %} di {{ client.albo_provincia }}{% endif %}</dd>
+          <dt class="col-sm-4">N. iscrizione</dt><dd class="col-sm-8">{{ client.albo_numero or '—' }}{% if client.albo_data_iscrizione %} dal {{ client.albo_data_iscrizione | data_it }}{% endif %}</dd>
+        </dl>
+        {% endif %}
         <h2 class="h6 text-uppercase text-muted">Dati fiscali</h2>
         <dl class="row mb-4">
           <dt class="col-sm-4">Partita IVA</dt><dd class="col-sm-8">{{ client.partita_iva or '—' }}</dd>
@@ -71,7 +92,7 @@
           <dt class="col-sm-4">Codice ATECO</dt><dd class="col-sm-8">{{ client.codice_ateco or '—' }}</dd>
           <dt class="col-sm-4">Referente</dt><dd class="col-sm-8">{{ client.referente or '—' }}</dd>
         </dl>
-        <h2 class="h6 text-uppercase text-muted">Contatti</h2>
+        <h2 class="h6 text-uppercase text-muted">{{ 'Contatti e sede' if client.tipo == 'azienda' else ('Contatti e studio' if client.tipo == 'professionista' else 'Contatti e domicilio') }}</h2>
         <dl class="row">
           <dt class="col-sm-4">Indirizzo</dt>
           <dd class="col-sm-8">{{ client.indirizzo or '—' }}{% if client.cap %}, {{ client.cap }}{% endif %}
@@ -102,6 +123,67 @@
         {% endif %}
       </div>
     </div>
+
+    <section class="border-top pt-4 mt-2" id="persone" aria-labelledby="t-persone">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 class="h6 text-uppercase text-muted mb-0" id="t-persone">
+          {{ 'Amministratori e figure societarie' if client.tipo == 'azienda' else 'Persone collegate' }}
+        </h2>
+        <div class="dropdown">
+          <button class="btn btn-outline-primary btn-sm dropdown-toggle text-wrap text-start" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-plus"></i> Aggiungi amministratore / consigliere / altro
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% if client.tipo == 'azienda' %}
+              {% for valore, etichetta in ruoli if valore in ruoli_societari %}
+              <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo=valore) }}">{{ etichetta }}</a></li>
+              {% endfor %}
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo='altro') }}">Altro…</a></li>
+            {% else %}
+              {% for valore, etichetta in ruoli if valore in ('coniuge', 'familiare', 'socio', 'altro') %}
+              <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo=valore) }}">{{ etichetta }}{% if valore == 'altro' %}…{% endif %}</a></li>
+              {% endfor %}
+              <li><hr class="dropdown-divider"></li>
+              {% for valore, etichetta in ruoli if valore in ruoli_societari %}
+              <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo=valore) }}">{{ etichetta }}</a></li>
+              {% endfor %}
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+      {% if client.persone %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th scope="col">Ruolo</th><th scope="col">Nome e cognome</th><th scope="col" class="d-none d-lg-table-cell">Codice fiscale</th><th scope="col" class="d-none d-md-table-cell">Residenza</th><th scope="col" class="d-none d-sm-table-cell">Contatti</th><th scope="col"><span class="visually-hidden">Azioni</span></th></tr></thead>
+          <tbody>
+            {% for p in client.persone %}
+            <tr>
+              <td>{{ p.ruolo_label }}{% if p.ruolo == 'socio' and p.quota_perc is not none %} <span class="text-muted small">({{ '%g' | format(p.quota_perc) }}%)</span>{% endif %}
+                {% if p.dal %}<div class="small text-muted">dal {{ p.dal | data_it }}</div>{% endif %}</td>
+              <td class="fw-semibold">{{ p.nome_completo }}
+                {% if p.data_nascita %}<div class="small text-muted fw-normal">{{ p.eta }} anni{% if p.luogo_nascita %}, nato/a a {{ p.luogo_nascita }}{% endif %}</div>{% endif %}
+                {% if p.telefono %}<div class="small fw-normal d-sm-none"><a href="tel:{{ p.telefono }}">{{ p.telefono }}</a></div>{% endif %}</td>
+              <td class="small d-none d-lg-table-cell">{{ p.codice_fiscale or '' }}</td>
+              <td class="small d-none d-md-table-cell">{{ p.indirizzo or '' }}{% if p.citta %}{% if p.indirizzo %}, {% endif %}{{ p.citta }}{% if p.provincia %} ({{ p.provincia }}){% endif %}{% endif %}</td>
+              <td class="small d-none d-sm-table-cell">{% if p.telefono %}<a href="tel:{{ p.telefono }}">{{ p.telefono }}</a>{% endif %}{% if p.email %}<div><a href="mailto:{{ p.email }}">{{ p.email }}</a></div>{% endif %}</td>
+              <td class="text-end text-nowrap">
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('clients.edit_person', client_id=client.id, persona_id=p.id) }}" aria-label="Modifica {{ p.nome_completo }}"><i class="bi bi-pencil"></i></a>
+                <form method="post" action="{{ url_for('clients.delete_person', client_id=client.id, persona_id=p.id) }}" class="d-inline"
+                      onsubmit='return confirm({{ ("Rimuovere " ~ p.nome_completo ~ " da questo cliente?") | tojson }});'>
+                  <button class="btn btn-sm btn-outline-danger" aria-label="Rimuovi {{ p.nome_completo }}"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% if p.note %}<tr class="table-light-subtle"><td></td><td colspan="5" class="small text-muted pt-0 text-break">{{ p.note }}</td></tr>{% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted small mb-0">{% if client.tipo == 'azienda' %}Nessun amministratore inserito. Aggiungi amministratori, consiglieri, soci e titolari effettivi: chi decide sulle coperture e chi va tutelato (D&amp;O, Key Man, TCM).{% else %}Nessuna persona collegata: aggiungi coniuge, familiari o soci dello studio.{% endif %}</p>
+      {% endif %}
+    </section>
   </div>
 
   <!-- ============ POLIZZE ============ -->

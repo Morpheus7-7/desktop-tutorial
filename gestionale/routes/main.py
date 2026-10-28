@@ -17,6 +17,8 @@ from ..models import (
     db,
 )
 
+from .clients import _persona_cercata
+
 bp = Blueprint("main", __name__)
 
 GIORNI_SETTIMANA = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"]
@@ -234,6 +236,7 @@ def search():
                     Client.professione.ilike(like),
                     Client.datore_lavoro.ilike(like),
                     Client.email.ilike(like),
+                    Client.persone.any(_persona_cercata(like)),
                 )
             )
             .order_by(Client.ragione_sociale.asc())
