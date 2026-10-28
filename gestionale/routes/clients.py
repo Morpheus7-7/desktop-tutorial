@@ -180,6 +180,25 @@ def _aggiorna_datore(client: Client, form) -> None:
         client.datore_lavoro = azienda.ragione_sociale
 
 
+def _aggiungi_persone(client: Client, form) -> int:
+    """Righe «amministratore / familiare» compilate nel modulo del cliente.
+    Le righe senza cognome si ignorano. Restituisce quante ne ha aggiunte."""
+    colonne = [form.getlist(k) for k in ("persona_ruolo", "persona_nome", "persona_cognome", "persona_cf",
+                                          "persona_telefono")]
+    aggiunte = 0
+    for ruolo, nome, cognome, cf, telefono in zip(*colonne):
+        cognome = cognome.strip()[:80]
+        if not cognome:
+            continue
+        db.session.add(PersonaCollegata(
+            client_id=client.id, ruolo=ruolo if ruolo in RUOLI_PERSONA_LABELS else "altro",
+            nome=nome.strip()[:80] or None, cognome=cognome, codice_fiscale=cf.strip().upper()[:16] or None,
+            telefono=telefono.strip()[:30] or None,
+        ))
+        aggiunte += 1
+    return aggiunte
+
+
 @bp.route("/nuovo", methods=["GET", "POST"])
 def new_client():
     if request.method == "POST":
@@ -191,16 +210,19 @@ def new_client():
             db.session.add(client)
             db.session.flush()
             _aggiorna_datore(client, request.form)
+            persone = _aggiungi_persone(client, request.form)
             db.session.commit()
-            flash(f"Cliente “{client.ragione_sociale}” creato.", "success")
+            flash(f"Cliente “{client.ragione_sociale}” creato"
+                  + (f" con {persone} {'persona collegata' if persone == 1 else 'persone collegate'}." if persone else "."),
+                  "success")
             if request.form.get("analizza_subito") and client.descrizione_attivita:
                 return redirect(
                     url_for("clients.run_analysis", client_id=client.id), code=307
                 )
-            return redirect(url_for("clients.detail", client_id=client.id))
+            return redirect(url_for("clients.detail", client_id=client.id) + ("#persone" if persone else ""))
     return render_template(
         "clients/form.html", client=None, client_types=CLIENT_TYPES, stati_civili=STATI_CIVILI,
-        aziende=_aziende(), datore=None,
+        aziende=_aziende(), datore=None, ruoli=RUOLI_PERSONA,
     )
 
 
@@ -237,6 +259,7 @@ def edit_client(client_id):
             flash("La ragione sociale / il nominativo è obbligatorio.", "danger")
         else:
             _aggiorna_datore(client, request.form)
+            _aggiungi_persone(client, request.form)
             for ruolo in client.ruoli_in_aziende:
                 _copia_anagrafica(ruolo, client)
             db.session.commit()
@@ -244,7 +267,7 @@ def edit_client(client_id):
             return redirect(url_for("clients.detail", client_id=client.id))
     return render_template(
         "clients/form.html", client=client, client_types=CLIENT_TYPES, stati_civili=STATI_CIVILI,
-        aziende=_aziende(escludi=client.id), datore=_datore_collegato(client),
+        aziende=_aziende(escludi=client.id), datore=_datore_collegato(client), ruoli=RUOLI_PERSONA,
     )
 
 

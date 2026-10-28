@@ -79,6 +79,27 @@
       </div>
     </div>
 
+    <section class="mb-4" aria-labelledby="t-persone-modulo">
+      <h2 class="h6 text-uppercase text-muted" id="t-persone-modulo">
+        <span class="campo-azienda">Amministratori e figure societarie</span><span class="campo-persona">Familiari e persone collegate</span>
+      </h2>
+      {% if client and client.persone %}
+      <ul class="list-unstyled small mb-2">
+        {% for p in client.persone %}<li><strong>{{ p.ruolo_label }}</strong> · {{ p.nome_completo }}</li>{% endfor %}
+      </ul>
+      <p class="small text-muted">Per modificarli o eliminarli usa la scheda <a href="{{ url_for('clients.detail', client_id=client.id) }}#persone">{{ 'Amministratori' if client.tipo == 'azienda' else 'Collegamenti' }}</a> del cliente. Qui puoi aggiungerne altri.</p>
+      {% endif %}
+      <div id="righe-persone">
+        {% if not client %}{% set prima_riga = True %}{% include "clients/_riga_persona.html" %}{% endif %}
+      </div>
+      <button type="button" class="btn btn-outline-primary btn-sm" id="aggiungi-persona">
+        <i class="bi bi-person-plus"></i> <span class="campo-azienda">Aggiungi amministratore / consigliere / altro</span><span class="campo-persona">Aggiungi familiare / socio / altro</span>
+      </button>
+      <div class="form-text">Basta il cognome; data di nascita, residenza e gli altri dati li completi poi dalla scheda del cliente.
+        Ogni persona si può gestire anche come cliente privato.</div>
+      <template id="modello-persona">{% set prima_riga = False %}{% include "clients/_riga_persona.html" %}</template>
+    </section>
+
     <div class="campo-professionista">
       <h2 class="h6 text-uppercase text-muted">Iscrizione all'albo</h2>
       <div class="row g-3 mb-4">
@@ -257,6 +278,27 @@
     }
     select.addEventListener('change', aggiorna);
     aggiorna();
+
+    // Amministratori / persone collegate: righe aggiunte al volo.
+    const righe = document.getElementById('righe-persone');
+    const modello = document.getElementById('modello-persona');
+    function ruoloPredefinito(riga) {
+      const s = riga.querySelector('select');
+      if (s && !s.dataset.toccato) s.value = select.value === 'azienda' ? 'amministratore_unico' : 'coniuge';
+    }
+    document.getElementById('aggiungi-persona').addEventListener('click', function () {
+      const riga = modello.content.firstElementChild.cloneNode(true);
+      righe.appendChild(riga);
+      ruoloPredefinito(riga);
+      riga.querySelector('input[name="persona_cognome"]').focus();
+    });
+    righe.addEventListener('change', function (e) { if (e.target.tagName === 'SELECT') e.target.dataset.toccato = '1'; });
+    righe.addEventListener('click', function (e) {
+      const via = e.target.closest('.rimuovi-persona');
+      if (via) via.closest('.riga-persona').remove();
+    });
+    select.addEventListener('change', function () { righe.querySelectorAll('.riga-persona').forEach(ruoloPredefinito); });
+    righe.querySelectorAll('.riga-persona').forEach(ruoloPredefinito);
 
     // Con l'azienda scelta tra i clienti il nome del datore si compila da solo.
     const datore = document.getElementById('datore_lavoro_id');

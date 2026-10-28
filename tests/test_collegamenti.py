@@ -226,3 +226,30 @@ def test_archivio_vecchio_riceve_il_collegamento():
             db.engine.dispose()
     finally:
         os.unlink(percorso)
+
+
+def test_amministratori_dal_modulo_del_cliente(app, client):
+    pagina = client.get("/clienti/nuovo").get_data(as_text=True)
+    assert "Amministratori e figure societarie" in pagina and 'name="persona_cognome"' in pagina
+    client.post("/clienti/nuovo", data={
+        "tipo": "azienda", "ragione_sociale": "Panificio Rossi S.n.c.",
+        "persona_ruolo": ["amministratore_unico", "socio", "consigliere"],
+        "persona_nome": ["Mario", "", "Solo nome"],
+        "persona_cognome": ["Rossi", "Bianchi", ""],
+        "persona_cf": ["rssmra70a01b157x", "", ""],
+        "persona_telefono": ["333 1", "", ""],
+    })
+    with app.app_context():
+        az = Client.query.filter_by(ragione_sociale="Panificio Rossi S.n.c.").one()
+        assert [(p.ruolo, p.nome_completo, p.codice_fiscale) for p in az.persone] == [
+            ("amministratore_unico", "Mario Rossi", "RSSMRA70A01B157X"), ("socio", "Bianchi", None)]
+        az_id = az.id
+    pagina = client.get(f"/clienti/{az_id}/modifica").get_data(as_text=True)
+    assert "Mario Rossi" in pagina  # elenco di chi c'è già
+    client.post(f"/clienti/{az_id}/modifica", data={
+        "tipo": "azienda", "ragione_sociale": "Panificio Rossi S.n.c.",
+        "persona_ruolo": ["inventato"], "persona_nome": ["Ugo"], "persona_cognome": ["Verdi"],
+        "persona_cf": [""], "persona_telefono": [""],
+    })
+    with app.app_context():
+        assert [p.ruolo for p in db.session.get(Client, az_id).persone] == ["amministratore_unico", "socio", "altro"]

@@ -10,9 +10,9 @@
 ; programma non cancella mai clienti, polizze e documenti.
 
 #define NomeApp "Deal Combined"
-; La versione si può passare da riga di comando: ISCC /DVersioneApp=2.3.0 …
+; La versione si può passare da riga di comando: ISCC /DVersioneApp=2.3.1 …
 #ifndef VersioneApp
-  #define VersioneApp "2.3.0"
+  #define VersioneApp "2.3.1"
 #endif
 #define Eseguibile "DealCombined.exe"
 ; Stesso nome usato da run_desktop.py: indica che il programma è aperto.
