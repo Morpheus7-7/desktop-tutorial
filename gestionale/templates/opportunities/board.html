@@ -30,7 +30,7 @@
           {% endif %}
           <div class="card-body p-2">
             <div class="d-flex justify-content-between align-items-start">
-              <span class="fw-semibold small">{{ o.titolo }}</span>
+              <span class="fw-semibold small">{{ o.titolo }}{% if o.preventivi %} <i class="bi bi-file-earmark-text text-muted" aria-label="{{ o.preventivi | length }} preventivi" title="{{ o.preventivi | length }} preventivi"></i>{% endif %}</span>
               <span class="badge {% if o.priorita == 'alta' %}bg-danger{% elif o.priorita == 'media' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ o.priorita }}</span>
             </div>
             <a class="small d-block" href="{{ url_for('clients.detail', client_id=o.client_id) }}">

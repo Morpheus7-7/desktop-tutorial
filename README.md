@@ -48,6 +48,11 @@ notifiche generate in automatico.
 - **Pipeline commerciale (opportunità)**: gestione delle opportunità di vendita
   a fasi in stile CRM (lead → contatto → preventivo → trattativa → vinta/persa),
   con premio e provvigione stimati, alimentabile direttamente dai gap di copertura.
+- **Preventivi nelle proposte**: ogni proposta (opportunità) del cliente
+  conserva i suoi preventivi, con compagnia, cosa prevedono, premio, data,
+  validità ed esito, e il file (PDF, Word, Excel, immagine) salvato anche tra
+  i documenti del cliente. Il primo preventivo porta la proposta a
+  «Preventivo inviato»; quelli scaduti senza risposta sono segnalati.
 - **Statistiche di portafoglio**: cruscotto con premi e provvigioni per ramo,
   clienti per tipo, valore della pipeline e premi in scadenza nei 12 mesi.
 - **Ricerca globale** di clienti e polizze dalla barra in alto.

@@ -650,3 +650,9 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 .nota-opzioni { margin-top: .75rem; }
 .nota-opzioni > summary { cursor: pointer; color: var(--dc-green); font-weight: 600; font-size: .9rem; width: fit-content; }
 [data-bs-theme="dark"] .nota-opzioni > summary { color: var(--dc-success); }
+
+/* Preventivi sotto ogni proposta, nella scheda del cliente */
+.riga-preventivi td { border-top: 0; }
+.preventivi { list-style: none; margin: 0 0 .25rem; padding: 0 0 0 .9rem; border-left: 2px solid var(--dc-line); }
+.preventivi li { padding: .3rem 0; display: flex; flex-wrap: wrap; gap: .25rem .6rem; align-items: baseline; font-size: .9rem; }
+.preventivi li .d-block { flex-basis: 100%; }

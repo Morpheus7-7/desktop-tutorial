@@ -66,4 +66,26 @@
        href="{% if client %}{{ url_for('clients.detail', client_id=client.id) }}#opportunita{% else %}{{ url_for('opportunities.board') }}{% endif %}">Annulla</a>
   </div>
 </form>
+{% if opp and opp.id %}
+<section class="card mt-4" aria-labelledby="t-preventivi">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h2 class="h6 mb-0" id="t-preventivi"><i class="bi bi-file-earmark-text me-1"></i>Preventivi</h2>
+    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('opportunities.new_quote', opportunity_id=opp.id, next=request.path) }}"><i class="bi bi-file-earmark-plus"></i> Aggiungi preventivo</a>
+  </div>
+  {% if opp.preventivi %}
+  <ul class="list-group list-group-flush">
+    {% for q in opp.preventivi %}
+    <li class="list-group-item d-flex flex-wrap gap-2 align-items-baseline">
+      <a class="fw-semibold" href="{{ url_for('opportunities.edit_quote', preventivo_id=q.id, next=request.path) }}">{{ q.compagnia or 'Preventivo' }}</a>
+      {% if q.premio is not none %}<span>{{ q.premio | euro }}</span>{% endif %}
+      <span class="small text-muted">del {{ q.data | data_it }}{% if q.valido_fino %} · valido fino al {{ q.valido_fino | data_it }}{% endif %} · {{ 'scaduto' if q.scaduto else q.esito_label | lower }}</span>
+      {% if q.documento %}<a class="small ms-auto" href="{{ url_for('documents.download', document_id=q.documento.id) }}"><i class="bi bi-paperclip" aria-hidden="true"></i> {{ q.documento.original_name }}</a>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="card-body small text-muted">Nessun preventivo: aggiungilo con il file PDF, così lo ritrovi sempre qui e nella scheda del cliente.</div>
+  {% endif %}
+</section>
+{% endif %}
 {% endblock %}

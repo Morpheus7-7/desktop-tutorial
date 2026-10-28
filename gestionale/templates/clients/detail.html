@@ -302,7 +302,7 @@
   <!-- ============ OPPORTUNITÀ ============ -->
   <div class="tab-pane fade" id="tab-opportunita">
     <div class="d-flex justify-content-between align-items-center mb-2">
-      <h2 class="h6 text-uppercase text-muted mb-0">Opportunità di vendita</h2>
+      <h2 class="h6 text-uppercase text-muted mb-0">Proposte e preventivi</h2>
       <a class="btn btn-sm btn-primary" href="{{ url_for('opportunities.new_opportunity', client_id=client.id) }}">
         <i class="bi bi-plus-lg"></i> Nuova opportunità
       </a>
@@ -310,32 +310,52 @@
     {% if client.opportunita %}
     <div class="table-responsive">
     <table class="table table-hover align-middle">
-      <thead><tr><th>Titolo</th><th>Ramo</th><th>Fase</th><th>Premio stimato</th><th>Origine</th><th></th></tr></thead>
+      <thead><tr><th>Titolo</th><th class="d-none d-md-table-cell">Ramo</th><th>Fase</th><th class="d-none d-sm-table-cell">Premio stimato</th><th class="d-none d-md-table-cell">Origine</th><th><span class="visually-hidden">Azioni</span></th></tr></thead>
       <tbody>
       {% for o in client.opportunita %}
         <tr>
-          <td class="fw-semibold">{{ o.titolo }}</td>
-          <td class="small">{{ o.ramo_label }}</td>
+          <td class="fw-semibold">{{ o.titolo }}{% if o.premio_stimato %}<div class="small fw-normal d-sm-none">{{ o.premio_stimato | euro }}</div>{% endif %}</td>
+          <td class="small d-none d-md-table-cell">{{ o.ramo_label }}</td>
           <td>
             <form method="post" action="{{ url_for('opportunities.change_stage', opportunity_id=o.id) }}">
               <input type="hidden" name="next" value="{{ url_for('clients.detail', client_id=client.id) }}#opportunita">
-              <select class="form-select form-select-sm" name="fase" onchange="this.form.submit()" style="min-width: 9rem;">
+              <select class="form-select form-select-sm" name="fase" onchange="this.form.submit()" style="min-width: 8rem;" aria-label="Fase della proposta">
                 {% for f, lab in [('lead','Lead'),('contatto','Contattato'),('preventivo','Preventivo inviato'),('trattativa','In trattativa'),('vinta','Vinta'),('persa','Persa')] %}
                 <option value="{{ f }}" {% if o.fase == f %}selected{% endif %}>{{ lab }}</option>{% endfor %}
               </select>
             </form>
           </td>
-          <td>{{ o.premio_stimato | euro }}{% if o.provvigione_stimata %}<br><span class="small text-success">prov. {{ o.provvigione_stimata | euro }}</span>{% endif %}</td>
-          <td class="small">{% if o.origine == 'analisi_rischi' %}<span class="badge bg-light text-dark border"><i class="bi bi-magic"></i> analisi</span>{% else %}{{ o.origine or '—' }}{% endif %}</td>
-          <td class="text-end text-nowrap">
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('opportunities.edit_opportunity', opportunity_id=o.id) }}"><i class="bi bi-pencil"></i></a>
-            <form class="d-inline" method="post" action="{{ url_for('opportunities.delete_opportunity', opportunity_id=o.id) }}"
+          <td class="d-none d-sm-table-cell">{{ o.premio_stimato | euro }}{% if o.provvigione_stimata %}<br><span class="small text-success">prov. {{ o.provvigione_stimata | euro }}</span>{% endif %}</td>
+          <td class="small d-none d-md-table-cell">{% if o.origine == 'analisi_rischi' %}<span class="badge bg-light text-dark border"><i class="bi bi-magic"></i> analisi</span>{% else %}{{ o.origine or '—' }}{% endif %}</td>
+          <td class="text-end"><div class="d-flex flex-wrap gap-1 justify-content-end">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('opportunities.new_quote', opportunity_id=o.id, next=url_for('clients.detail', client_id=client.id) ~ '#opportunita') }}"><i class="bi bi-file-earmark-plus" aria-hidden="true"></i><span class="d-none d-sm-inline"> Preventivo</span><span class="visually-hidden d-sm-none">Aggiungi preventivo</span></a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('opportunities.edit_opportunity', opportunity_id=o.id) }}" aria-label="Modifica la proposta {{ o.titolo }}"><i class="bi bi-pencil"></i></a>
+            <form method="post" action="{{ url_for('opportunities.delete_opportunity', opportunity_id=o.id) }}"
                   onsubmit="return confirm('Eliminare l\'opportunità?');">
               <input type="hidden" name="next" value="{{ url_for('clients.detail', client_id=client.id) }}#opportunita">
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-sm btn-outline-danger" aria-label="Elimina la proposta {{ o.titolo }}"><i class="bi bi-trash"></i></button>
             </form>
+          </div></td>
+        </tr>
+        {% if o.preventivi %}
+        <tr class="riga-preventivi">
+          <td colspan="6" class="pt-0">
+            <ul class="preventivi">
+              {% for q in o.preventivi %}
+              <li>
+                <a class="preventivo-titolo" href="{{ url_for('opportunities.edit_quote', preventivo_id=q.id, next=url_for('clients.detail', client_id=client.id) ~ '#opportunita') }}">
+                  <i class="bi bi-file-earmark-text" aria-hidden="true"></i> Preventivo {{ q.compagnia or '' }}</a>
+                {% if q.premio is not none %}<span class="fw-semibold">{{ q.premio | euro }}</span>{% endif %}
+                <span class="text-muted">del {{ q.data | data_it }}{% if q.valido_fino %} · valido fino al {{ q.valido_fino | data_it }}{% endif %}</span>
+                <span class="badge {{ 'text-bg-success' if q.esito == 'accettato' else ('text-bg-secondary' if q.esito == 'rifiutato' else ('text-bg-danger' if q.scaduto else 'text-bg-light border')) }}">{{ 'Scaduto' if q.scaduto else q.esito_label }}</span>
+                {% if q.descrizione %}<span class="d-block small text-muted">{{ q.descrizione }}</span>{% endif %}
+                {% if q.documento %}<a class="small" href="{{ url_for('documents.download', document_id=q.documento.id) }}"><i class="bi bi-paperclip" aria-hidden="true"></i> {{ q.documento.original_name }}</a>{% endif %}
+              </li>
+              {% endfor %}
+            </ul>
           </td>
         </tr>
+        {% endif %}
       {% endfor %}
       </tbody>
     </table>

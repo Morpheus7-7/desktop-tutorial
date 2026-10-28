@@ -1,16 +1,20 @@
 """Pipeline commerciale: opportunità di vendita (stile CRM assicurativo)."""
-from datetime import datetime
+from datetime import date, datetime
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 from ..models import (
+    ESITI_PREVENTIVO,
+    ESITI_PREVENTIVO_LABELS,
     OPPORTUNITY_OPEN_STAGES,
     OPPORTUNITY_STAGES,
     POLICY_BRANCHES,
     Client,
     Opportunity,
+    Preventivo,
     db,
 )
+from .documents import ALLOWED_EXTENSIONS, elimina_file, salva_file
 
 bp = Blueprint("opportunities", __name__, url_prefix="/opportunita")
 
@@ -18,9 +22,12 @@ _CHIUSE = {"vinta", "persa"}
 
 
 def _float_or_none(value):
+    """Importi anche all'italiana: «1.250,50», «€ 900», «12%»."""
+    from ..import_excel import _numero
+
     try:
-        return float(value.replace(",", ".")) if value not in (None, "") else None
-    except (ValueError, AttributeError):
+        return _numero(value.strip() if isinstance(value, str) else value)
+    except (ValueError, TypeError):
         return None
 
 
@@ -164,3 +171,98 @@ def delete_opportunity(opportunity_id):
     flash("Opportunità eliminata.", "success")
     dest = request.form.get("next")
     return redirect(dest or url_for("opportunities.board"))
+
+
+# ----------------------------------------------------------------------
+# Preventivi delle proposte
+# ----------------------------------------------------------------------
+def _data(valore):
+    try:
+        return date.fromisoformat(valore) if valore else None
+    except ValueError:
+        return None
+
+
+def _torna(opp: Opportunity) -> str:
+    dest = request.values.get("next") or ""
+    if dest.startswith("/") and not dest.startswith("//") and "\\" not in dest:
+        return dest
+    return url_for("clients.detail", client_id=opp.client_id) + "#opportunita"
+
+
+def _compila_preventivo(prev: Preventivo, form) -> None:
+    prev.compagnia = (form.get("compagnia") or "").strip()[:120] or None
+    prev.descrizione = (form.get("descrizione") or "").strip()[:200] or None
+    prev.premio = _float_or_none(form.get("premio"))
+    prev.data = _data(form.get("data")) or prev.data or date.today()
+    prev.valido_fino = _data(form.get("valido_fino"))
+    esito = form.get("esito", "in_attesa")
+    prev.esito = esito if esito in ESITI_PREVENTIVO_LABELS else "in_attesa"
+    prev.note = (form.get("note") or "").strip() or None
+
+
+def _allega(prev: Preventivo, opp: Opportunity) -> bool:
+    """Salva il file del preventivo tra i documenti del cliente. False se il
+    tipo di file non è consentito."""
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return True
+    nota = f"Preventivo per «{opp.titolo}»" + (f" · {prev.compagnia}" if prev.compagnia else "")
+    doc = salva_file(file, opp.client_id, "preventivo", nota)
+    if doc is None:
+        return False
+    if prev.documento is not None:
+        elimina_file(prev.documento)  # sostituito dal nuovo file
+    prev.documento = doc
+    return True
+
+
+@bp.route("/<int:opportunity_id>/preventivi/nuovo", methods=["GET", "POST"])
+def new_quote(opportunity_id):
+    opp = db.get_or_404(Opportunity, opportunity_id)
+    prev = Preventivo(data=date.today())
+    if request.method == "POST":
+        _compila_preventivo(prev, request.form)
+        if not (prev.compagnia or prev.premio is not None or request.files.get("file")):
+            flash("Indica almeno la compagnia, il premio o il file del preventivo.", "danger")
+        elif not _allega(prev, opp):
+            flash("Tipo di file non consentito.", "danger")
+        else:
+            opp.preventivi.append(prev)
+            if opp.fase in ("lead", "contatto"):
+                _set_fase(opp, "preventivo")  # la proposta passa a «Preventivo inviato»
+            if prev.premio is not None and opp.premio_stimato is None:
+                opp.premio_stimato = prev.premio
+            db.session.commit()
+            flash("Preventivo salvato" + (" con il file tra i documenti del cliente." if prev.documento else "."), "success")
+            return redirect(_torna(opp))
+    return render_template("opportunities/preventivo.html", opp=opp, prev=prev, esiti=ESITI_PREVENTIVO,
+                           estensioni=sorted(ALLOWED_EXTENSIONS), prossimo=_torna(opp))
+
+
+@bp.route("/preventivi/<int:preventivo_id>/modifica", methods=["GET", "POST"])
+def edit_quote(preventivo_id):
+    prev = db.get_or_404(Preventivo, preventivo_id)
+    opp = prev.opportunita
+    if request.method == "POST":
+        _compila_preventivo(prev, request.form)
+        if not _allega(prev, opp):
+            flash("Tipo di file non consentito.", "danger")
+        else:
+            db.session.commit()
+            flash("Preventivo aggiornato.", "success")
+            return redirect(_torna(opp))
+    return render_template("opportunities/preventivo.html", opp=opp, prev=prev, esiti=ESITI_PREVENTIVO,
+                           estensioni=sorted(ALLOWED_EXTENSIONS), prossimo=_torna(opp))
+
+
+@bp.route("/preventivi/<int:preventivo_id>/elimina", methods=["POST"])
+def delete_quote(preventivo_id):
+    prev = db.get_or_404(Preventivo, preventivo_id)
+    opp = prev.opportunita
+    if prev.documento is not None and request.form.get("con_file"):
+        elimina_file(prev.documento)
+    db.session.delete(prev)
+    db.session.commit()
+    flash("Preventivo eliminato.", "success")
+    return redirect(_torna(opp))

@@ -133,6 +133,14 @@ SEZIONI_NOTE = [
 SEZIONI_NOTE_LABELS = {codice: etichetta for codice, etichetta, _ in SEZIONI_NOTE}
 SEZIONI_NOTE_ICONE = {codice: icona for codice, _, icona in SEZIONI_NOTE}
 
+# Esito di un preventivo
+ESITI_PREVENTIVO = [
+    ("in_attesa", "In attesa di risposta"),
+    ("accettato", "Accettato"),
+    ("rifiutato", "Rifiutato"),
+]
+ESITI_PREVENTIVO_LABELS = dict(ESITI_PREVENTIVO)
+
 # Fasi della pipeline commerciale (opportunità di vendita), stile CRM.
 OPPORTUNITY_STAGES = [
     ("lead", "Lead"),
@@ -555,6 +563,40 @@ class Opportunity(db.Model):
         if self.premio_stimato and self.provvigione_perc:
             return self.premio_stimato * self.provvigione_perc / 100.0
         return None
+
+    preventivi = db.relationship(
+        "Preventivo", backref="opportunita", cascade="all, delete-orphan", lazy=True,
+        order_by="Preventivo.data.desc(), Preventivo.id.desc()",
+    )
+
+
+class Preventivo(db.Model):
+    """Un preventivo fatto per una proposta (opportunità): compagnia, premio,
+    validità ed esito, con il file salvato tra i documenti del cliente."""
+
+    __tablename__ = "quotes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    opportunity_id = db.Column(db.Integer, db.ForeignKey("opportunities.id"), nullable=False, index=True)
+    compagnia = db.Column(db.String(120))
+    descrizione = db.Column(db.String(200))  # es. «RCT/O massimale 3 mln, franchigia 500 €»
+    premio = db.Column(db.Float)
+    data = db.Column(db.Date, nullable=False, default=date.today)
+    valido_fino = db.Column(db.Date)
+    esito = db.Column(db.String(20), nullable=False, default="in_attesa")
+    note = db.Column(db.Text)
+    document_id = db.Column(db.Integer, db.ForeignKey("documents.id"), index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    documento = db.relationship("Document", backref=db.backref("preventivi", lazy=True))
+
+    @property
+    def esito_label(self):
+        return ESITI_PREVENTIVO_LABELS.get(self.esito, self.esito)
+
+    @property
+    def scaduto(self):
+        return self.esito == "in_attesa" and self.valido_fino is not None and self.valido_fino < date.today()
 
 
 class RiskAnalysis(db.Model):

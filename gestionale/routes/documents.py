@@ -28,6 +28,34 @@ def _allowed(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def salva_file(file, client_id: int, categoria: str, note: str | None = None,
+               policy_id: int | None = None) -> Document | None:
+    """Salva il file caricato tra i documenti del cliente (senza commit).
+    None se il tipo di file non è consentito."""
+    original = file.filename
+    if not _allowed(original):
+        return None
+    safe = secure_filename(original) or "documento"
+    stored_name = f"{uuid.uuid4().hex}_{safe}"
+    path = os.path.join(current_app.config["UPLOAD_FOLDER"], stored_name)
+    file.save(path)
+    try:
+        dimensione = os.path.getsize(path)
+    except OSError:
+        dimensione = None
+    doc = Document(client_id=client_id, policy_id=policy_id, categoria=categoria, filename=stored_name,
+                   original_name=original, dimensione=dimensione, note=note)
+    db.session.add(doc)
+    return doc
+
+
+def elimina_file(doc: Document) -> None:
+    path = os.path.join(current_app.config["UPLOAD_FOLDER"], doc.filename)
+    if os.path.exists(path):
+        os.remove(path)
+    db.session.delete(doc)
+
+
 @bp.route("/")
 def list_documents():
     categoria = request.args.get("categoria", "")
@@ -65,33 +93,11 @@ def upload(client_id):
     policy_id = _resolve_policy_id(client, request.form.get("policy_id"))
     categoria = request.form.get("categoria", "altro")
     note = request.form.get("note", "").strip() or None
-    upload_folder = current_app.config["UPLOAD_FOLDER"]
-
     caricati, scartati = 0, []
     for file in files:
-        original = file.filename
-        if not _allowed(original):
-            scartati.append(original)
+        if salva_file(file, client.id, categoria, note, policy_id) is None:
+            scartati.append(file.filename)
             continue
-        safe = secure_filename(original) or "documento"
-        stored_name = f"{uuid.uuid4().hex}_{safe}"
-        path = os.path.join(upload_folder, stored_name)
-        file.save(path)
-        try:
-            dimensione = os.path.getsize(path)
-        except OSError:
-            dimensione = None
-        db.session.add(
-            Document(
-                client_id=client.id,
-                policy_id=policy_id,
-                categoria=categoria,
-                filename=stored_name,
-                original_name=original,
-                dimensione=dimensione,
-                note=note,
-            )
-        )
         caricati += 1
 
     if caricati:
@@ -120,10 +126,7 @@ def download(document_id):
 def delete(document_id):
     doc = db.get_or_404(Document, document_id)
     client_id = doc.client_id
-    path = os.path.join(current_app.config["UPLOAD_FOLDER"], doc.filename)
-    if os.path.exists(path):
-        os.remove(path)
-    db.session.delete(doc)
+    elimina_file(doc)
     db.session.commit()
     flash("Documento eliminato.", "success")
     if request.form.get("da_archivio"):
