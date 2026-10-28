@@ -22,6 +22,7 @@ from ..models import (
     POLICY_STATUSES,
     RUOLI_PERSONA,
     RUOLI_PERSONA_LABELS,
+    SEZIONI_NOTE,
     RUOLI_SOCIETARI,
     STATI_CIVILI,
     Client,
@@ -29,6 +30,7 @@ from ..models import (
     RiskAnalysis,
     db,
 )
+from .. import diario
 from ..risk_engine import analyze_client
 from ..academy import get_scheda
 from ..schede import SCHEDE_CLIENTE
@@ -176,6 +178,8 @@ def detail(client_id):
         followup_priorities=FOLLOWUP_PRIORITIES,
         ruoli=RUOLI_PERSONA,
         ruoli_societari=RUOLI_SOCIETARI,
+        sezioni_note=SEZIONI_NOTE,
+        email_pronta=diario.destinatari_configurati(),
     )
 
 

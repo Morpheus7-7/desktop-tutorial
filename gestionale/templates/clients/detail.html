@@ -54,6 +54,7 @@
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-documenti">Documenti <span class="badge bg-secondary">{{ client.documenti | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-opportunita">Opportunità <span class="badge bg-secondary">{{ client.opportunita | selectattr('aperta') | list | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-followup">Follow-up <span class="badge bg-secondary">{{ client.followups | selectattr('stato', 'equalto', 'aperto') | list | length }}</span></button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-note">Note <span class="badge bg-secondary">{{ client.diario | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-schede">Schede <span class="badge bg-secondary">{{ client.schede | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-analisi">Analisi rischi <span class="badge bg-secondary">{{ client.analisi | length }}</span></button></li>
 </ul>
@@ -476,6 +477,26 @@
   </div>
 
   <!-- ============ ANALISI RISCHI ============ -->
+  <!-- ============ NOTE ============ -->
+  <div class="tab-pane fade" id="tab-note">
+    {% set qui = url_for('clients.detail', client_id=client.id) ~ '#note' %}
+    <h2 class="h6 text-uppercase text-muted">Nuova nota su {{ client.ragione_sociale }}</h2>
+    {% with nota=None, sezioni=sezioni_note, cliente_fisso=client, azione=url_for('note.new'), next=qui, id_prefisso='cn', annulla=None %}
+    {% include "note/_modulo.html" %}
+    {% endwith %}
+    <hr class="my-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <h2 class="h6 text-uppercase text-muted mb-0">Diario del cliente</h2>
+      <a class="small" href="{{ url_for('note.index', cliente=client.id, periodo='tutte') }}">Apri nelle Note</a>
+    </div>
+    {% for n in client.diario[:50] %}
+      {% if loop.first or n.giorno != loop.previtem.giorno %}<h3 class="note-data">{{ n.giorno | giorno_lungo | capitalize }} <span>{{ n.giorno | data_it }}</span></h3>{% endif %}
+      {% with next=qui, mostra_cliente=False %}{% include "note/_nota.html" %}{% endwith %}
+    {% else %}
+      <p class="text-muted small mb-0">Nessuna nota per questo cliente: annota qui chiamate, incontri ed esiti.</p>
+    {% endfor %}
+  </div>
+
   <div class="tab-pane fade" id="tab-schede">
     {% if client.schede %}
     <div class="table-responsive">
@@ -567,7 +588,7 @@
     const map = {
       polizze: '#tab-polizze', documenti: '#tab-documenti',
       opportunita: '#tab-opportunita', followup: '#tab-followup', analisi: '#tab-analisi',
-      schede: '#tab-schede'
+      schede: '#tab-schede', note: '#tab-note'
     };
     const target = map[window.location.hash.replace('#', '')];
     if (target) {

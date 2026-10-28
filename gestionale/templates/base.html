@@ -43,6 +43,7 @@
         <ul class="nav flex-column" aria-labelledby="nav-lavoro">
           <li><a class="nav-link {% if ep == 'main.dashboard' %}active{% endif %}" {% if ep == 'main.dashboard' %}aria-current="page"{% endif %} href="{{ url_for('main.dashboard') }}"><i class="bi bi-journal-bookmark"></i> Oggi</a></li>
           <li><a class="nav-link {% if bp == 'followups' %}active{% endif %}" {% if bp == 'followups' %}aria-current="page"{% endif %} href="{{ url_for('followups.list_followups') }}"><i class="bi bi-check2-square"></i> Follow-up</a></li>
+          <li><a class="nav-link {% if bp == 'note' %}active{% endif %}" {% if bp == 'note' %}aria-current="page"{% endif %} href="{{ url_for('note.index') }}"><i class="bi bi-journal-text"></i> Note</a></li>
           <li><a class="nav-link {% if ep == 'main.scadenzario' %}active{% endif %}" {% if ep == 'main.scadenzario' %}aria-current="page"{% endif %} href="{{ url_for('main.scadenzario') }}"><i class="bi bi-calendar3"></i> Scadenzario</a></li>
           <li><a class="nav-link {% if bp == 'opportunities' %}active{% endif %}" {% if bp == 'opportunities' %}aria-current="page"{% endif %} href="{{ url_for('opportunities.board') }}"><i class="bi bi-kanban"></i> Pipeline</a></li>
         </ul>

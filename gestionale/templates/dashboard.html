@@ -47,11 +47,16 @@
               </div>
               <div class="min-w-0">
                 <div class="oggi-titolo">{{ v.titolo }}<span class="oggi-tipo">{{ v.etichetta }}</span></div>
-                <div class="oggi-meta"><a href="{{ url_for('clients.detail', client_id=v.cliente.id) }}">{{ v.cliente.ragione_sociale }}</a></div>
+                <div class="oggi-meta">{% if v.cliente %}<a href="{{ url_for('clients.detail', client_id=v.cliente.id) }}">{{ v.cliente.ragione_sociale }}</a>{% else %}<a href="{{ url_for('note.index') }}">Note</a>{% endif %}</div>
               </div>
               <div class="oggi-azione">
                 {% if v.tipo == 'followup' %}
                 <form method="post" action="{{ url_for('followups.complete', followup_id=v.id) }}">
+                  <input type="hidden" name="next" value="{{ url_for('main.dashboard') }}">
+                  <button class="btn btn-sm btn-outline-success"><i class="bi bi-check-lg"></i> Fatto</button>
+                </form>
+                {% elif v.tipo == 'nota' %}
+                <form method="post" action="{{ url_for('note.done', nota_id=v.id) }}">
                   <input type="hidden" name="next" value="{{ url_for('main.dashboard') }}">
                   <button class="btn btn-sm btn-outline-success"><i class="bi bi-check-lg"></i> Fatto</button>
                 </form>

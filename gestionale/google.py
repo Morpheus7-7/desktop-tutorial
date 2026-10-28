@@ -12,7 +12,7 @@ import os
 import re
 import string
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -80,6 +80,21 @@ def link_calendar(titolo: str, giorno: date, dettagli: str = "") -> str:
     return "https://calendar.google.com/calendar/render?" + urlencode(parametri)
 
 
+def link_calendar_ora(titolo: str, inizio: datetime, dettagli: str = "", minuti: int = 30) -> str:
+    """Link che apre Google Calendar con un evento a un'ora precisa (ora
+    locale italiana): Calendar ricorda l'evento con le sue notifiche anche
+    sul telefono, pure a PC spento."""
+    fine = inizio + timedelta(minutes=minuti)
+    parametri = {
+        "action": "TEMPLATE",
+        "text": titolo,
+        "dates": f"{inizio:%Y%m%dT%H%M%S}/{fine:%Y%m%dT%H%M%S}",
+        "ctz": "Europe/Rome",
+        "details": dettagli,
+    }
+    return "https://calendar.google.com/calendar/render?" + urlencode(parametri)
+
+
 def _ics_testo(testo: str) -> str:
     testo = (testo or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
     return testo.replace("\r\n", "\\n").replace("\n", "\\n")
@@ -98,21 +113,28 @@ def _piega(riga: str) -> str:
     return "\r\n".join(out)
 
 
-def calendario_ics(eventi: list[dict]) -> bytes:
-    """eventi: dict con uid, titolo, giorno (date), dettagli."""
+def _utc(locale: datetime) -> str:
+    """Ora locale del PC -> UTC nel formato iCalendar."""
+    return locale.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def calendario_ics(eventi: list[dict], nome: str = "Deal Combined - Follow-up") -> bytes:
+    """eventi: dict con uid, titolo, dettagli e giorno (date, tutto il giorno)
+    oppure inizio (datetime locale: evento di 30 minuti con avviso)."""
     adesso = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
     righe = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Deal Combined//Follow-up//IT",
-             "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Deal Combined - Follow-up"]
+             "CALSCALE:GREGORIAN", "METHOD:PUBLISH", f"X-WR-CALNAME:{_ics_testo(nome)}"]
     for e in eventi:
-        righe += [
-            "BEGIN:VEVENT",
-            f"UID:{e['uid']}@deal-combined",
-            f"DTSTAMP:{adesso}",
-            f"DTSTART;VALUE=DATE:{e['giorno']:%Y%m%d}",
-            f"DTEND;VALUE=DATE:{e['giorno'] + timedelta(days=1):%Y%m%d}",
-            f"SUMMARY:{_ics_testo(e['titolo'])}",
-            f"DESCRIPTION:{_ics_testo(e.get('dettagli', ''))}",
-            "END:VEVENT",
-        ]
+        righe += ["BEGIN:VEVENT", f"UID:{e['uid']}@deal-combined", f"DTSTAMP:{adesso}"]
+        if e.get("inizio"):
+            righe += [f"DTSTART:{_utc(e['inizio'])}", f"DTEND:{_utc(e['inizio'] + timedelta(minutes=30))}"]
+        else:
+            righe += [f"DTSTART;VALUE=DATE:{e['giorno']:%Y%m%d}",
+                      f"DTEND;VALUE=DATE:{e['giorno'] + timedelta(days=1):%Y%m%d}"]
+        righe += [f"SUMMARY:{_ics_testo(e['titolo'])}", f"DESCRIPTION:{_ics_testo(e.get('dettagli', ''))}"]
+        if e.get("inizio"):
+            righe += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{_ics_testo(e['titolo'])}",
+                      "TRIGGER:PT0M", "END:VALARM"]
+        righe.append("END:VEVENT")
     righe.append("END:VCALENDAR")
     return ("\r\n".join(_piega(r) for r in righe) + "\r\n").encode("utf-8")

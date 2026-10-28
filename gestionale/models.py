@@ -117,6 +117,21 @@ RUOLI_SOCIETARI = ("amministratore_unico", "amministratore_delegato", "president
 STATI_CIVILI = ["Celibe / Nubile", "Coniugato/a", "Unito/a civilmente", "Convivente",
                 "Separato/a", "Divorziato/a", "Vedovo/a"]
 
+# Sezioni del diario delle attività (Note)
+SEZIONI_NOTE = [
+    ("chiamate", "Chiamate", "bi-telephone"),
+    ("appuntamenti", "Appuntamenti", "bi-people"),
+    ("preventivi", "Preventivi e proposte", "bi-file-earmark-text"),
+    ("pratiche", "Pratiche e sinistri", "bi-folder-check"),
+    ("prospezione", "Nuovi contatti", "bi-person-plus"),
+    ("amministrazione", "Amministrazione", "bi-calculator"),
+    ("formazione", "Formazione", "bi-mortarboard"),
+    ("personale", "Personale", "bi-heart"),
+    ("altro", "Altro", "bi-three-dots"),
+]
+SEZIONI_NOTE_LABELS = {codice: etichetta for codice, etichetta, _ in SEZIONI_NOTE}
+SEZIONI_NOTE_ICONE = {codice: icona for codice, _, icona in SEZIONI_NOTE}
+
 # Fasi della pipeline commerciale (opportunità di vendita), stile CRM.
 OPPORTUNITY_STAGES = [
     ("lead", "Lead"),
@@ -198,6 +213,8 @@ class Client(db.Model):
         lazy=True,
         order_by="Opportunity.created_at.desc()",
     )
+    # Le note restano anche se il cliente viene eliminato (perdono solo il collegamento).
+    diario = db.relationship("Nota", backref="cliente", lazy=True, order_by="Nota.giorno.desc(), Nota.id.desc()")
     persone = db.relationship(
         "PersonaCollegata",
         backref="cliente",
@@ -293,6 +310,42 @@ class PersonaCollegata(db.Model):
     @property
     def eta(self):
         return _eta(self.data_nascita)
+
+
+class Nota(db.Model):
+    """Una nota del diario: un'attività svolta (o da fare) in un giorno, con
+    eventuale promemoria via email e Google Calendar."""
+
+    __tablename__ = "notes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    giorno = db.Column(db.Date, nullable=False, default=date.today, index=True)
+    ora = db.Column(db.String(5))  # «HH:MM», facoltativa
+    sezione = db.Column(db.String(30), nullable=False, default="altro", index=True)
+    titolo = db.Column(db.String(200), nullable=False)
+    testo = db.Column(db.Text)
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), index=True)
+    promemoria_il = db.Column(db.DateTime, index=True)  # ora locale del PC
+    promemoria_email = db.Column(db.Boolean, nullable=False, default=False)
+    promemoria_fatto = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def sezione_label(self):
+        return SEZIONI_NOTE_LABELS.get(self.sezione, self.sezione)
+
+    @property
+    def sezione_icona(self):
+        return SEZIONI_NOTE_ICONE.get(self.sezione, "bi-journal")
+
+    @property
+    def promemoria_aperto(self):
+        return bool(self.promemoria_il) and not self.promemoria_fatto
+
+    @property
+    def promemoria_scaduto(self):
+        return self.promemoria_aperto and self.promemoria_il <= datetime.now()
 
 
 class Policy(db.Model):

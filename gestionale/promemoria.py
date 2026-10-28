@@ -9,22 +9,30 @@ essere aperto sull'altro PC.
 from __future__ import annotations
 
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 NOME_AVVIO = "Deal Combined"
 CHIAVE_AVVIO = r"Software\Microsoft\Windows\CurrentVersion\Run"
 PARAMETRO_SILENZIOSO = "--avvio-silenzioso"
 GIORNI_SCADENZA = 7
-CONTROLLO_OGNI = 15 * 60
+CONTROLLO_OGNI = 60  # i promemoria delle note hanno un orario preciso
 
 
-def elementi_di_oggi(oggi: date | None = None) -> list[dict]:
-    """Follow-up aperti con scadenza fino a oggi e polizze attive in scadenza
-    nei prossimi giorni. Da chiamare dentro un app context."""
-    from .models import FollowUp, Policy
+def elementi_di_oggi(oggi: date | None = None, adesso: datetime | None = None) -> list[dict]:
+    """Promemoria delle note arrivati all'ora, follow-up aperti con scadenza
+    fino a oggi e polizze attive in scadenza nei prossimi giorni. Da
+    chiamare dentro un app context."""
+    from .models import FollowUp, Nota, Policy
 
     oggi = oggi or date.today()
+    adesso = adesso or datetime.now()
     elementi = []
+    for n in (Nota.query.filter(Nota.promemoria_fatto.is_(False), Nota.promemoria_il <= adesso,
+                                Nota.promemoria_il >= datetime.combine(oggi, datetime.min.time()))
+              .order_by(Nota.promemoria_il).all()):
+        testo = f"{n.promemoria_il:%H:%M} {n.titolo}" + (f" · {n.cliente.ragione_sociale}" if n.cliente else "")
+        elementi.append({"chiave": f"n{n.id}-{n.promemoria_il:%Y%m%d%H%M}", "tipo": "nota", "ritardo": False,
+                         "testo": testo, "titolo": n.titolo})
     for f in (FollowUp.query.filter(FollowUp.stato == "aperto", FollowUp.data_scadenza <= oggi)
               .order_by(FollowUp.data_scadenza).all()):
         elementi.append({"chiave": f"f{f.id}", "tipo": "followup", "ritardo": f.data_scadenza < oggi,
@@ -39,10 +47,16 @@ def elementi_di_oggi(oggi: date | None = None) -> list[dict]:
     return elementi
 
 
-def messaggio(elementi: list[dict]) -> tuple[str, str] | None:
-    """Titolo e testo della notifica (breve: Windows ne mostra poche righe)."""
+def messaggio(elementi: list[dict], nuove: set | None = None) -> tuple[str, str] | None:
+    """Titolo e testo della notifica (breve: Windows ne mostra poche righe).
+    Un promemoria di una nota appena arrivato ha la precedenza."""
     if not elementi:
         return None
+    note_nuove = [e for e in elementi if e["tipo"] == "nota" and (nuove is None or e["chiave"] in nuove)]
+    if note_nuove:
+        titolo = (f"Promemoria: {note_nuove[0]['titolo']}" if len(note_nuove) == 1
+                  else f"{len(note_nuove)} promemoria")
+        return titolo[:63], "\n".join(e["testo"] for e in note_nuove[:4])[:250]
     followup = [e for e in elementi if e["tipo"] == "followup"]
     polizze = [e for e in elementi if e["tipo"] == "polizza"]
     parti = []
@@ -68,10 +82,11 @@ class Annunciatore:
         if oggi != self.giorno:
             self.giorno, self.visti = oggi, set()
         chiavi = {e["chiave"] for e in elementi}
-        if not chiavi - self.visti:
+        nuove = chiavi - self.visti
+        if not nuove:
             return None
         self.visti |= chiavi
-        return messaggio(elementi)
+        return messaggio(elementi, nuove)
 
 
 # ----------------------------------------------------------------------

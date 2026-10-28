@@ -1,5 +1,5 @@
 """Dashboard, scadenzario, ricerca globale e statistiche."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import Blueprint, render_template, request
 
@@ -11,6 +11,7 @@ from ..models import (
     OPPORTUNITY_STAGES,
     Client,
     FollowUp,
+    Nota,
     Notification,
     Opportunity,
     Policy,
@@ -62,6 +63,15 @@ def _agenda_oggi(oggi: date) -> list[dict]:
             "tipo": "scadenza", "id": p.id, "data": p.data_scadenza,
             "titolo": f"Rinnovo {p.ramo_label}", "etichetta": f"Polizza {p.numero_polizza}",
             "cliente": p.cliente, "priorita": "alta",
+        })
+    for n in Nota.query.filter(
+        Nota.promemoria_il.isnot(None), Nota.promemoria_fatto.is_(False),
+        Nota.promemoria_il < datetime.combine(oggi + timedelta(days=8), datetime.min.time()),
+    ):
+        voci.append({
+            "tipo": "nota", "id": n.id, "data": n.promemoria_il.date(),
+            "titolo": n.titolo, "etichetta": f"Promemoria {n.promemoria_il:%H:%M}",
+            "cliente": n.cliente, "priorita": "alta",
         })
     peso_priorita = {"alta": 0, "media": 1, "bassa": 2}
     voci.sort(key=lambda v: (v["data"], peso_priorita.get(v["priorita"], 1), v["tipo"] != "followup"))

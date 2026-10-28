@@ -15,6 +15,12 @@ notifiche generate in automatico.
   **nome e cognome**, nascita, **residenza**, stato civile, nucleo familiare e
   interessi; per i professionisti anche l'**iscrizione all'albo** (ordine,
   sede, numero, data).
+- **Note (diario delle attività)**: ogni attività del giorno come nota singola,
+  divisa per sezione (chiamate, appuntamenti, preventivi, pratiche, nuovi
+  contatti, amministrazione, formazione, personale), collegabile a un cliente.
+  Ogni nota può avere un **promemoria**: email dal proprio Gmail all'ora
+  scelta, pulsante che apre **Google Calendar** con l'evento compilato,
+  notifica di Windows e voce nell'agenda di «Oggi».
 - **Amministratori e persone collegate**: dal pulsante *Aggiungi amministratore
   / consigliere / altro* si registrano amministratori, consiglieri, soci (con
   quota), legali rappresentanti, titolari effettivi, familiari o altre figure,

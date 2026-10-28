@@ -619,3 +619,34 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 .sblocco-marchio { font-size: 2rem; font-stretch: 82%; color: var(--dc-ink); }
 .sblocco-card { width: 100%; max-width: 22rem; }
 .sblocco-card input[type="password"] { letter-spacing: .4em; }
+
+/* ------------------------------------------------------------------
+   Note: diario delle attività, un giorno sotto l'altro
+   ------------------------------------------------------------------ */
+.note-sezioni { display: flex; flex-wrap: wrap; gap: .35rem; }
+.note-giorno { margin-bottom: 1.75rem; }
+.note-data {
+  font-size: 1.05rem; font-weight: 700; margin: 0 0 .6rem; padding-bottom: .35rem;
+  border-bottom: 2px solid var(--dc-line); display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .6rem;
+}
+.note-data span { font-size: .8rem; font-weight: 400; color: var(--dc-muted); }
+.nota {
+  background: var(--dc-surface); border: 1px solid var(--dc-line); border-radius: .6rem;
+  padding: .85rem 1rem; margin-bottom: .6rem;
+}
+.nota-testa { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .75rem; font-size: .8rem; color: var(--dc-muted); }
+.nota-sezione { font-weight: 600; color: var(--dc-ink); }
+.nota-ora { font-variant-numeric: tabular-nums; }
+.nota-cliente { max-width: 100%; }
+.nota-titolo { font-size: 1rem; font-weight: 600; margin: .35rem 0 0; overflow-wrap: anywhere; }
+.nota-corpo { white-space: pre-line; margin: .35rem 0 0; overflow-wrap: anywhere; max-width: 70ch; }
+.nota-promemoria { margin-top: .5rem; font-size: .85rem; font-weight: 600; color: var(--dc-green); }
+.nota-promemoria.scaduto { color: var(--dc-danger); }
+.nota-promemoria.fatto { color: var(--dc-muted); font-weight: 400; text-decoration: line-through; }
+.nota-azioni { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .65rem; }
+[data-bs-theme="dark"] .nota-promemoria { color: var(--dc-success); }
+[data-bs-theme="dark"] .nota-promemoria.scaduto { color: var(--dc-danger); }
+[data-bs-theme="dark"] .nota-promemoria.fatto { color: var(--dc-muted); }
+.nota-opzioni { margin-top: .75rem; }
+.nota-opzioni > summary { cursor: pointer; color: var(--dc-green); font-weight: 600; font-size: .9rem; width: fit-content; }
+[data-bs-theme="dark"] .nota-opzioni > summary { color: var(--dc-success); }

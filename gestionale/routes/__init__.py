@@ -10,6 +10,7 @@ def register_blueprints(app: Flask) -> None:
         documents,
         followups,
         importazione,
+        note,
         main,
         notifications,
         opportunities,
@@ -29,3 +30,4 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(client_sheets.bp)
     app.register_blueprint(privacy.bp)
     app.register_blueprint(importazione.bp)
+    app.register_blueprint(note.bp)

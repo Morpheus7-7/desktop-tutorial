@@ -1,0 +1,91 @@
+{# Modulo della nota. Variabili: nota (o None), sezioni, clienti (o None se il cliente è fisso),
+   cliente_fisso (o None), azione, next, email_pronta, id_prefisso, annulla #}
+{% set p = id_prefisso or 'n' %}
+<form method="post" action="{{ azione }}" class="modulo-nota">
+  <input type="hidden" name="next" value="{{ next }}">
+  <div class="row g-2 align-items-end">
+    <div class="col-md">
+      <label class="form-label" for="{{ p }}-titolo">Cosa hai fatto (o devi fare)</label>
+      <input type="text" class="form-control" id="{{ p }}-titolo" name="titolo" maxlength="200" required
+             placeholder="es. Chiamato Rossi per il rinnovo RC" value="{{ nota.titolo if nota else '' }}">
+    </div>
+    <div class="col-sm-7 col-md-4 col-xl-3">
+      <label class="form-label" for="{{ p }}-sezione">Sezione</label>
+      <select class="form-select" id="{{ p }}-sezione" name="sezione">
+        {% for codice, etichetta, _ in sezioni %}
+        <option value="{{ codice }}" {% if nota and nota.sezione == codice %}selected{% endif %}>{{ etichetta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if not nota %}
+    <div class="col-sm-5 col-md-auto">
+      <button class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i> Aggiungi</button>
+    </div>
+    {% endif %}
+  </div>
+
+  <details class="nota-opzioni" {% if nota %}open{% endif %}>
+    <summary>Dettagli, cliente e promemoria</summary>
+    <div class="row g-3 pt-2">
+      <div class="col-6 col-md-3">
+        <label class="form-label" for="{{ p }}-giorno">Giorno</label>
+        <input type="date" class="form-control" id="{{ p }}-giorno" name="giorno" value="{{ (nota.giorno if nota else oggi).isoformat() }}" required>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label" for="{{ p }}-ora">Ora</label>
+        <input type="time" class="form-control" id="{{ p }}-ora" name="ora" value="{{ nota.ora if nota and nota.ora else '' }}">
+      </div>
+      <div class="col-md-6">
+        {% if cliente_fisso %}
+        <input type="hidden" name="client_id" value="{{ cliente_fisso.id }}">
+        <span class="form-label d-block">Cliente</span>
+        <div class="form-control-plaintext text-truncate">{{ cliente_fisso.ragione_sociale }}</div>
+        {% else %}
+        <label class="form-label" for="{{ p }}-cliente">Cliente</label>
+        <select class="form-select" id="{{ p }}-cliente" name="client_id">
+          <option value="">— nessuno —</option>
+          {% for c in clienti %}
+          <option value="{{ c.id }}" {% if nota and nota.client_id == c.id %}selected{% endif %}>{{ c.ragione_sociale }}</option>
+          {% endfor %}
+        </select>
+        {% endif %}
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="{{ p }}-testo">Dettagli</label>
+        <textarea class="form-control" id="{{ p }}-testo" name="testo" rows="3"
+                  placeholder="Esito, cosa ha detto, prossimi passi…">{{ nota.testo if nota and nota.testo else '' }}</textarea>
+      </div>
+      <fieldset class="col-12">
+        <legend class="form-label fs-6"><i class="bi bi-bell" aria-hidden="true"></i> Promemoria</legend>
+        <div class="row g-3 align-items-center">
+          <div class="col-6 col-md-3">
+            <label class="visually-hidden" for="{{ p }}-pgiorno">Giorno del promemoria</label>
+            <input type="date" class="form-control" id="{{ p }}-pgiorno" name="promemoria_giorno"
+                   value="{{ nota.promemoria_il.date().isoformat() if nota and nota.promemoria_il else '' }}">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="visually-hidden" for="{{ p }}-pora">Ora del promemoria</label>
+            <input type="time" class="form-control" id="{{ p }}-pora" name="promemoria_ora"
+                   value="{{ nota.promemoria_il.strftime('%H:%M') if nota and nota.promemoria_il else '09:00' }}">
+          </div>
+          <div class="col-md-6">
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="checkbox" id="{{ p }}-pemail" name="promemoria_email" value="1"
+                     {% if not nota or nota.promemoria_email or not nota.promemoria_il %}checked{% endif %}>
+              <label class="form-check-label" for="{{ p }}-pemail">Mandami un'email all'ora del promemoria</label>
+            </div>
+          </div>
+        </div>
+        <div class="form-text">Scegli il giorno per attivarlo. Dopo il salvataggio, il pulsante <em>Google Calendar</em> della nota lo aggiunge al tuo calendario.
+          {% if not email_pronta %}<span class="text-warning-emphasis">Per le email collega Gmail in <a href="{{ url_for('settings.google') }}">Impostazioni → Google</a>.</span>{% endif %}</div>
+      </fieldset>
+    </div>
+  </details>
+
+  {% if nota %}
+  <div class="d-flex gap-2 flex-wrap mt-3">
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Salva</button>
+    {% if annulla %}<a class="btn btn-outline-secondary" href="{{ annulla }}">Annulla</a>{% endif %}
+  </div>
+  {% endif %}
+</form>

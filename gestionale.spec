@@ -32,6 +32,7 @@ hiddenimports = [
     "gestionale.routes.client_sheets",
     "gestionale.routes.privacy",
     "gestionale.routes.importazione",
+    "gestionale.routes.note",
     "gestionale.tray",
     "pystray._win32",
     "PIL.Image",
