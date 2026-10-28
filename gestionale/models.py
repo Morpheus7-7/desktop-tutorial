@@ -12,7 +12,7 @@ db = SQLAlchemy()
 CLIENT_TYPES = [
     ("azienda", "Azienda"),
     ("professionista", "Professionista"),
-    ("dipendente", "Lavoratore dipendente"),
+    ("dipendente", "Privato / dipendente"),
 ]
 CLIENT_TYPE_BADGES = {
     "azienda": "tipo-azienda",
@@ -105,6 +105,7 @@ RUOLI_PERSONA = [
     ("procuratore", "Procuratore"),
     ("sindaco", "Sindaco / Revisore"),
     ("titolare_effettivo", "Titolare effettivo"),
+    ("dipendente", "Dipendente"),
     ("coniuge", "Coniuge / Convivente"),
     ("familiare", "Familiare"),
     ("altro", "Altro"),
@@ -221,6 +222,16 @@ class Client(db.Model):
         cascade="all, delete-orphan",
         lazy=True,
         order_by="PersonaCollegata.id",
+        foreign_keys="PersonaCollegata.client_id",
+    )
+    # Le stesse persone viste dall'altra parte: i ruoli di questo cliente
+    # privato nelle aziende (amministratore di…, dipendente di…).
+    ruoli_in_aziende = db.relationship(
+        "PersonaCollegata",
+        backref="persona_cliente",
+        lazy=True,
+        order_by="PersonaCollegata.id",
+        foreign_keys="PersonaCollegata.persona_client_id",
     )
     schede = db.relationship(
         "SchedaCompilata",
@@ -279,6 +290,8 @@ class PersonaCollegata(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True)
+    # La stessa persona come cliente privato (sue polizze, sua anagrafica).
+    persona_client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), index=True)
     ruolo = db.Column(db.String(40), nullable=False, default="amministratore_unico")
     ruolo_altro = db.Column(db.String(100))  # testo libero se ruolo = «altro»
     nome = db.Column(db.String(80))
@@ -297,8 +310,28 @@ class PersonaCollegata(db.Model):
     note = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Con la scheda privata collegata, i dati anagrafici vengono da lì: si
+    # aggiornano in un posto solo.
+    _ANAGRAFICI = ("nome", "cognome", "codice_fiscale", "data_nascita", "luogo_nascita", "email", "telefono")
+    _INDIRIZZO = ("indirizzo", "citta", "cap", "provincia")
+
+    def dato(self, campo):
+        c = self.persona_cliente
+        if c is None:
+            return getattr(self, campo)
+        if campo in self._ANAGRAFICI:
+            return getattr(c, campo)
+        if campo in self._INDIRIZZO:
+            # La residenza se c'è, altrimenti l'indirizzo principale (dove abita).
+            if c.residenza_indirizzo or c.residenza_citta:
+                return getattr(c, f"residenza_{campo}")
+            return getattr(c, campo)
+        return getattr(self, campo)
+
     @property
     def nome_completo(self):
+        if self.persona_cliente is not None:
+            return self.persona_cliente.nome_completo
         return " ".join(x for x in (self.nome, self.cognome) if x)
 
     @property
@@ -309,7 +342,7 @@ class PersonaCollegata(db.Model):
 
     @property
     def eta(self):
-        return _eta(self.data_nascita)
+        return _eta(self.dato("data_nascita"))
 
 
 class Nota(db.Model):

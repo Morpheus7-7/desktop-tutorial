@@ -57,6 +57,9 @@ def _ensure_schema() -> None:
             "pin_tentativi": "ALTER TABLE settings ADD COLUMN pin_tentativi INTEGER DEFAULT 0",
             "pin_attesa_fino": "ALTER TABLE settings ADD COLUMN pin_attesa_fino DATETIME",
         },
+        "client_persons": {
+            "persona_client_id": "ALTER TABLE client_persons ADD COLUMN persona_client_id INTEGER",
+        },
         "followups": {
             "policy_id": "ALTER TABLE followups ADD COLUMN policy_id INTEGER",
             "auto_generato": "ALTER TABLE followups ADD COLUMN auto_generato BOOLEAN NOT NULL DEFAULT 0",

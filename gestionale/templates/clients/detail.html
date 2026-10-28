@@ -50,6 +50,7 @@
 
 <ul class="nav nav-tabs" role="tablist">
   <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-info">Anagrafica</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-persone">{{ 'Amministratori' if client.tipo == 'azienda' else 'Collegamenti' }} <span class="badge bg-secondary">{{ (client.persone | length) + (client.ruoli_in_aziende | length) }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-polizze">Polizze <span class="badge bg-secondary">{{ client.polizze | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-documenti">Documenti <span class="badge bg-secondary">{{ client.documenti | length }}</span></button></li>
   <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-opportunita">Opportunità <span class="badge bg-secondary">{{ client.opportunita | selectattr('aperta') | list | length }}</span></button></li>
@@ -124,67 +125,6 @@
         {% endif %}
       </div>
     </div>
-
-    <section class="border-top pt-4 mt-2" id="persone" aria-labelledby="t-persone">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <h2 class="h6 text-uppercase text-muted mb-0" id="t-persone">
-          {{ 'Amministratori e figure societarie' if client.tipo == 'azienda' else 'Persone collegate' }}
-        </h2>
-        <div class="dropdown">
-          <button class="btn btn-outline-primary btn-sm dropdown-toggle text-wrap text-start" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-person-plus"></i> Aggiungi amministratore / consigliere / altro
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end">
-            {% if client.tipo == 'azienda' %}
-              {% for valore, etichetta in ruoli if valore in ruoli_societari %}
-              <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo=valore) }}">{{ etichetta }}</a></li>
-              {% endfor %}
-              <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo='altro') }}">Altro…</a></li>
-            {% else %}
-              {% for valore, etichetta in ruoli if valore in ('coniuge', 'familiare', 'socio', 'altro') %}
-              <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo=valore) }}">{{ etichetta }}{% if valore == 'altro' %}…{% endif %}</a></li>
-              {% endfor %}
-              <li><hr class="dropdown-divider"></li>
-              {% for valore, etichetta in ruoli if valore in ruoli_societari %}
-              <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo=valore) }}">{{ etichetta }}</a></li>
-              {% endfor %}
-            {% endif %}
-          </ul>
-        </div>
-      </div>
-      {% if client.persone %}
-      <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0">
-          <thead><tr><th scope="col">Ruolo</th><th scope="col">Nome e cognome</th><th scope="col" class="d-none d-lg-table-cell">Codice fiscale</th><th scope="col" class="d-none d-md-table-cell">Residenza</th><th scope="col" class="d-none d-sm-table-cell">Contatti</th><th scope="col"><span class="visually-hidden">Azioni</span></th></tr></thead>
-          <tbody>
-            {% for p in client.persone %}
-            <tr>
-              <td>{{ p.ruolo_label }}{% if p.ruolo == 'socio' and p.quota_perc is not none %} <span class="text-muted small">({{ '%g' | format(p.quota_perc) }}%)</span>{% endif %}
-                {% if p.dal %}<div class="small text-muted">dal {{ p.dal | data_it }}</div>{% endif %}</td>
-              <td class="fw-semibold">{{ p.nome_completo }}
-                {% if p.data_nascita %}<div class="small text-muted fw-normal">{{ p.eta }} anni{% if p.luogo_nascita %}, nato/a a {{ p.luogo_nascita }}{% endif %}</div>{% endif %}
-                {% if p.telefono %}<div class="small fw-normal d-sm-none"><a href="tel:{{ p.telefono }}">{{ p.telefono }}</a></div>{% endif %}</td>
-              <td class="small d-none d-lg-table-cell">{{ p.codice_fiscale or '' }}</td>
-              <td class="small d-none d-md-table-cell">{{ p.indirizzo or '' }}{% if p.citta %}{% if p.indirizzo %}, {% endif %}{{ p.citta }}{% if p.provincia %} ({{ p.provincia }}){% endif %}{% endif %}</td>
-              <td class="small d-none d-sm-table-cell">{% if p.telefono %}<a href="tel:{{ p.telefono }}">{{ p.telefono }}</a>{% endif %}{% if p.email %}<div><a href="mailto:{{ p.email }}">{{ p.email }}</a></div>{% endif %}</td>
-              <td class="text-end text-nowrap">
-                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('clients.edit_person', client_id=client.id, persona_id=p.id) }}" aria-label="Modifica {{ p.nome_completo }}"><i class="bi bi-pencil"></i></a>
-                <form method="post" action="{{ url_for('clients.delete_person', client_id=client.id, persona_id=p.id) }}" class="d-inline"
-                      onsubmit='return confirm({{ ("Rimuovere " ~ p.nome_completo ~ " da questo cliente?") | tojson }});'>
-                  <button class="btn btn-sm btn-outline-danger" aria-label="Rimuovi {{ p.nome_completo }}"><i class="bi bi-trash"></i></button>
-                </form>
-              </td>
-            </tr>
-            {% if p.note %}<tr class="table-light-subtle"><td></td><td colspan="5" class="small text-muted pt-0 text-break">{{ p.note }}</td></tr>{% endif %}
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <p class="text-muted small mb-0">{% if client.tipo == 'azienda' %}Nessun amministratore inserito. Aggiungi amministratori, consiglieri, soci e titolari effettivi: chi decide sulle coperture e chi va tutelato (D&amp;O, Key Man, TCM).{% else %}Nessuna persona collegata: aggiungi coniuge, familiari o soci dello studio.{% endif %}</p>
-      {% endif %}
-    </section>
   </div>
 
   <!-- ============ POLIZZE ============ -->
@@ -477,6 +417,74 @@
   </div>
 
   <!-- ============ ANALISI RISCHI ============ -->
+  <!-- ============ AMMINISTRATORI / COLLEGAMENTI ============ -->
+  <div class="tab-pane fade" id="tab-persone">
+    {% set azienda = client.tipo == 'azienda' %}
+    {% set dipendenti = client.persone | selectattr('ruolo', 'equalto', 'dipendente') | list %}
+    {% set figure = client.persone | rejectattr('ruolo', 'equalto', 'dipendente') | list %}
+
+    {% if not azienda %}
+    <section class="mb-4" aria-labelledby="t-ruoli">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 class="h6 text-uppercase text-muted mb-0" id="t-ruoli">Ruoli nelle aziende</h2>
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('clients.new_role', client_id=client.id) }}"><i class="bi bi-building-add"></i> Collega a un'azienda</a>
+      </div>
+      {% if client.ruoli_in_aziende %}
+      <ul class="list-group mb-0">
+        {% for r in client.ruoli_in_aziende %}
+        <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span><strong>{{ r.ruolo_label }}</strong>{% if r.ruolo == 'socio' and r.quota_perc is not none %} ({{ '%g' | format(r.quota_perc) }}%){% endif %} di
+            <a href="{{ url_for('clients.detail', client_id=r.client_id) }}#persone">{{ r.cliente.ragione_sociale }}</a>{% if r.dal %} <span class="text-muted small">dal {{ r.dal | data_it }}</span>{% endif %}</span>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('clients.edit_person', client_id=r.client_id, persona_id=r.id) }}" aria-label="Modifica il ruolo in {{ r.cliente.ragione_sociale }}"><i class="bi bi-pencil"></i></a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-muted small mb-0">Non risulta amministratore, socio o dipendente di aziende tue clienti. Collegalo per vedere tutto il suo mondo assicurativo: le sue polizze private e quelle delle aziende in cui lavora o decide.</p>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section aria-labelledby="t-persone">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 class="h6 text-uppercase text-muted mb-0" id="t-persone">{{ 'Amministratori e figure societarie' if azienda else 'Persone collegate' }}</h2>
+        <div class="dropdown">
+          <button class="btn btn-outline-primary btn-sm dropdown-toggle text-wrap text-start" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-plus"></i> {{ 'Aggiungi amministratore / consigliere / altro' if azienda else 'Aggiungi familiare / socio / altro' }}
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% set principali = ruoli_societari if azienda else ('coniuge', 'familiare', 'socio') %}
+            {% for valore, etichetta in ruoli if valore in principali %}
+            <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo=valore) }}">{{ etichetta }}</a></li>
+            {% endfor %}
+            {% if azienda %}
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo='dipendente') }}">Dipendente</a></li>
+            {% endif %}
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('clients.new_person', client_id=client.id, ruolo='altro') }}">Altro…</a></li>
+          </ul>
+        </div>
+      </div>
+      {% if figure %}
+        {% with persone=figure %}{% include "clients/_persone.html" %}{% endwith %}
+      {% else %}
+      <p class="text-muted small">{% if azienda %}Nessun amministratore inserito. Aggiungi amministratori, consiglieri, soci e titolari effettivi: chi decide sulle coperture e chi va tutelato (D&amp;O, Key Man, TCM).{% else %}Nessuna persona collegata: aggiungi coniuge, familiari o soci dello studio.{% endif %}</p>
+      {% endif %}
+    </section>
+
+    {% if azienda %}
+    <section class="mt-4" aria-labelledby="t-dipendenti">
+      <h2 class="h6 text-uppercase text-muted mb-3" id="t-dipendenti">Dipendenti</h2>
+      {% if dipendenti %}
+        {% with persone=dipendenti %}{% include "clients/_persone.html" %}{% endwith %}
+      {% else %}
+      <p class="text-muted small mb-0">Nessun dipendente collegato. Aggiungilo da qui («Dipendente» nel menu qui sopra) oppure, nella scheda di un cliente privato, scegli quest'azienda in «Lavora presso».</p>
+      {% endif %}
+    </section>
+    {% endif %}
+  </div>
+
   <!-- ============ NOTE ============ -->
   <div class="tab-pane fade" id="tab-note">
     {% set qui = url_for('clients.detail', client_id=client.id) ~ '#note' %}
@@ -588,7 +596,7 @@
     const map = {
       polizze: '#tab-polizze', documenti: '#tab-documenti',
       opportunita: '#tab-opportunita', followup: '#tab-followup', analisi: '#tab-analisi',
-      schede: '#tab-schede', note: '#tab-note'
+      schede: '#tab-schede', note: '#tab-note', persone: '#tab-persone'
     };
     const target = map[window.location.hash.replace('#', '')];
     if (target) {

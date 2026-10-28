@@ -707,7 +707,14 @@ def importa(anteprima: dict) -> dict:
             if cliente is None:
                 continue
             d = {k: v for k, v in r["dati"].items() if k in campi_persona and v not in (None, "")}
-            db.session.add(PersonaCollegata(client_id=cliente.id, **d))
+            persona = PersonaCollegata(client_id=cliente.id, **d)
+            if persona.codice_fiscale:
+                # Già cliente privato (stesso codice fiscale): si collegano le schede.
+                privato = Client.query.filter(Client.tipo.in_(("dipendente", "professionista")),
+                                              db.func.upper(Client.codice_fiscale) == persona.codice_fiscale).first()
+                if privato is not None and privato.id != cliente.id:
+                    persona.persona_client_id = privato.id
+            db.session.add(persona)
             persone_create += 1
         db.session.commit()
     except Exception:

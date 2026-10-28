@@ -25,7 +25,11 @@ notifiche generate in automatico.
   / consigliere / altro* si registrano amministratori, consiglieri, soci (con
   quota), legali rappresentanti, titolari effettivi, familiari o altre figure,
   con dati anagrafici, residenza e contatti. La ricerca trova un'azienda anche
-  dal nome di un suo amministratore.
+  dal nome di un suo amministratore. Ogni persona si può **gestire anche come
+  cliente privato** (sue polizze, sua anagrafica): i dati restano uno solo e
+  dalla scheda privata si vede di quali aziende è amministratore, socio o
+  dipendente. I **dipendenti** si collegano all'azienda cliente per cui
+  lavorano (scheda *Amministratori → Dipendenti* dell'azienda).
 - **Polizze**: compagnia, ramo, massimale, premio, **percentuale di provvigione**,
   frazionamento, decorrenza, scadenza, tacito rinnovo e stato; oltre 20 rami
   precompilati.

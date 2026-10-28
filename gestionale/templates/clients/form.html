@@ -57,8 +57,17 @@
         <input type="text" class="form-control" name="professione" placeholder="es. Ingegnere civile" value="{{ client.professione or '' if client else '' }}">
       </div>
       <div class="col-md-3 campo-dipendente">
-        <label class="form-label">Datore di lavoro</label>
-        <input type="text" class="form-control" name="datore_lavoro" placeholder="es. Acme S.p.A." value="{{ client.datore_lavoro or '' if client else '' }}">
+        <label class="form-label" for="datore_lavoro_id">Lavora presso (tuo cliente)</label>
+        <select class="form-select" id="datore_lavoro_id" name="datore_lavoro_id">
+          <option value="">— non è un mio cliente —</option>
+          {% for a in aziende %}
+          <option value="{{ a.id }}" {% if datore and datore.client_id == a.id %}selected{% endif %}>{{ a.ragione_sociale }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 campo-dipendente" id="riga-datore-testo">
+        <label class="form-label" for="datore_lavoro">Datore di lavoro</label>
+        <input type="text" class="form-control" id="datore_lavoro" name="datore_lavoro" placeholder="es. Acme S.p.A." value="{{ client.datore_lavoro or '' if client else '' }}">
       </div>
       <div class="col-md-3 campo-persona">
         <label class="form-label" for="data_nascita">Data di nascita</label>
@@ -248,6 +257,13 @@
     }
     select.addEventListener('change', aggiorna);
     aggiorna();
+
+    // Con l'azienda scelta tra i clienti il nome del datore si compila da solo.
+    const datore = document.getElementById('datore_lavoro_id');
+    const testoDatore = document.getElementById('riga-datore-testo');
+    function aggiornaDatore() { testoDatore.hidden = !!datore.value; }
+    datore.addEventListener('change', aggiornaDatore);
+    aggiornaDatore();
   })();
 </script>
 {% endblock %}
