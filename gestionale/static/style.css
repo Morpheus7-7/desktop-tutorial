@@ -337,7 +337,7 @@ code { color: var(--dc-ink); background: var(--dc-surface-2); padding: .05rem .3
   background: var(--dc-danger); color: #fff; text-align: center;
 }
 [data-bs-theme="dark"] .dc-count { color: #1a0d0b; }
-.dc-content { flex: 1; padding: 1.75rem 2rem 2.5rem; width: 100%; max-width: 1480px; }
+.dc-content { flex: 1; padding: 1.75rem 2rem 2.5rem; width: 100%; max-width: 2400px; }
 .dc-footer { padding: 0 2rem 1.5rem; color: var(--dc-muted); font-size: .8rem; }
 @media (max-width: 991.98px) {
   .dc-topbar { padding: .6rem 1rem; flex-wrap: wrap; }

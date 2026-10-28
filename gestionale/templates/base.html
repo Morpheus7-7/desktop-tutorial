@@ -51,7 +51,6 @@
         <ul class="nav flex-column" aria-labelledby="nav-archivio">
           <li><a class="nav-link {% if bp == 'clients' %}active{% endif %}" {% if bp == 'clients' %}aria-current="page"{% endif %} href="{{ url_for('clients.list_clients') }}"><i class="bi bi-people"></i> Clienti</a></li>
           <li><a class="nav-link {% if bp == 'policies' %}active{% endif %}" {% if bp == 'policies' %}aria-current="page"{% endif %} href="{{ url_for('policies.list_policies') }}"><i class="bi bi-file-earmark-text"></i> Polizze</a></li>
-          <li><a class="nav-link {% if bp == 'documents' %}active{% endif %}" {% if bp == 'documents' %}aria-current="page"{% endif %} href="{{ url_for('documents.list_documents') }}"><i class="bi bi-folder2-open"></i> Documenti</a></li>
           <li><a class="nav-link {% if ep == 'main.analytics' %}active{% endif %}" {% if ep == 'main.analytics' %}aria-current="page"{% endif %} href="{{ url_for('main.analytics') }}"><i class="bi bi-bar-chart-line"></i> Statistiche</a></li>
         </ul>
         <div class="dc-nav-group" id="nav-formazione">Formazione</div>
