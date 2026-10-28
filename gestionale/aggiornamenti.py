@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -28,6 +29,10 @@ PARAMETRI_SILENZIOSI = ["/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART"]
 
 class AggiornamentoNonValido(Exception):
     pass
+
+
+class NessunaVersionePubblicata(Exception):
+    """Su GitHub non c'è ancora nessuna Release: non è un errore."""
 
 
 def versione_tupla(testo: str) -> tuple[int, ...]:
@@ -77,6 +82,10 @@ def controlla(versione_attuale: str, timeout: float = 8.0) -> dict | None:
     """Chiede a GitHub l'ultima versione. Errori di rete -> eccezione OSError."""
     try:
         dati = json.loads(_scarica(API_ULTIMA, timeout, 2 * 1024 * 1024))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:  # GitHub risponde 404 finché non c'è una Release
+            raise NessunaVersionePubblicata from exc
+        raise
     except ValueError as exc:
         raise OSError("Risposta di GitHub non leggibile.") from exc
     return leggi_release(dati, versione_attuale)

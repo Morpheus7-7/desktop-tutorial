@@ -15,6 +15,7 @@
         <p class="small text-muted mb-3">
           {% if controllato %}Ultimo controllo: {{ controllato.strftime('%d/%m/%Y alle %H:%M') }}.{% else %}Nessun controllo ancora fatto in questa sessione.{% endif %}
           {% if errore %}<span class="text-danger">Non è stato possibile raggiungere GitHub ({{ errore }}).</span>{% endif %}
+          {% if nessuna_release %}Su GitHub non c'è ancora nessuna versione pubblicata: per ora gli aggiornamenti si installano a mano con il nuovo installatore.{% endif %}
         </p>
 
         {% if nuova %}

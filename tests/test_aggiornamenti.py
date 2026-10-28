@@ -90,3 +90,17 @@ def test_errore_di_rete_non_blocca(app, monkeypatch):
     rs.controlla_aggiornamenti(app)
     assert app.config["DC_AGGIORNAMENTO_ERRORE"] == "rete assente"
     assert app.test_client().get("/impostazioni/aggiornamenti").status_code == 200
+
+
+def test_nessuna_versione_pubblicata_non_e_un_errore(app, monkeypatch):
+    import urllib.error
+
+    def nessuna(url, timeout, limite):
+        raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+
+    monkeypatch.setattr(ag, "_scarica", nessuna)
+    client = app.test_client()
+    r = client.post("/impostazioni/aggiornamenti", data={"azione": "controlla"}, follow_redirects=True)
+    pagina = r.get_data(as_text=True)
+    assert "non è ancora stata pubblicata nessuna versione" in pagina and "Controllo non riuscito" not in pagina
+    assert app.config["DC_AGGIORNAMENTO_ERRORE"] is None and app.config["DC_NESSUNA_RELEASE"]

@@ -4,7 +4,7 @@ Gestionale per intermediari assicurativi: anagrafiche clienti
 (professionisti e aziende), polizze, documenti, analisi automatica dei
 rischi, follow-up, scadenzario e notifiche.
 """
-__version__ = "2.3.2"
+__version__ = "2.3.3"
 
 import os
 from datetime import date

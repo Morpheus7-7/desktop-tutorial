@@ -325,9 +325,14 @@ def controlla_aggiornamenti(app) -> None:
     disturbare l'utente, viene solo annotato."""
     from .. import __version__, aggiornamenti
 
+    app.config["DC_NESSUNA_RELEASE"] = False
     try:
         app.config["DC_AGGIORNAMENTO"] = aggiornamenti.controlla(__version__)
         app.config["DC_AGGIORNAMENTO_ERRORE"] = None
+    except aggiornamenti.NessunaVersionePubblicata:
+        app.config["DC_AGGIORNAMENTO"] = None
+        app.config["DC_AGGIORNAMENTO_ERRORE"] = None
+        app.config["DC_NESSUNA_RELEASE"] = True
     except Exception as exc:  # noqa: BLE001 - rete assente, GitHub non raggiungibile…
         app.config["DC_AGGIORNAMENTO_ERRORE"] = str(exc) or exc.__class__.__name__
     app.config["DC_AGGIORNAMENTO_CONTROLLATO"] = datetime.now()
@@ -352,6 +357,9 @@ def updates():
             errore = current_app.config.get("DC_AGGIORNAMENTO_ERRORE")
             if errore:
                 flash(f"Controllo non riuscito: {errore}", "danger")
+            elif current_app.config.get("DC_NESSUNA_RELEASE"):
+                flash("Su GitHub non è ancora stata pubblicata nessuna versione da installare: "
+                      "per ora gli aggiornamenti si installano a mano.", "info")
             elif not current_app.config.get("DC_AGGIORNAMENTO"):
                 flash(f"Hai già l'ultima versione ({__version__}).", "success")
         elif azione == "avvio" and _installabile():
@@ -373,6 +381,7 @@ def updates():
         nuova=current_app.config.get("DC_AGGIORNAMENTO"),
         controllato=current_app.config.get("DC_AGGIORNAMENTO_CONTROLLATO"),
         errore=current_app.config.get("DC_AGGIORNAMENTO_ERRORE"),
+        nessuna_release=current_app.config.get("DC_NESSUNA_RELEASE"),
         installabile=_installabile(),
         automatico=config.get("aggiornamenti_automatici", True),
         desktop_mode=bool(file_config),
