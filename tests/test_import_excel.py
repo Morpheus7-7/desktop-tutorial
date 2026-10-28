@@ -103,7 +103,7 @@ def test_polizze_creano_clienti_mancanti_e_saltano_doppioni(app):
         assert a["conteggi"]["clienti_nuovi"] == 1  # «Nuovo Cliente», una volta sola
 
         esito = ie.importa(a)
-        assert esito == {"clienti": 1, "completati": 0, "polizze": 2}
+        assert esito == {"clienti": 1, "completati": 0, "polizze": 2, "persone": 0}
         assert Policy.query.filter_by(client_id=cid).count() == 2
         nuovo = Client.query.filter_by(ragione_sociale="Nuovo Cliente").one()
         assert [p.numero_polizza for p in nuovo.polizze] == ["C-4"]
@@ -202,3 +202,68 @@ def test_righe_di_esempio_segnalate(app):
         a = ie.analizza(ie.modello_xlsx(), "modello.xlsx")
         assert any("esempio" in w for w in a["clienti"][0]["avvisi"])
         assert any("esempio" in w for w in a["polizze"][0]["avvisi"])
+
+
+def test_persone_con_nome_cognome_albo_e_residenza(app):
+    from gestionale.models import PersonaCollegata  # noqa: F401
+
+    dati = _xlsx({"Clienti": [
+        ["Nome", "Cognome", "Codice fiscale", "Partita IVA", "Albo", "N. iscrizione", "Nato il", "Comune di residenza"],
+        ["Giulia", "Bianchi", "BNCGLI80D52B157X", "01234567891", "Ordine degli Ingegneri", "A123", "12/04/1980", "Monza"],
+        ["Anna", "Neri", "NRENNA85A41F205Y", None, None, None, None, None],
+    ]})
+    with app.app_context():
+        a = ie.analizza(dati, "persone.xlsx")
+        g, n = a["clienti"][0]["dati"], a["clienti"][1]["dati"]
+        assert g["ragione_sociale"] == "Giulia Bianchi" and g["tipo"] == "professionista"
+        assert n["tipo"] == "dipendente" and n["ragione_sociale"] == "Anna Neri"
+        ie.importa(a)
+        c = Client.query.filter_by(cognome="Bianchi").one()
+        assert (c.albo, c.albo_numero, c.data_nascita, c.residenza_citta) == (
+            "Ordine degli Ingegneri", "A123", date(1980, 4, 12), "Monza")
+
+
+def test_foglio_amministratori(app):
+    from gestionale.models import PersonaCollegata
+
+    with app.app_context():
+        c = Client(tipo="azienda", ragione_sociale="Alfa S.r.l.", partita_iva="11111111111")
+        db.session.add(c)
+        db.session.flush()
+        db.session.add(PersonaCollegata(client_id=c.id, ruolo="consigliere", nome="Già", cognome="Presente"))
+        db.session.commit()
+    dati = _xlsx({"Amministratori": [
+        ["Società", "Carica", "Nome", "Cognome", "CF", "Quota"],
+        ["11111111111", "A.D.", "Luca", "Verdi", "vrdlcu70a01b157x", None],
+        ["Alfa S.r.l.", "Socio", "Sara", "Gialli", None, 0.3],
+        ["Alfa S.r.l.", "Direttore tecnico", "Piero", "Blu", None, None],
+        ["Alfa S.r.l.", "Consigliere", "Già", "Presente", None, None],
+        ["Beta S.p.A.", "Presidente", "Ugo", "Rosa", None, None],
+        ["Alfa S.r.l.", "Socio", "Senza", "", None, None],
+    ]})
+    with app.app_context():
+        a = ie.analizza(dati, "cda.xlsx")
+        esiti = [r["esito"] for r in a["persone"]]
+        assert esiti == ["nuova", "nuova", "nuova", "esistente", "nuova", "errore"]
+        ruoli = [(r["dati"]["ruolo"], r["dati"]["ruolo_altro"]) for r in a["persone"][:3]]
+        assert ruoli == [("amministratore_delegato", None), ("socio", None), ("altro", "Direttore tecnico")]
+        assert a["persone"][1]["dati"]["quota_perc"] == 30
+        assert a["conteggi"]["clienti_nuovi"] == 1  # «Beta S.p.A.» creato dal foglio amministratori
+        esito = ie.importa(a)
+        assert esito["persone"] == 4
+        beta = Client.query.filter_by(ragione_sociale="Beta S.p.A.").one()
+        assert [p.ruolo_label for p in beta.persone] == ["Presidente del CdA"]
+        alfa = Client.query.filter_by(partita_iva="11111111111").one()
+        assert {p.ruolo_label for p in alfa.persone} == {"Consigliere", "Amministratore delegato", "Socio",
+                                                       "Direttore tecnico"}
+        assert next(p for p in alfa.persone if p.cognome == "Verdi").codice_fiscale == "VRDLCU70A01B157X"
+
+
+def test_modello_contiene_il_foglio_amministratori(app):
+    libro = load_workbook(io.BytesIO(ie.modello_xlsx()))
+    assert "Amministratori" in libro.sheetnames
+    with app.app_context():
+        a = ie.analizza(ie.modello_xlsx(), "modello.xlsx")
+        assert a["conteggi"]["persone_nuove"] == 1
+        assert a["persone"][0]["nome_cliente"] == ie.ESEMPIO_CLIENTE
+        assert any("esempio" in w for w in a["persone"][0]["avvisi"])

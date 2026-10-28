@@ -21,7 +21,8 @@ import unicodedata
 from datetime import date, datetime
 
 from .models import (
-    BRANCH_LABELS, CLIENT_TYPES, PAYMENT_FREQUENCIES, POLICY_BRANCHES, POLICY_STATUSES, Client, Policy, db,
+    BRANCH_LABELS, CLIENT_TYPES, PAYMENT_FREQUENCIES, POLICY_BRANCHES, POLICY_STATUSES, RUOLI_PERSONA,
+    RUOLI_PERSONA_LABELS, Client, PersonaCollegata, Policy, db,
 )
 
 RIGHE_MASSIME = 20000
@@ -33,8 +34,10 @@ ESEMPIO_COMPAGNIA = "Compagnia Esempio"
 # Colonne: campo -> (intestazione del modello, altri nomi riconosciuti, tipo)
 # ----------------------------------------------------------------------
 COLONNE_CLIENTI = {
-    "ragione_sociale": ("Ragione sociale / Nome e cognome", ["ragione sociale", "nome", "cliente", "denominazione",
+    "ragione_sociale": ("Ragione sociale (aziende)", ["ragione sociale", "cliente", "denominazione",
                         "nominativo", "nome e cognome", "nome cognome", "azienda", "contraente"], "testo"),
+    "nome": ("Nome (persone)", ["nome persona"], "testo"),
+    "cognome": ("Cognome (persone)", ["cognome persona"], "testo"),
     "tipo": ("Tipo", ["tipo cliente", "tipologia"], "tipo"),
     "referente": ("Referente", ["contatto", "persona di riferimento"], "testo"),
     "partita_iva": ("Partita IVA", ["p iva", "piva", "p iva cliente", "partita iva"], "piva"),
@@ -50,6 +53,17 @@ COLONNE_CLIENTI = {
     "email": ("Email", ["e mail", "mail", "posta elettronica"], "testo"),
     "pec": ("PEC", ["email pec", "posta certificata"], "testo"),
     "telefono": ("Telefono", ["tel", "cellulare", "cell", "telefono cellulare", "mobile", "numero di telefono"], "testo"),
+    "data_nascita": ("Data di nascita", ["nato il", "nata il", "data nascita", "nascita"], "data"),
+    "luogo_nascita": ("Luogo di nascita", ["nato a", "nata a", "luogo nascita", "comune di nascita"], "testo"),
+    "residenza_indirizzo": ("Indirizzo di residenza", ["residenza", "indirizzo residenza"], "testo"),
+    "residenza_citta": ("Città di residenza", ["comune di residenza", "citta residenza"], "testo"),
+    "residenza_cap": ("CAP residenza", ["cap di residenza"], "cap"),
+    "residenza_provincia": ("Provincia residenza", ["provincia di residenza", "prov residenza"], "provincia"),
+    "albo": ("Albo / Ordine", ["ordine", "ordine professionale", "albo professionale"], "testo"),
+    "albo_provincia": ("Sede dell'ordine", ["provincia albo", "sede albo", "sede ordine"], "testo"),
+    "albo_numero": ("N. iscrizione albo", ["numero albo", "n iscrizione", "iscrizione albo", "numero iscrizione",
+                    "n albo"], "testo"),
+    "albo_data_iscrizione": ("Data iscrizione albo", ["iscritto dal", "iscritta dal", "data iscrizione"], "data"),
     "numero_dipendenti": ("Numero dipendenti", ["dipendenti", "n dipendenti", "addetti"], "intero"),
     "fatturato_annuo": ("Fatturato annuo (€)", ["fatturato", "ricavi", "volume d affari"], "numero"),
     "descrizione_attivita": ("Descrizione attività", ["descrizione", "attivita"], "testo"),
@@ -72,6 +86,28 @@ COLONNE_POLIZZE = {
     "stato": ("Stato", ["stato polizza"], "stato"),
     "note": ("Note", ["annotazioni", "osservazioni"], "testo"),
 }
+
+COLONNE_PERSONE = {
+    "cliente": ("Cliente (nome, P.IVA o codice fiscale)", ["cliente", "societa", "azienda", "ragione sociale",
+                "ditta"], "testo"),
+    "piva_cliente": ("P.IVA del cliente", ["partita iva", "p iva", "piva", "p iva cliente"], "piva"),
+    "ruolo": ("Ruolo", ["carica", "qualifica", "ruolo societario", "incarico"], "testo"),
+    "nome": ("Nome", ["nome persona"], "testo"),
+    "cognome": ("Cognome", ["cognome persona"], "testo"),
+    "codice_fiscale": ("Codice fiscale", ["cf", "cod fiscale", "c f"], "cf"),
+    "data_nascita": ("Data di nascita", ["nato il", "nata il", "data nascita", "nascita"], "data"),
+    "luogo_nascita": ("Luogo di nascita", ["nato a", "nata a", "luogo nascita", "comune di nascita"], "testo"),
+    "indirizzo": ("Indirizzo di residenza", ["indirizzo", "residenza", "via"], "testo"),
+    "citta": ("Città", ["comune", "localita", "citta di residenza"], "testo"),
+    "cap": ("CAP", ["codice postale"], "cap"),
+    "provincia": ("Provincia", ["prov", "pr"], "provincia"),
+    "email": ("Email", ["e mail", "mail"], "testo"),
+    "telefono": ("Telefono", ["tel", "cellulare", "cell"], "testo"),
+    "quota_perc": ("Quota %", ["quota", "quota partecipazione", "percentuale", "quota di partecipazione"], "percentuale"),
+    "dal": ("In carica dal", ["data nomina", "nominato il", "dal"], "data"),
+    "note": ("Note", ["annotazioni", "osservazioni"], "testo"),
+}
+ESEMPIO_PERSONA = ("Mario", "Rossi")
 
 # Le colonne che identificano un cliente servono anche nel foglio polizze.
 CLIENTE_IN_POLIZZE = {"partita_iva", "codice_fiscale"}
@@ -230,6 +266,8 @@ def _converti(campo: str, tipo: str, v, avvisi: list, errori: list, etichetta: s
         errori.append(f"{etichetta}: valore non valido «{_testo(v)}»")
         return None
     if tipo == "tipo":
+        if not _testo(v):
+            return None  # deciso dopo: azienda o persona, in base alle colonne compilate
         codice, ok = _scelta(v, CLIENT_TYPES, "azienda", SINONIMI_TIPO)
     elif tipo == "ramo":
         codice, ok = _scelta(v, POLICY_BRANCHES, "altro", SINONIMI_RAMO)
@@ -242,6 +280,31 @@ def _converti(campo: str, tipo: str, v, avvisi: list, errori: list, etichetta: s
     if not ok:
         avvisi.append(f"{etichetta}: «{_testo(v)}» non riconosciuto, uso «{dict(_VOCI[tipo])[codice]}»")
     return codice
+
+
+SINONIMI_RUOLO = {
+    "amministratore unico": "amministratore_unico", "amm unico": "amministratore_unico",
+    "amministratore delegato": "amministratore_delegato", "delegato": "amministratore_delegato",
+    "presidente": "presidente_cda", "consigl": "consigliere", "legale rapp": "legale_rappresentante",
+    "rappresentante legale": "legale_rappresentante", "soci": "socio", "procurat": "procuratore",
+    "sindac": "sindaco", "revisor": "sindaco", "titolare effettivo": "titolare_effettivo",
+    "beneficiario effettivo": "titolare_effettivo", "coniuge": "coniuge", "moglie": "coniuge", "marito": "coniuge",
+    "convivente": "coniuge", "figli": "familiare", "padre": "familiare", "madre": "familiare",
+    "familiar": "familiare", "amministratore": "amministratore_unico",
+}
+ABBREVIAZIONI_RUOLO = {"ad": "amministratore_delegato", "au": "amministratore_unico", "lr": "legale_rappresentante",
+                       "pres": "presidente_cda", "cons": "consigliere"}
+
+
+def _ruolo(testo: str | None) -> tuple[str, str | None]:
+    """(codice del ruolo, testo libero se non riconosciuto)."""
+    if not testo:
+        return "altro", None
+    n = _norm(testo)
+    if n.replace(" ", "") in ABBREVIAZIONI_RUOLO:
+        return ABBREVIAZIONI_RUOLO[n.replace(" ", "")], None
+    codice, ok = _scelta(testo, RUOLI_PERSONA, "altro", SINONIMI_RUOLO)
+    return (codice, None) if ok else ("altro", testo[:100])
 
 
 _VOCI = {"tipo": CLIENT_TYPES, "ramo": POLICY_BRANCHES, "stato": POLICY_STATUSES, "frazionamento": PAYMENT_FREQUENCIES}
@@ -298,7 +361,7 @@ def _trova_intestazione(righe: list[list]) -> int:
     for i, riga in enumerate(righe[:10]):
         if _vuota(riga):
             continue
-        p = len(_mappa_intestazioni(riga, COLONNE_CLIENTI)) + len(_mappa_intestazioni(riga, COLONNE_POLIZZE))
+        p = max(len(_mappa_intestazioni(riga, c)) for c in (COLONNE_CLIENTI, COLONNE_POLIZZE, COLONNE_PERSONE))
         if p > punti:
             migliore, punti = i, p
     return migliore
@@ -310,12 +373,16 @@ def _tipo_foglio(nome: str, intestazioni: list) -> str | None:
         return None
     if "polizz" in n:
         return "polizze"
+    if any(x in n for x in ("ammin", "person", "soci", "esponent", "consigl", "familiar")):
+        return "persone"
     if "client" in n or "anagraf" in n:
         return "clienti"
     campi_polizze = set(_mappa_intestazioni(intestazioni, COLONNE_POLIZZE).values())
     if {"compagnia", "numero_polizza"} <= campi_polizze:
         return "polizze"
-    if "ragione_sociale" in _mappa_intestazioni(intestazioni, COLONNE_CLIENTI).values():
+    if {"ruolo", "cognome"} <= set(_mappa_intestazioni(intestazioni, COLONNE_PERSONE).values()):
+        return "persone"
+    if {"ragione_sociale", "cognome"} & set(_mappa_intestazioni(intestazioni, COLONNE_CLIENTI).values()):
         return "clienti"
     return None
 
@@ -404,7 +471,7 @@ def analizza(dati: bytes, nome_file: str) -> dict:
     clienti, polizze, ignorati = [], [], []
     polizze_viste = {(_norm(p.numero_polizza), _norm(p.compagnia)) for p in Policy.query.all()}
 
-    righe_clienti, righe_polizze = [], []
+    righe_clienti, righe_polizze, righe_persone, persone = [], [], [], []
     for nome, righe in fogli:
         if not righe:
             continue
@@ -414,23 +481,43 @@ def analizza(dati: bytes, nome_file: str) -> dict:
             righe_clienti.append((nome, righe, inizio))
         elif tipo == "polizze":
             righe_polizze.append((nome, righe, inizio))
+        elif tipo == "persone":
+            righe_persone.append((nome, righe, inizio))
         elif not _vuota(righe[inizio]) and not _norm(nome).startswith(("istruzion", "valori")):
             ignorati.append(nome)
 
-    if not righe_clienti and not righe_polizze:
-        raise FileNonValido("Non trovo colonne riconoscibili: serve almeno «Ragione sociale» (clienti) "
-                            "oppure «Compagnia» e «Numero polizza» (polizze). Parti dal modello.")
+    if not righe_clienti and not righe_polizze and not righe_persone:
+        raise FileNonValido("Non trovo colonne riconoscibili: serve almeno «Ragione sociale» o «Cognome» (clienti), "
+                            "«Compagnia» e «Numero polizza» (polizze) oppure «Ruolo» e «Cognome» (amministratori). "
+                            "Parti dal modello.")
 
     # 1) Clienti
     for nome, righe, inizio in righe_clienti:
         mappa, lette = _leggi_righe(righe, COLONNE_CLIENTI, inizio)
-        if "ragione_sociale" not in mappa.values():
-            raise FileNonValido(f"Nel foglio «{nome}» manca la colonna «Ragione sociale / Nome e cognome».")
+        if "nome" in mappa.values() and not {"ragione_sociale", "cognome"} & set(mappa.values()):
+            # Una sola colonna «Nome»: contiene il nominativo intero, non si divide.
+            for r in lette:
+                r["dati"]["ragione_sociale"] = r["dati"].pop("nome", None)
+            mappa = {i: ("ragione_sociale" if c == "nome" else c) for i, c in mappa.items()}
+        if not {"ragione_sociale", "cognome"} & set(mappa.values()):
+            raise FileNonValido(f"Nel foglio «{nome}» manca la colonna «Ragione sociale» (aziende) "
+                                "oppure «Cognome» (persone).")
         for r in lette:
             d = r["dati"]
             r["foglio"] = nome
+            persona = d.get("nome") or d.get("cognome")
+            cf_persona = len(d.get("codice_fiscale") or "") == 16  # il CF di una persona ha 16 caratteri
+            if not d.get("tipo"):
+                if (persona and not d.get("ragione_sociale")) or cf_persona:
+                    professionista = d.get("albo") or d.get("partita_iva") or d.get("professione")
+                    d["tipo"] = "professionista" if professionista else "dipendente"
+                else:
+                    d["tipo"] = "azienda"
+            if persona and d["tipo"] != "azienda":
+                # Per le persone il nominativo è «Nome Cognome», come nella scheda.
+                d["ragione_sociale"] = " ".join(x for x in (d.get("nome"), d.get("cognome")) if x)
             if not d.get("ragione_sociale"):
-                r["errori"].append("Manca la ragione sociale o il nome")
+                r["errori"].append("Manca la ragione sociale (aziende) o nome e cognome (persone)")
             if r["errori"]:
                 r["esito"] = "errore"
             else:
@@ -451,6 +538,25 @@ def analizza(dati: bytes, nome_file: str) -> dict:
                     indice.aggiungi(r["rif"], d.get("partita_iva"), d.get("codice_fiscale"), d.get("ragione_sociale"))
             clienti.append(r)
 
+    def risolvi_cliente(r, testo, piva=None, cf=None):
+        """Trova il cliente di una riga di polizze o persone; se non esiste e
+        il campo «Cliente» contiene un nome, lo prepara come cliente nuovo."""
+        rif = indice.trova(piva, cf)
+        if not rif and testo:
+            rif = indice.cerca_testo(testo)
+            if rif and indice.codici_in_conflitto(rif, piva, cf):
+                rif = None  # stesso nome ma codici diversi: è un altro cliente
+        if not rif:
+            if testo and not re.fullmatch(r"[\d\s]+", testo):
+                rif = ("file", len(clienti))
+                nuovo = {"ragione_sociale": testo, "partita_iva": piva, "codice_fiscale": cf}
+                clienti.append({"riga": r["riga"], "foglio": r["foglio"], "dati": nuovo, "avvisi": [],
+                                "errori": [], "esito": "nuovo", "rif": rif, "da_polizza": True})
+                indice.aggiungi(rif, piva, cf, testo)
+            else:
+                r["errori"].append("Cliente non trovato")
+        return rif
+
     # 2) Polizze
     for nome, righe, inizio in righe_polizze:
         colonne = {**COLONNE_POLIZZE, **{k: COLONNE_CLIENTI[k] for k in CLIENTE_IN_POLIZZE}}
@@ -466,23 +572,7 @@ def analizza(dati: bytes, nome_file: str) -> dict:
             for campo in ("compagnia", "numero_polizza"):
                 if not d.get(campo):
                     r["errori"].append(f"Manca {COLONNE_POLIZZE[campo][0].lower()}")
-            rif = indice.trova(d.get("partita_iva"), d.get("codice_fiscale"))
-            if not rif and d.get("cliente"):
-                rif = indice.cerca_testo(d["cliente"])
-                if rif and indice.codici_in_conflitto(rif, d.get("partita_iva"), d.get("codice_fiscale")):
-                    rif = None  # stesso nome ma codici diversi: è un altro cliente
-            if not rif:
-                if d.get("cliente") and not re.fullmatch(r"[\d\s]+", d["cliente"]):
-                    # Cliente non presente: lo crea con i dati della riga.
-                    rif = ("file", len(clienti))
-                    nuovo = {"ragione_sociale": d["cliente"], "partita_iva": d.get("partita_iva"),
-                             "codice_fiscale": d.get("codice_fiscale")}
-                    clienti.append({"riga": r["riga"], "foglio": nome, "dati": nuovo, "avvisi": [],
-                                    "errori": [], "esito": "nuovo", "rif": rif, "da_polizza": True})
-                    indice.aggiungi(rif, nuovo["partita_iva"], nuovo["codice_fiscale"], nuovo["ragione_sociale"])
-                else:
-                    r["errori"].append("Cliente non trovato")
-            r["rif"] = rif
+            r["rif"] = risolvi_cliente(r, d.get("cliente"), d.get("partita_iva"), d.get("codice_fiscale"))
             if d.get("data_decorrenza") and d.get("data_scadenza") and d["data_scadenza"] < d["data_decorrenza"]:
                 r["avvisi"].append("La scadenza è prima della decorrenza")
             chiave = (_norm(d.get("numero_polizza")), _norm(d.get("compagnia")))
@@ -495,6 +585,45 @@ def analizza(dati: bytes, nome_file: str) -> dict:
                 polizze_viste.add(chiave)
             polizze.append(r)
 
+    # 3) Amministratori e persone collegate
+    gia_presenti = set()
+    for p in PersonaCollegata.query.all():
+        rif = ("db", p.client_id)
+        if p.codice_fiscale:
+            gia_presenti.add((rif, "cf", p.codice_fiscale.upper()))
+        gia_presenti.add((rif, "nome", _chiave_nome(p.nome_completo)))
+    for nome, righe, inizio in righe_persone:
+        mappa, lette = _leggi_righe(righe, COLONNE_PERSONE, inizio)
+        if "cognome" not in mappa.values():
+            raise FileNonValido(f"Nel foglio «{nome}» manca la colonna «Cognome».")
+        if not {"cliente", "piva_cliente"} & set(mappa.values()):
+            raise FileNonValido(f"Nel foglio «{nome}» manca la colonna «Cliente» (o P.IVA del cliente).")
+        for r in lette:
+            d = r["dati"]
+            r["foglio"] = nome
+            d["ruolo"], d["ruolo_altro"] = _ruolo(d.get("ruolo"))
+            if not d.get("cognome"):
+                r["errori"].append("Manca il cognome")
+            if d.get("quota_perc") is not None and not 0 <= d["quota_perc"] <= 100:
+                r["errori"].append("La quota deve essere tra 0 e 100")
+            rif = risolvi_cliente(r, d.get("cliente"), d.get("piva_cliente"))
+            r["rif"] = rif
+            chiavi = set()
+            if rif:
+                if d.get("codice_fiscale"):
+                    chiavi.add((rif, "cf", d["codice_fiscale"]))
+                chiavi.add((rif, "nome", _chiave_nome(" ".join(x for x in (d.get("nome"), d.get("cognome")) if x))))
+            if r["errori"]:
+                r["esito"] = "errore"
+            elif chiavi & gia_presenti:
+                r["esito"] = "esistente"
+            else:
+                r["esito"] = "nuova"
+                gia_presenti |= chiavi
+            if (d.get("nome"), d.get("cognome")) == ESEMPIO_PERSONA and d.get("cliente") == ESEMPIO_CLIENTE:
+                r["avvisi"].append("È la riga di esempio del modello: cancellala dal file se non serve")
+            persone.append(r)
+
     for r in clienti:
         if r["dati"].get("ragione_sociale") == ESEMPIO_CLIENTE:
             r["avvisi"].append("È la riga di esempio del modello: cancellala dal file se non è un tuo cliente")
@@ -506,7 +635,7 @@ def analizza(dati: bytes, nome_file: str) -> dict:
         return sum(1 for r in righe if r["esito"] == esito)
 
     nomi_db = {c.id: c.ragione_sociale for c in Client.query.with_entities(Client.id, Client.ragione_sociale)}
-    for p in polizze:
+    for p in polizze + persone:
         rif = p.get("rif")
         if rif:
             p["nome_cliente"] = nomi_db.get(rif[1]) if rif[0] == "db" else clienti[rif[1]]["dati"]["ragione_sociale"]
@@ -514,6 +643,7 @@ def analizza(dati: bytes, nome_file: str) -> dict:
     return {
         "clienti": clienti,
         "polizze": polizze,
+        "persone": persone,
         "ignorati": ignorati,
         "conteggi": {
             "clienti_nuovi": conta(clienti, "nuovo"),
@@ -522,6 +652,9 @@ def analizza(dati: bytes, nome_file: str) -> dict:
             "polizze_nuove": conta(polizze, "nuova"),
             "polizze_esistenti": conta(polizze, "esistente"),
             "polizze_errori": conta(polizze, "errore"),
+            "persone_nuove": conta(persone, "nuova"),
+            "persone_esistenti": conta(persone, "esistente"),
+            "persone_errori": conta(persone, "errore"),
         },
     }
 
@@ -563,11 +696,25 @@ def importa(anteprima: dict) -> dict:
             p.frazionamento = p.frazionamento or "annuale"
             db.session.add(p)
             polizze_create += 1
+
+        persone_create = 0
+        campi_persona = set(COLONNE_PERSONE) - {"cliente", "piva_cliente"} | {"ruolo_altro"}
+        for r in anteprima.get("persone", []):
+            if r["esito"] != "nuova":
+                continue
+            origine, idx = r["rif"]
+            cliente = db.session.get(Client, idx) if origine == "db" else creati.get(idx)
+            if cliente is None:
+                continue
+            d = {k: v for k, v in r["dati"].items() if k in campi_persona and v not in (None, "")}
+            db.session.add(PersonaCollegata(client_id=cliente.id, **d))
+            persone_create += 1
         db.session.commit()
     except Exception:
         db.session.rollback()
         raise
-    return {"clienti": len(creati), "completati": completati, "polizze": polizze_create}
+    return {"clienti": len(creati), "completati": completati, "polizze": polizze_create,
+            "persone": persone_create}
 
 
 # ----------------------------------------------------------------------
@@ -583,9 +730,15 @@ def modello_xlsx() -> bytes:
     testa = Font(bold=True, color="FFFFFF")
     sfondo = PatternFill("solid", fgColor="1D3B30")
 
-    def prepara(foglio, colonne, esempio):
+    def prepara(foglio, colonne, esempio: dict, testo=(), date_col=()):
         foglio.append([v[0] for v in colonne.values()])
-        foglio.append(esempio)
+        foglio.append([esempio.get(campo) for campo in colonne])
+        # Codici come testo (Excel non toglie gli zeri), date in formato italiano
+        for campi, formato in ((testo, "@"), (date_col, "DD/MM/YYYY")):
+            for campo in campi:
+                col = get_column_letter(list(colonne).index(campo) + 1)
+                for riga in range(2, 501):
+                    foglio[f"{col}{riga}"].number_format = formato
         for i, cella in enumerate(foglio[1], start=1):
             cella.font, cella.fill = testa, sfondo
             cella.alignment = Alignment(vertical="center", wrap_text=True)
@@ -607,6 +760,7 @@ def modello_xlsx() -> bytes:
         "Stato polizza": [e for _, e in POLICY_STATUSES],
         "Frazionamento": [e for _, e in PAYMENT_FREQUENCIES],
         "Sì/No": ["Sì", "No"],
+        "Ruolo": [e for _, e in RUOLI_PERSONA],
     }
     for j, (titolo, voci) in enumerate(elenchi.items(), start=1):
         valori.cell(row=1, column=j, value=titolo).font = Font(bold=True)
@@ -619,52 +773,65 @@ def modello_xlsx() -> bytes:
         return f"Valori!${col}$2:${col}${len(voci) + 1}"
 
     clienti = libro.create_sheet("Clienti", 0)
-    prepara(clienti, COLONNE_CLIENTI, [
-        ESEMPIO_CLIENTE, "Azienda", "Mario Rossi", "01234567890", "01234567890", "43.21.01", None, None,
-        "Impianti elettrici", "Via Roma 1", "Brescia", "25121", "BS", "info@rossiimpianti.it", None,
-        "030 1234567", 12, 1500000, "Installazione impianti elettrici civili e industriali", None,
-    ])
+    prepara(clienti, COLONNE_CLIENTI, {
+        "ragione_sociale": ESEMPIO_CLIENTE, "tipo": "Azienda", "referente": "Mario Rossi",
+        "partita_iva": "01234567890", "codice_fiscale": "01234567890", "codice_ateco": "43.21.01",
+        "settore": "Impianti elettrici", "indirizzo": "Via Roma 1", "citta": "Brescia", "cap": "25121",
+        "provincia": "BS", "email": "info@rossiimpianti.it", "telefono": "030 1234567", "numero_dipendenti": 12,
+        "fatturato_annuo": 1500000, "descrizione_attivita": "Installazione impianti elettrici civili e industriali",
+    }, testo=("partita_iva", "codice_fiscale", "cap", "residenza_cap"),
+        date_col=("data_nascita", "albo_data_iscrizione"))
     lista(clienti, COLONNE_CLIENTI, "tipo", rif(1, elenchi["Tipo cliente"]))
-    for col in ("D", "E", "L"):  # P.IVA, CF e CAP come testo: Excel non toglie gli zeri
-        for riga in range(2, 501):
-            clienti[f"{col}{riga}"].number_format = "@"
 
     polizze = libro.create_sheet("Polizze", 1)
-    prepara(polizze, COLONNE_POLIZZE, [
-        ESEMPIO_CLIENTE, ESEMPIO_COMPAGNIA, "123456789", BRANCH_LABELS["rct_rco"], 3000000, 2450,
-        12, "Annuale", date(date.today().year, 1, 1), date(date.today().year, 12, 31), "Sì", "Attiva", None,
-    ])
+    prepara(polizze, COLONNE_POLIZZE, {
+        "cliente": ESEMPIO_CLIENTE, "compagnia": ESEMPIO_COMPAGNIA, "numero_polizza": "123456789",
+        "ramo": BRANCH_LABELS["rct_rco"], "massimale": 3000000, "premio_annuo": 2450, "provvigione_perc": 12,
+        "frazionamento": "Annuale", "data_decorrenza": date(date.today().year, 1, 1),
+        "data_scadenza": date(date.today().year, 12, 31), "tacito_rinnovo": "Sì", "stato": "Attiva",
+    }, date_col=("data_decorrenza", "data_scadenza"))
     lista(polizze, COLONNE_POLIZZE, "ramo", rif(2, elenchi["Ramo"]))
     lista(polizze, COLONNE_POLIZZE, "stato", rif(3, elenchi["Stato polizza"]))
     lista(polizze, COLONNE_POLIZZE, "frazionamento", rif(4, elenchi["Frazionamento"]))
     lista(polizze, COLONNE_POLIZZE, "tacito_rinnovo", rif(5, elenchi["Sì/No"]))
-    for col in ("I", "J"):
-        for riga in range(2, 501):
-            polizze[f"{col}{riga}"].number_format = "DD/MM/YYYY"
+
+    persone = libro.create_sheet("Amministratori", 2)
+    prepara(persone, COLONNE_PERSONE, {
+        "cliente": ESEMPIO_CLIENTE, "ruolo": "Amministratore unico", "nome": ESEMPIO_PERSONA[0],
+        "cognome": ESEMPIO_PERSONA[1], "codice_fiscale": "RSSMRA70A01B157X", "data_nascita": date(1970, 1, 1),
+        "luogo_nascita": "Brescia", "indirizzo": "Via Garibaldi 3", "citta": "Brescia", "cap": "25122",
+        "provincia": "BS", "telefono": "333 1234567", "dal": date(2015, 3, 1),
+    }, testo=("piva_cliente", "codice_fiscale", "cap"), date_col=("data_nascita", "dal"))
+    lista(persone, COLONNE_PERSONE, "ruolo", rif(6, elenchi["Ruolo"]))
 
     istruzioni = libro.create_sheet("Istruzioni")
     testo = [
         "Come compilare",
-        "1. Foglio «Clienti»: una riga per cliente. Obbligatoria solo la colonna «Ragione sociale / Nome e cognome».",
+        "1. Foglio «Clienti»: una riga per cliente. Per le aziende basta «Ragione sociale»;",
+        "   per professionisti e privati compila «Nome» e «Cognome» (più nascita, residenza e albo se li hai).",
         "2. Foglio «Polizze»: una riga per polizza. Obbligatori «Cliente», «Compagnia» e «Numero polizza».",
         "   In «Cliente» scrivi il nome come nel foglio Clienti, oppure la P.IVA o il codice fiscale.",
         "   Se il cliente non esiste ancora viene creato con quel nome.",
-        "3. Le righe di esempio (riga 2) vanno sostituite o cancellate.",
-        "4. Date nel formato 31/12/2026; importi senza simbolo € (es. 2450 o 2.450,00).",
-        "5. Ramo, stato, frazionamento e tipo: scegli dal menu a tendina (elenchi nel foglio «Valori»).",
+        "3. Foglio «Amministratori»: amministratori, consiglieri, soci, familiari… Obbligatori «Cliente»",
+        "   e «Cognome»; il «Ruolo» si sceglie dal menu (un ruolo diverso viene salvato così com'è).",
+        "4. Le righe di esempio (riga 2) vanno sostituite o cancellate.",
+        "5. Date nel formato 31/12/2026; importi senza simbolo € (es. 2450 o 2.450,00).",
+        "6. Ramo, stato, frazionamento, tipo e ruolo: scegli dal menu a tendina (elenchi nel foglio «Valori»).",
         "",
         "Cosa succede all'importazione",
         "- Prima vedi un'anteprima: niente viene salvato finché non confermi.",
         "- I clienti già presenti (stessa P.IVA, codice fiscale o nome) non vengono sovrascritti:",
         "  si completano solo i campi che erano vuoti.",
-        "- Le polizze già presenti (stesso numero e compagnia) vengono saltate.",
+        "- Le polizze già presenti (stesso numero e compagnia) vengono saltate, così come le persone",
+        "  già registrate sullo stesso cliente (stesso codice fiscale o stesso nome e cognome).",
         "- Prima di importare il gestionale fa un backup del database.",
     ]
     for riga in testo:
         istruzioni.append([riga])
     istruzioni.column_dimensions["A"].width = 110
-    for r in (1, 10):
-        istruzioni[f"A{r}"].font = Font(bold=True, size=12)
+    for r, riga in enumerate(testo, start=1):
+        if riga in ("Come compilare", "Cosa succede all'importazione"):
+            istruzioni[f"A{r}"].font = Font(bold=True, size=12)
 
     buf = io.BytesIO()
     libro.save(buf)

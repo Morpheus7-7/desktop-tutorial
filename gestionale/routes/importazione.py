@@ -11,7 +11,7 @@ from flask import (
 
 from .. import desktop, import_excel
 from ..archivio import ArchivioNonValido, percorso_db
-from ..models import BRANCH_LABELS
+from ..models import BRANCH_LABELS, RUOLI_PERSONA_LABELS
 
 bp = Blueprint("importazione", __name__, url_prefix="/clienti/importa")
 
@@ -68,7 +68,7 @@ def upload():
     (_cartella_temporanea() / f"{token}.dat").write_bytes(dati)
     session["dc_import"] = {"token": token, "nome": file.filename[-200:]}
     return render_template("importazione/anteprima.html", a=anteprima, nome_file=file.filename, token=token,
-                           rami=BRANCH_LABELS)
+                           rami=BRANCH_LABELS, ruoli=RUOLI_PERSONA_LABELS)
 
 
 @bp.route("/conferma", methods=["POST"])
@@ -92,6 +92,8 @@ def confirm():
     percorso.unlink(missing_ok=True)
     session.pop("dc_import", None)
     parti = [f"{esito['clienti']} clienti nuovi", f"{esito['polizze']} polizze"]
+    if esito.get("persone"):
+        parti.append(f"{esito['persone']} amministratori/persone collegate")
     if esito["completati"]:
         parti.append(f"{esito['completati']} clienti esistenti completati")
     flash("Importazione completata: " + ", ".join(parti) + ".", "success")

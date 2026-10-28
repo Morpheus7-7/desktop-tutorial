@@ -24,31 +24,37 @@
 
 {% set c = a.conteggi %}
 <div class="row g-3 mb-4">
-  <div class="col-sm-6">
+  <div class="col-sm-4">
     <section class="card h-100"><div class="card-body">
       <h2 class="h6">Clienti</h2>
       <p class="mb-0"><strong>{{ quanti(c.clienti_nuovi, 'nuovo', 'nuovi') }}</strong> · {{ c.clienti_esistenti }} già present{{ 'e' if c.clienti_esistenti == 1 else 'i' }}{% if c.clienti_errori %} · <span class="text-danger">{{ c.clienti_errori }} con errori</span>{% endif %}</p>
     </div></section>
   </div>
-  <div class="col-sm-6">
+  <div class="col-sm-4">
     <section class="card h-100"><div class="card-body">
       <h2 class="h6">Polizze</h2>
       <p class="mb-0"><strong>{{ quanti(c.polizze_nuove, 'nuova', 'nuove') }}</strong> · {{ c.polizze_esistenti }} già present{{ 'e' if c.polizze_esistenti == 1 else 'i' }}{% if c.polizze_errori %} · <span class="text-danger">{{ c.polizze_errori }} con errori</span>{% endif %}</p>
     </div></section>
   </div>
+  <div class="col-sm-4">
+    <section class="card h-100"><div class="card-body">
+      <h2 class="h6">Amministratori e persone</h2>
+      <p class="mb-0"><strong>{{ quanti(c.persone_nuove, 'nuova', 'nuove') }}</strong> · {{ c.persone_esistenti }} già present{{ 'e' if c.persone_esistenti == 1 else 'i' }}{% if c.persone_errori %} · <span class="text-danger">{{ c.persone_errori }} con errori</span>{% endif %}</p>
+    </div></section>
+  </div>
 </div>
 
 {% if a.ignorati %}<div class="alert alert-info">Fogli non riconosciuti e non letti: {{ a.ignorati | join(', ') }}.</div>{% endif %}
-{% if c.clienti_errori or c.polizze_errori %}
+{% if c.clienti_errori or c.polizze_errori or c.persone_errori %}
 <div class="alert alert-warning">Le righe con errori vengono saltate. Puoi correggerle nel file e ricaricarlo, oppure importare intanto le altre.</div>
 {% endif %}
 
 <div class="d-flex gap-2 flex-wrap mb-4">
-  {% if c.clienti_nuovi or c.polizze_nuove or c.clienti_esistenti %}
+  {% if c.clienti_nuovi or c.polizze_nuove or c.persone_nuove or c.clienti_esistenti %}
   <form method="post" action="{{ url_for('importazione.confirm') }}"
         onsubmit="this.querySelector('button').disabled = true;">
     <input type="hidden" name="token" value="{{ token }}">
-    <button class="btn btn-primary"><i class="bi bi-check2-circle"></i> Importa {{ quanti(c.clienti_nuovi, 'cliente', 'clienti') }} e {{ quanti(c.polizze_nuove, 'polizza', 'polizze') }}</button>
+    <button class="btn btn-primary"><i class="bi bi-check2-circle"></i> Importa {{ quanti(c.clienti_nuovi, 'cliente', 'clienti') }}, {{ quanti(c.polizze_nuove, 'polizza', 'polizze') }}{% if c.persone_nuove %} e {{ quanti(c.persone_nuove, 'persona', 'persone') }}{% endif %}</button>
   </form>
   {% endif %}
   <form method="post" action="{{ url_for('importazione.cancel') }}">
@@ -67,7 +73,8 @@
         <tr>
           <td class="text-muted small">{{ r.foglio }} {{ r.riga }}</td>
           <td>{{ esito(r) }}</td>
-          <td>{{ r.dati.ragione_sociale or '—' }}{% if r.da_polizza %} <span class="small text-muted">(dal foglio polizze)</span>{% endif %}</td>
+          <td>{{ r.dati.ragione_sociale or '—' }}{% if r.da_polizza %} <span class="small text-muted">(da {{ r.foglio }})</span>{% endif %}
+            {% if r.dati.tipo and r.dati.tipo != 'azienda' %}<div class="small text-muted">{{ 'Professionista' if r.dati.tipo == 'professionista' else 'Privato' }}</div>{% endif %}</td>
           <td class="small">{{ r.dati.partita_iva or r.dati.codice_fiscale or '' }}</td>
           <td class="small">{{ r.dati.citta or '' }}</td>
           <td class="small">{{ problemi(r) }}</td>
@@ -104,6 +111,30 @@
     </table>
   </div>
   {% if a.polizze | length > 500 %}<div class="card-footer small text-muted">Mostrate le prime 500 righe su {{ a.polizze | length }}.</div>{% endif %}
+</section>
+{% endif %}
+
+{% if a.persone %}
+<section class="card mt-4" aria-labelledby="t-persone">
+  <div class="card-header"><h2 class="h6 mb-0" id="t-persone">Amministratori e persone nel file</h2></div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th scope="col">Riga</th><th scope="col">Esito</th><th scope="col">Cliente</th><th scope="col">Ruolo</th><th scope="col">Nome e cognome</th><th scope="col">Codice fiscale</th><th scope="col">Note</th></tr></thead>
+      <tbody>
+        {% for r in a.persone[:500] %}
+        <tr>
+          <td class="text-muted small">{{ r.foglio }} {{ r.riga }}</td>
+          <td>{{ esito(r) }}</td>
+          <td>{{ r.nome_cliente or r.dati.cliente or '—' }}</td>
+          <td class="small">{{ r.dati.ruolo_altro or ruoli.get(r.dati.ruolo, '') }}</td>
+          <td>{{ [r.dati.nome, r.dati.cognome] | select | join(' ') or '—' }}</td>
+          <td class="small">{{ r.dati.codice_fiscale or '' }}</td>
+          <td class="small">{{ problemi(r) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </section>
 {% endif %}
 {% endblock %}
