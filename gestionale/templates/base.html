@@ -16,11 +16,11 @@
 <body>
 <a class="dc-skip" href="#contenuto">Vai al contenuto</a>
 
-<div class="dc-shell">
-  {% set ep = request.endpoint or '' %}
-  {% set bp = request.blueprint or '' %}
-  {# Con lo schermo bloccato dal PIN non si mostra niente dell'archivio. #}
-  {% set bloccato = ep in ('privacy.unlock', 'privacy.recover') %}
+{% set ep = request.endpoint or '' %}
+{% set bp = request.blueprint or '' %}
+{# Con lo schermo bloccato dal PIN non si mostra niente dell'archivio. #}
+{% set bloccato = ep in ('privacy.unlock', 'privacy.recover') %}
+<div class="dc-shell{% if bloccato %} dc-shell-bloccata{% endif %}">
   {% macro voce(endpoint, icona, testo, attiva) -%}
     <li><a class="nav-link {% if attiva %}active{% endif %}" {% if attiva %}aria-current="page"{% endif %} href="{{ url_for(endpoint) }}"><i class="bi {{ icona }}" aria-hidden="true"></i> {{ testo }}</a></li>
   {%- endmacro %}

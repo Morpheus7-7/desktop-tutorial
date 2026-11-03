@@ -577,7 +577,7 @@ def test_csp_senza_script_inline_e_template_senza_gestori(client, app):
     cartella = pathlib.Path(app.root_path) / "templates"
     for f in cartella.rglob("*.html"):
         testo = f.read_text()
-        assert not re.search(r"\son[a-z]+\s*=\s*\"", testo), f"gestore inline in {f.name}"
+        assert not re.search(r"\son[a-z]+\s*=\s*[\"']", testo), f"gestore inline in {f.name}"
         assert not re.search(r"<script(?![^>]*\b(?:src|nonce)=)", testo), f"script inline senza nonce in {f.name}"
 
 

@@ -231,7 +231,7 @@
       const ruoloPredefinito = function (riga) {
         const s = riga.querySelector('select');
         if (s && !s.dataset.toccato && tipoSelect) {
-          s.value = (tipoSelect.value === 'azienda' || tipoSelect.value === 'studio') ? 'amministratore_unico' : 'coniuge';
+          s.value = tipoSelect.value === 'azienda' ? 'amministratore_unico' : (tipoSelect.value === 'studio' ? 'socio' : 'coniuge');
         }
       };
       aggiungi.addEventListener('click', function () {

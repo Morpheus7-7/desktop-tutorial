@@ -60,6 +60,9 @@ READONLY_ALLOWED_POST = {
     "privacy.unlock",
     "privacy.recover",
     "privacy.lock_now",
+    # Accademia: lezioni completate e quiz sono formazione, non dati del portafoglio.
+    "academy.toggle_lesson",
+    "academy.quiz",
     "notifications.mark_read",
     "notifications.mark_all_read",
 }

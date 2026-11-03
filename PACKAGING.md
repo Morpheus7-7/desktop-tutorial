@@ -238,9 +238,12 @@ con **Chiudi Deal Combined** in fondo alla barra laterale.
   codice.
 - **Si apre una finestra di Edge invece di quella del programma.** La finestra
   nativa non è partita (manca Edge WebView2, raro su Windows 10 e 11, oppure
-  si è chiusa da sola all'avvio precedente). Funziona allo stesso modo; si
-  chiude con **Chiudi Deal Combined** in fondo alla barra laterale. Con la
-  versione successiva del programma si riprova la finestra nativa.
+  si è chiusa da sola all'avvio precedente). Funziona allo stesso modo.
+  Chiudendo la finestra l'archivio si libera per l'altro PC e il programma
+  resta pronto: un nuovo doppio clic sull'icona riapre la finestra. Per
+  chiuderlo del tutto usa **Chiudi Deal Combined** in fondo alla barra
+  laterale. Con la versione successiva del programma si riprova la finestra
+  nativa.
 - **Il programma non parte.** Guarda `Documenti\Deal Combined\deal-combined.log`.
 - **Email:** si configurano da *Impostazioni → Generali ed email*. Le variabili
   d'ambiente equivalenti sono elencate nel README.

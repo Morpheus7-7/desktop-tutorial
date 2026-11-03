@@ -39,7 +39,7 @@
             {% endif %}
             <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('clients.edit_person', client_id=client.id, persona_id=p.id) }}" aria-label="Modifica {{ p.nome_completo }}"><i class="bi bi-pencil"></i></a>
             <form method="post" action="{{ url_for('clients.delete_person', client_id=client.id, persona_id=p.id) }}"
-                  onsubmit='return confirm({{ ("Rimuovere " ~ p.nome_completo ~ " da " ~ client.ragione_sociale ~ "? La sua eventuale scheda di cliente privato resta.") | tojson }});'>
+                  data-confirm="{{ 'Rimuovere ' ~ p.nome_completo ~ ' da ' ~ client.ragione_sociale ~ '? La sua eventuale scheda di cliente privato resta.' }}">
               {{ csrf_field() }}
               <button class="btn btn-sm btn-outline-danger" aria-label="Rimuovi {{ p.nome_completo }}"><i class="bi bi-trash"></i></button>
             </form>

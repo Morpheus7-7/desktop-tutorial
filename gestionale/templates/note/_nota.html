@@ -25,7 +25,7 @@
     {% endif %}
     <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('note.edit', nota_id=n.id, next=next) }}" aria-label="Modifica la nota {{ n.titolo }}"><i class="bi bi-pencil"></i></a>
     <form method="post" action="{{ url_for('note.delete', nota_id=n.id) }}" class="d-inline"
-          onsubmit='return confirm({{ ("Eliminare la nota «" ~ n.titolo ~ "»?") | tojson }});'>
+          data-confirm="{{ 'Eliminare la nota «' ~ n.titolo ~ '»?' }}">
       {{ csrf_field() }}
       <input type="hidden" name="next" value="{{ next }}">
       <button class="btn btn-sm btn-outline-danger" aria-label="Elimina la nota {{ n.titolo }}"><i class="bi bi-trash"></i></button>

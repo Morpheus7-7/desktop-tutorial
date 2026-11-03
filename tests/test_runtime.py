@@ -190,3 +190,61 @@ def test_finestra_nativa_fallita_si_ricorda_per_versione(tmp_path):
     assert rd._leggi_testo(prova) == __version__  # stessa versione: si usa Edge
     prova.write_text("0.0.1", encoding="utf-8")
     assert rd._leggi_testo(prova) != __version__  # programma aggiornato: si riprova la finestra nativa
+
+
+def test_finestra_di_ripiego_riapribile_e_archivio_liberato_alla_chiusura(tmp_path, monkeypatch):
+    """Con la finestra di Edge un nuovo doppio clic la riapre (DC_MOSTRA) e,
+    chiusa la finestra, l'archivio si libera per l'altro PC."""
+    import threading
+    import time
+
+    class _App:
+        config = {}
+
+    eventi, aperture = [], []
+    profilo = tmp_path / "finestra_edge"
+    profilo.mkdir()
+
+    def apri(url, cartella):
+        aperture.append(url)
+        (profilo / "lockfile").write_text("")  # Edge ha aperto la finestra
+        return True
+
+    in_uso = {"n": 0}
+
+    def edge_in_uso(p):
+        in_uso["n"] += 1
+        return in_uso["n"] < 3  # dopo un paio di controlli la finestra è chiusa
+
+    chiusa = threading.Event()
+    monkeypatch.setattr(rd, "_apri_finestra_edge", apri)
+    monkeypatch.setattr(rd, "edge_in_uso", edge_in_uso)
+    monkeypatch.setattr(rd.sys, "platform", "win32")
+    app = _App()
+    rd._finestra_ripiego(app, "http://127.0.0.1:5000", tmp_path,
+                         entra=lambda: eventi.append("entra"),
+                         esce=lambda: (eventi.append("esce"), chiusa.set()), pausa_s=0.01)
+    assert chiusa.wait(5), "chiusa la finestra l'archivio deve liberarsi"
+    assert eventi == ["entra", "esce"] and aperture == ["http://127.0.0.1:5000"]
+    # Secondo doppio clic sull'icona: la finestra si riapre.
+    app.config["DC_MOSTRA"]()
+    time.sleep(0.05)
+    assert aperture == ["http://127.0.0.1:5000"] * 2 and eventi[2] == "entra"
+
+
+def test_finestra_di_ripiego_senza_edge_usa_il_browser(tmp_path, monkeypatch):
+    class _App:
+        config = {}
+
+    aperti = []
+    monkeypatch.setattr(rd, "_apri_finestra_edge", lambda url, cartella: False)
+    monkeypatch.setattr(rd.webbrowser, "open", aperti.append)
+    app = _App()
+    rd._finestra_ripiego(app, "http://127.0.0.1:5000", tmp_path, entra=lambda: None, esce=lambda: None)
+    assert aperti == ["http://127.0.0.1:5000"] and callable(app.config["DC_MOSTRA"])
+
+
+def test_edge_in_uso_legge_il_blocco_del_profilo(tmp_path):
+    assert rd.edge_in_uso(tmp_path) is False  # nessun lockfile: finestra chiusa
+    (tmp_path / "lockfile").write_text("")
+    assert rd.edge_in_uso(tmp_path) is False and not (tmp_path / "lockfile").exists()  # file libero

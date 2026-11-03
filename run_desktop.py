@@ -336,20 +336,19 @@ def _avvia() -> None:
     prova = data_dir / FILE_PROVA_FINESTRA
     nativa_fallita = _leggi_testo(prova) == __version__
 
-    if webview is None or os.environ.get("DC_BROWSER") or nativa_fallita:
-        # Ripiego: finestra di Edge (o browser); si chiude dal pulsante «Chiudi Deal Combined».
-        entra()
-        _chiudi_splash()
-        threading.Timer(1.2, lambda: _apri_finestra_edge(url, data_dir) or webbrowser.open(url)).start()
-        servi()
-        return
-
     threading.Thread(target=servi, name="server", daemon=True).start()
     _attendi_server(port)
     try:
         file_istanza.write_text(str(port), encoding="utf-8")
     except OSError:
         pass
+
+    if webview is None or os.environ.get("DC_BROWSER") or nativa_fallita:
+        # Ripiego: finestra di Edge (o browser); si chiude dal pulsante «Chiudi Deal Combined».
+        _chiudi_splash()
+        _finestra_ripiego(app, url, data_dir, entra, esce)
+        threading.Event().wait()  # il server resta attivo; si chiude dall'app
+        return
     app.config["DC_FINESTRA"] = True
 
     finestra = webview.create_window(
@@ -378,9 +377,7 @@ def _avvia() -> None:
     except Exception as exc:  # noqa: BLE001 - nessun motore WebView disponibile
         print(f"Finestra non disponibile ({exc}): apro la finestra di Edge.")
         app.config["DC_FINESTRA"] = False
-        entra()
-        if not _apri_finestra_edge(url, data_dir):
-            webbrowser.open(url)
+        _finestra_ripiego(app, url, data_dir, entra, esce)
         threading.Event().wait()  # il server resta attivo; si chiude dall'app
         return
     chiudi()  # finestra chiusa davvero (senza icona nella barra): fine
@@ -422,6 +419,54 @@ def _apri_finestra_edge(url: str, cartella: Path) -> bool:
     except OSError:
         return False
     return True
+
+
+def edge_in_uso(profilo: Path) -> bool:
+    """Edge tiene bloccato il file «lockfile» del profilo finché la finestra è
+    aperta (Windows): finché non si riesce a cancellarlo, la finestra c'è."""
+    blocco = Path(profilo) / "lockfile"
+    if not blocco.exists():
+        return False
+    try:
+        blocco.unlink()  # riesce solo quando Edge ha chiuso la finestra
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return False
+
+
+def _finestra_ripiego(app, url: str, data_dir: Path, entra, esce, pausa_s: float = 2.0) -> None:
+    """Apre il programma nella finestra di Edge (o nel browser) e la rende
+    riapribile: un nuovo doppio clic sull'icona la riporta su (invece di non
+    fare nulla). Chiusa la finestra di Edge, l'archivio si libera per l'altro
+    PC come quando la finestra nativa va nella barra; il programma resta
+    pronto e si chiude del tutto con «Chiudi Deal Combined»."""
+    stato = {"sorveglia": False}
+    profilo = data_dir / "finestra_edge"
+
+    def sorveglia() -> None:
+        # Aspetta che Edge apra la finestra (al massimo 30 s), poi che la chiuda.
+        for _ in range(int(30 / pausa_s) + 1):
+            if (profilo / "lockfile").exists():
+                break
+            time.sleep(pausa_s)
+        while edge_in_uso(profilo):
+            time.sleep(pausa_s)
+        stato["sorveglia"] = False
+        esce()
+
+    def mostra() -> None:
+        entra()
+        if _apri_finestra_edge(url, data_dir):
+            if sys.platform == "win32" and not stato["sorveglia"]:
+                stato["sorveglia"] = True
+                threading.Thread(target=sorveglia, name="finestra-edge", daemon=True).start()
+        else:
+            webbrowser.open(url)
+
+    app.config["DC_MOSTRA"] = mostra
+    mostra()
 
 
 def _avvia_barra(app, finestra, entra, esce, chiudi, url):

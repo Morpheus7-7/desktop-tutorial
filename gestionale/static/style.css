@@ -964,3 +964,7 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 .dc-utente { width: auto; padding-inline: .35rem; }
 .dc-topbar-actions .dc-count { z-index: 1; }
 .dc-versione { color: var(--dc-cover-muted); padding: .5rem .75rem 0; }
+
+/* Schermo bloccato dal PIN: niente menu (né la sua colonna verde). */
+.dc-rail[hidden] { display: none !important; }
+.dc-shell.dc-shell-bloccata { background: var(--dc-ground); }
