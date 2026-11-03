@@ -35,7 +35,7 @@ già i dati accanto all'eseguibile.
 
 ## Il modo più semplice: `CREA_EXE.bat`
 
-Su un PC Windows con **Python 3.11 o successivo** (da python.org, spuntando «Add
+Su un PC Windows con **Python dalla 3.11 alla 3.14** (da python.org, spuntando «Add
 Python to PATH»), scompatta la cartella del progetto e fai **doppio clic su
 `CREA_EXE.bat`**. Lo script crea un ambiente separato, installa i componenti,
 costruisce l'eseguibile e apre la cartella `dist` con `GestionaleAssicurativo.exe`

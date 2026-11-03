@@ -11,8 +11,8 @@ echo.
 
 rem --- Python 3.11 o successivo (launcher "py" installato con Python da python.org)
 set "PY="
-rem Versioni provate con tutti i componenti (finestra compresa): prima 3.12, poi 3.11 e 3.13.
-for %%V in (3.12 3.11 3.13) do if not defined PY py -%%V --version >nul 2>&1 && set "PY=py -%%V"
+rem Versioni supportate da tutti i componenti (finestra compresa): dalla 3.11 alla 3.14.
+for %%V in (3.14 3.13 3.12 3.11) do if not defined PY py -%%V --version >nul 2>&1 && set "PY=py -%%V"
 if not defined PY py -3 --version >nul 2>&1 && set "PY=py -3"
 if not defined PY python --version >nul 2>&1 && set "PY=python"
 if not defined PY (
@@ -24,7 +24,6 @@ if not defined PY (
   exit /b 1
 )
 echo Uso: %PY%
-echo Consigliato Python 3.12: versioni piu' nuove potrebbero non supportare ancora la finestra del programma.
 %PY% --version
 
 rem --- Ambiente separato, per non toccare altri programmi Python
