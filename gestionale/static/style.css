@@ -296,14 +296,14 @@ code { color: var(--dc-ink); background: var(--dc-surface-2); padding: .05rem .3
 
 .dc-nav { flex: 1; }
 .dc-nav-group {
-  margin: 1rem .6rem .35rem; font-size: .72rem; font-weight: 600;
+  margin: .8rem .6rem .3rem; font-size: .72rem; font-weight: 600;
   letter-spacing: .08em; text-transform: uppercase; color: var(--dc-cover-muted);
 }
 .dc-nav-group:first-child { margin-top: .25rem; }
 .dc-nav .nav, .dc-rail-foot { gap: .1rem; }
 .dc-rail .nav-link {
   display: flex; align-items: center; gap: .65rem;
-  padding: .5rem .6rem; border-radius: .45rem;
+  padding: .42rem .6rem; border-radius: .45rem;
   color: var(--dc-cover-muted); font-weight: 500;
   transition: background-color .15s ease, color .15s ease;
 }
@@ -685,115 +685,112 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 .ga-muted { color: var(--ga-muted) !important; }
 .tabular { font-variant-numeric: tabular-nums; }
 
-/* Intestazione di pagina */
-.page-title { font-size: 1.45rem; font-weight: 700; margin: 0; }
-.page-subtitle { color: var(--ga-muted); font-size: .88rem; }
+/* Intestazione di pagina (headline del DESIGN.md) */
+.page-title { font-size: 1.6rem; font-weight: 650; font-stretch: 94%; letter-spacing: -.01em; line-height: 1.2; margin: 0; }
+.page-subtitle { color: var(--dc-muted); font-size: .9rem; max-width: 70ch; }
 
 /* ---------- Superfici ------------------------------------------------------ */
-.tab-content.bg-white { box-shadow: var(--ga-card-shadow); border-radius: 0 0 var(--ga-radius) var(--ga-radius); }
-.section-title { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ga-muted); font-weight: 600; margin-bottom: .6rem; }
+.tab-content.bg-white { box-shadow: var(--dc-shadow); border-radius: 0 0 var(--dc-radius) var(--dc-radius); }
+.section-title { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--dc-muted); font-weight: 650; margin-bottom: .6rem; }
 
-/* ---------- Stat card (dashboard) ----------------------------------------- */
+/* ---------- Indicatori (Oggi, scheda cliente, statistiche) ----------------- */
 .stat-card { position: relative; overflow: hidden; }
-.stat-card .stat-label { color: var(--ga-muted); font-size: .8rem; padding-right: 2.6rem; }
-.stat-card .stat-value { font-size: 1.65rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
-.stat-card .stat-value.small-value { font-size: 1.3rem; }
+.stat-card .stat-label { color: var(--dc-muted); font-size: .82rem; padding-right: 2.6rem; }
+.stat-card .stat-value { font-size: 1.6rem; font-weight: 700; font-stretch: 80%; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.stat-card .stat-value.small-value { font-size: 1.35rem; }
 .stat-card .stat-icon {
   position: absolute; right: .9rem; top: .9rem;
-  width: 34px; height: 34px; border-radius: .55rem;
+  width: 34px; height: 34px; border-radius: .5rem;
   display: inline-flex; align-items: center; justify-content: center; font-size: 1.05rem;
-  background: var(--ga-soft); color: var(--ga-primary-2);
+  background: var(--dc-green-soft); color: var(--dc-green);
 }
-.stat-card.accent-success .stat-icon { background: #e8f7ee; color: var(--ga-success); }
-.stat-card.accent-warning .stat-icon { background: #fff4e0; color: #b45309; }
-.stat-card.accent-danger  .stat-icon { background: #fdecec; color: var(--ga-danger); }
-.stat-card.accent-info    .stat-icon { background: #e6f6fd; color: #0369a1; }
+.stat-card.accent-success .stat-icon { background: var(--dc-success-soft); color: var(--dc-success); }
+.stat-card.accent-warning .stat-icon { background: var(--dc-warning-soft); color: var(--dc-warning); }
+.stat-card.accent-danger  .stat-icon { background: var(--dc-danger-soft); color: var(--dc-danger); }
+.stat-card.accent-info    .stat-icon { background: var(--dc-info-soft); color: var(--dc-info); }
 .stat-card a.stretched-link:hover ~ * { text-decoration: none; }
 @media (max-width: 575.98px) {
   .stat-card .stat-icon { display: none; }
   .stat-card .stat-label { padding-right: 0; }
   .stat-card .stat-value { font-size: 1.35rem; }
-  .stat-card .stat-value.small-value { font-size: 1.05rem; }
+  .stat-card .stat-value.small-value { font-size: 1.1rem; }
 }
-.stat-alert { border-left: 4px solid var(--ga-danger); }
-.stat-warn  { border-left: 4px solid var(--ga-warning); }
+/* Stato dell'indicatore: tono del foglio e filetto, mai barre laterali (DESIGN.md). */
+.stat-alert { background: color-mix(in srgb, var(--dc-danger-soft) 55%, var(--dc-surface)); border-color: color-mix(in srgb, var(--dc-danger) 40%, var(--dc-line)); }
+.stat-warn  { background: color-mix(in srgb, var(--dc-warning-soft) 55%, var(--dc-surface)); border-color: color-mix(in srgb, var(--dc-warning) 40%, var(--dc-line)); }
 
 /* ---------- Analisi rischi ------------------------------------------------- */
-.severita-alta    { border-left: 4px solid var(--ga-danger); }
-.severita-media   { border-left: 4px solid #fd7e14; }
-.severita-bassa   { border-left: 4px solid #ffc107; }
-.severita-baseline{ border-left: 4px solid var(--ga-primary-2); }
+.severita-alta     { border-color: color-mix(in srgb, var(--dc-danger) 45%, var(--dc-line)); }
+.severita-media    { border-color: color-mix(in srgb, var(--dc-warning) 45%, var(--dc-line)); }
+.severita-bassa    { border-color: color-mix(in srgb, var(--dc-warning) 25%, var(--dc-line)); }
+.severita-baseline { border-color: color-mix(in srgb, var(--dc-green) 35%, var(--dc-line)); }
 .keyword-badge { font-weight: 400; }
 
-/* Spunto di trattativa: riquadro evidenziato */
-.trattativa {
-  background: #fff7ed; border: 1px solid #fed7aa; border-radius: .5rem;
-  padding: .6rem .75rem; margin-top: .6rem;
-}
-.trattativa .trattativa-title { color: #b45309; font-weight: 600; }
-.trattativa .esempio { font-style: italic; color: #7c2d12; }
-
 /* ---------- Tabelle -------------------------------------------------------- */
-.table { --bs-table-hover-bg: #f6f8fc; }
+.table { --bs-table-hover-bg: var(--dc-surface-2); --bs-table-bg: transparent; }
 .table td, .table th { vertical-align: middle; }
-.table thead th {
-  font-size: .74rem; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--ga-muted); font-weight: 600; background: #fafbfd; border-bottom-width: 1px; white-space: nowrap;
-}
-.table-totals td { font-weight: 700; background: #f8fafc; }
-.nav-tabs .nav-link { color: #475569; }
-.nav-tabs .nav-link.active { color: var(--ga-primary); font-weight: 600; }
-.urgenza-scaduta { background-color: #fdeeee !important; }
-.urgenza-critica { background-color: #fff6df !important; }
-.urgenza-attenzione { background-color: #fcfce9 !important; }
+.table thead th { background: transparent; border-bottom-width: 1px; white-space: nowrap; }
+.table-totals td { font-weight: 700; background: var(--dc-surface-2) !important; color: var(--dc-ink); }
+.nav-tabs .nav-link { color: var(--dc-muted); }
+.nav-tabs .nav-link.active { color: var(--dc-ink); font-weight: 650; }
+.nav-tabs.overflow-auto { padding-inline: .15rem; }
+.nav-pills .nav-link { color: var(--dc-muted); border-radius: .45rem; }
+.nav-pills .nav-link:hover { background: var(--dc-surface-2); color: var(--dc-ink); }
+.nav-pills .nav-link.active, .nav-pills .show > .nav-link { background: var(--dc-green); color: var(--dc-on-green); }
+.urgenza-scaduta, .urgenza-scaduta > td { background-color: var(--dc-danger-soft) !important; }
+.urgenza-critica, .urgenza-critica > td { background-color: var(--dc-warning-soft) !important; }
+.urgenza-attenzione, .urgenza-attenzione > td { background-color: color-mix(in srgb, var(--dc-warning-soft) 45%, var(--dc-surface)) !important; }
+/* Sul fondo tinto delle righe urgenti il verde degli importi va scurito (≥ 4,5:1). */
+[class*="urgenza-"] .text-success { color: color-mix(in srgb, var(--dc-success) 70%, var(--dc-ink)) !important; }
 .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Filtri sopra le liste */
-.filter-bar { background: #fff; border: 1px solid var(--ga-border); border-radius: var(--ga-radius); padding: .75rem; margin-bottom: 1rem; }
+.filter-bar { background: var(--dc-surface); border: 1px solid var(--dc-line); border-radius: var(--dc-radius); padding: .75rem; margin-bottom: 1rem; }
 
-/* ---------- Dropzone documenti -------------------------------------------- */
+/* ---------- Documenti ------------------------------------------------------ */
 .dropzone {
-  border: 2px dashed #c7cede; border-radius: var(--ga-radius); background: #fbfcff;
-  padding: 1.5rem; text-align: center; color: #64748b;
+  border: 2px dashed var(--dc-line); border-radius: var(--dc-radius); background: var(--dc-surface);
+  padding: 1.5rem; text-align: center; color: var(--dc-muted);
   transition: border-color .15s ease, background-color .15s ease; cursor: pointer;
 }
-.dropzone:hover, .dropzone.dragover { border-color: var(--ga-primary-2); background: #eff4ff; color: var(--ga-primary); }
+.dropzone:hover, .dropzone.dragover { border-color: var(--dc-green); background: var(--dc-green-soft); color: var(--dc-ink); }
 .dropzone .bi { font-size: 1.8rem; }
 .file-pill {
   display: inline-flex; align-items: center; gap: .35rem;
-  background: #eef2ff; color: #3730a3; border-radius: 999px; padding: .15rem .6rem; margin: .2rem; font-size: .85rem;
+  background: var(--dc-green-soft); color: var(--dc-ink); border-radius: 999px; padding: .15rem .6rem; margin: .2rem; font-size: .85rem;
 }
 
 /* ---------- Badge ---------------------------------------------------------- */
-.tipo-azienda { background: var(--ga-primary) !important; }
-.tipo-professionista { background: #15803d !important; }
-.tipo-dipendente { background: #7c3aed !important; }
-.tipo-studio { background: #0e7490 !important; }
-.tipo-privato { background: #64748b !important; }
-.badge-soft { background: #eef2f7; color: #334155; font-weight: 500; }
+/* Nessun badge sotto gli 11 px, anche dentro testo .small. */
+.badge { font-size: max(.75em, .72rem); }
+/* Tipo di cliente: chip del DESIGN.md (stesso tono per tutti, il testo distingue). */
+.tipo-azienda, .tipo-studio, .tipo-professionista, .tipo-dipendente, .tipo-privato {
+  background: var(--dc-green-soft) !important; color: var(--dc-ink) !important; font-weight: 600;
+}
+.badge-soft { background: var(--dc-surface-2); color: var(--dc-muted); font-weight: 500; }
 
 /* ---------- Cronologia (sinistri, storico polizza) -------------------------- */
 .timeline { list-style: none; padding-left: 0; margin: 0; }
 .timeline li { position: relative; padding: 0 0 1rem 1.6rem; }
-.timeline li::before { content: ""; position: absolute; left: .42rem; top: .35rem; bottom: -.2rem; width: 2px; background: #e2e8f0; }
+.timeline li::before { content: ""; position: absolute; left: .42rem; top: .35rem; bottom: -.2rem; width: 2px; background: var(--dc-line); }
 .timeline li:last-child::before { display: none; }
 .timeline li::after {
   content: ""; position: absolute; left: 0; top: .2rem; width: 1rem; height: 1rem; border-radius: 50%;
-  background: #fff; border: 3px solid #94a3b8;
+  background: var(--dc-surface); border: 3px solid var(--dc-muted);
 }
-.timeline li.ev-stato::after { border-color: var(--ga-primary-2); }
+.timeline li.ev-stato::after { border-color: var(--dc-green); }
 
 /* ---------- Grafici (serie singola, barre sottili) ------------------------- */
 .hbar { display: flex; align-items: center; gap: .6rem; }
 .hbar-track { flex: 1; height: 12px; background: var(--ga-chart-track); border-radius: 0 4px 4px 0; }
 .hbar-fill { height: 100%; background: var(--ga-chart); border-radius: 0 4px 4px 0; min-width: 2px; }
-.colchart { display: flex; align-items: flex-end; gap: 2px; height: 190px; border-bottom: 1px solid #e2e8f0; padding-top: 1.2rem; }
+.colchart { display: flex; align-items: flex-end; gap: 2px; height: 190px; border-bottom: 1px solid var(--dc-line); padding-top: 1.2rem; }
 .colchart .col-slot { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; min-width: 0; }
 .colchart .col-bar { width: 60%; max-width: 24px; background: var(--ga-chart); border-radius: 4px 4px 0 0; min-height: 2px; cursor: default; }
 .colchart .col-slot:hover .col-bar { filter: brightness(.88); }
 .colchart .col-tip {
   position: absolute; bottom: calc(100% - .2rem); left: 50%; transform: translateX(-50%);
-  background: #0f172a; color: #fff; font-size: .72rem; padding: .2rem .45rem; border-radius: .3rem; white-space: nowrap;
+  background: var(--dc-ink); color: var(--dc-surface); font-size: .75rem; padding: .2rem .45rem; border-radius: .3rem; white-space: nowrap;
   opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .1s ease; z-index: 2;
 }
 .colchart .col-slot:hover .col-tip, .colchart .col-slot:focus-within .col-tip { opacity: 1; visibility: visible; }
@@ -808,11 +805,11 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 /* ---------- Pagine di accesso --------------------------------------------- */
 .ga-auth {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  background: radial-gradient(circle at 20% 10%, var(--ga-primary) 0, var(--ga-sidebar) 55%, #0b1530 100%);
+  background: radial-gradient(circle at 20% 10%, var(--dc-green-hover) 0, var(--dc-cover) 60%);
   padding: 1.5rem 1rem;
 }
 .ga-auth-box {
-  width: 100%; max-width: 420px; background: #fff; border-radius: 1rem;
+  width: 100%; max-width: 420px; background: var(--dc-surface); color: var(--dc-ink); border-radius: 1rem;
   padding: 2rem; box-shadow: 0 20px 50px rgba(0,0,0,.35);
 }
 .ga-auth-box.wide { max-width: 560px; }
@@ -839,12 +836,12 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 }
 
 /* ---------- Contrasto (WCAG 1.4.3: testo ≥ 4,5:1) -------------------------- */
-.text-warning { color: #b45309 !important; }
-.btn-outline-warning { --bs-btn-color: #b45309; --bs-btn-border-color: #d97706; --bs-btn-hover-bg: #d97706; --bs-btn-hover-border-color: #d97706; --bs-btn-hover-color: #fff; }
-.btn-outline-info { --bs-btn-color: #0369a1; --bs-btn-border-color: #0369a1; --bs-btn-hover-bg: #0369a1; --bs-btn-hover-border-color: #0369a1; --bs-btn-hover-color: #fff; }
+.text-warning { color: var(--dc-warning) !important; }
+.btn-outline-warning { --bs-btn-color: var(--dc-warning); --bs-btn-border-color: var(--dc-warning); --bs-btn-hover-bg: var(--dc-warning); --bs-btn-hover-border-color: var(--dc-warning); --bs-btn-hover-color: var(--dc-surface); }
+.btn-outline-info { --bs-btn-color: var(--dc-info); --bs-btn-border-color: var(--dc-info); --bs-btn-hover-bg: var(--dc-info); --bs-btn-hover-border-color: var(--dc-info); --bs-btn-hover-color: var(--dc-surface); }
 
 /* Card cliccabili (stretched-link): indicatore visibile del focus da tastiera. */
-.card:has(.stretched-link:focus-visible) { outline: 3px solid var(--ga-primary-2); outline-offset: 2px; }
+.card:has(.stretched-link:focus-visible) { outline: 2px solid var(--dc-green); outline-offset: 2px; }
 .stretched-link:focus-visible { outline: none; }
 
 /* Agenda dello scadenzario */
@@ -933,22 +930,6 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 .btn-check:checked + .tema-scelta { outline: 3px solid var(--ga-primary-2); outline-offset: 2px; border-radius: .6rem; }
 .btn-check:focus-visible + .tema-scelta { outline: 3px solid var(--ga-accent); outline-offset: 2px; }
 
-/* Modalità scura: dettagli dei componenti del gestionale. */
-[data-bs-theme="dark"] .urgenza-scaduta { background-color: rgba(220,38,38,.18) !important; }
-[data-bs-theme="dark"] .urgenza-critica { background-color: rgba(245,158,11,.16) !important; }
-[data-bs-theme="dark"] .urgenza-attenzione { background-color: rgba(234,179,8,.10) !important; }
-[data-bs-theme="dark"] .stat-card.accent-success .stat-icon { background: rgba(22,163,74,.2); }
-[data-bs-theme="dark"] .stat-card.accent-warning .stat-icon { background: rgba(245,158,11,.2); color: #fbbf24; }
-[data-bs-theme="dark"] .stat-card.accent-danger .stat-icon { background: rgba(220,38,38,.2); }
-[data-bs-theme="dark"] .stat-card.accent-info .stat-icon { background: rgba(14,165,233,.2); color: #38bdf8; }
-[data-bs-theme="dark"] .trattativa { background: rgba(245,158,11,.10); border-color: rgba(245,158,11,.35); }
-[data-bs-theme="dark"] .trattativa .trattativa-title, [data-bs-theme="dark"] .text-warning { color: #fbbf24 !important; }
-[data-bs-theme="dark"] .trattativa .esempio { color: #fcd9b6; }
-[data-bs-theme="dark"] .timeline li::before, [data-bs-theme="dark"] .colchart { border-color: var(--ga-border); }
-[data-bs-theme="dark"] .timeline li::before { background: var(--ga-border); }
-[data-bs-theme="dark"] .btn-outline-warning { --bs-btn-color: #fbbf24; --bs-btn-border-color: #fbbf24; }
-[data-bs-theme="dark"] .btn-outline-info { --bs-btn-color: #38bdf8; --bs-btn-border-color: #38bdf8; }
-
 /* Cartelle dell'archivio documenti (accordion) nel colore del tema. */
 .accordion { --bs-accordion-active-bg: var(--ga-soft); --bs-accordion-active-color: var(--ga-primary);
   --bs-accordion-btn-focus-box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--ga-primary-2) 25%, transparent);
@@ -968,3 +949,9 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 /* Schermo bloccato dal PIN: niente menu (né la sua colonna verde). */
 .dc-rail[hidden] { display: none !important; }
 .dc-shell.dc-shell-bloccata { background: var(--dc-ground); }
+
+/* Riquadro di stato dentro una scheda (es. compliance del cliente): un tono
+   del foglio, non una card dentro la card. */
+.riquadro-stato { background: var(--dc-surface-2); border-radius: var(--dc-radius); overflow: hidden; }
+.riquadro-stato .list-group-item { background: transparent; }
+.riquadro-avviso { background: color-mix(in srgb, var(--dc-warning-soft) 60%, var(--dc-surface)); }

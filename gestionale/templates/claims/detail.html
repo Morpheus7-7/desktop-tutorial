@@ -58,7 +58,7 @@
         </dl>
         {% if claim.descrizione %}
         <div class="section-title mt-3">Descrizione dell'accaduto</div>
-        <p class="border rounded p-3 bg-light mb-0" style="white-space: pre-line;">{{ claim.descrizione }}</p>
+        <p class="descrizione-attivita">{{ claim.descrizione }}</p>
         {% endif %}
         {% if claim.note %}<p class="small ga-muted mt-2 mb-0"><i class="bi bi-sticky me-1"></i>{{ claim.note }}</p>{% endif %}
       </div>

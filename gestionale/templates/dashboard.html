@@ -298,42 +298,6 @@
   <div class="col-xl-6">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-check2-square me-1"></i> Follow-up in programma</span>
-        <a class="small" href="{{ url_for('followups.list_followups') }}">Tutti</a>
-      </div>
-      <div class="table-responsive">
-        {% if prossimi_followup %}
-        <table class="table table-sm mb-0 align-middle">
-          <thead><tr><th>Cliente</th><th>Attività</th><th>Data</th><th></th></tr></thead>
-          <tbody>
-          {% for f in prossimi_followup %}
-            <tr {% if f.in_ritardo %}class="urgenza-scaduta"{% endif %}>
-              <td><a href="{{ url_for('clients.detail', client_id=f.client_id) }}">{{ f.cliente.ragione_sociale }}</a></td>
-              <td>{{ f.titolo }} <span class="badge badge-soft">{{ f.tipo_label }}</span></td>
-              <td class="text-nowrap">{{ f.data_scadenza | data_it }}{% if f.in_ritardo %} <span class="badge bg-danger">ritardo</span>{% endif %}</td>
-              <td class="text-end">
-                {% if puo_modificare %}
-                <form method="post" action="{{ url_for('followups.complete', followup_id=f.id) }}" class="d-inline">
-                  {{ csrf_field() }}
-                  <input type="hidden" name="next" value="{{ url_for('main.dashboard') }}">
-                  <button class="btn btn-sm btn-outline-success" title="Completa" aria-label="Completa il follow-up {{ f.titolo }}"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
-                </form>
-                {% endif %}
-              </td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <p class="ga-muted p-3 mb-0">Nessun follow-up aperto.</p>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <div class="col-xl-6">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-exclamation-octagon me-1"></i> Sinistri aperti</span>
         <a class="small" href="{{ url_for('claims.list_claims') }}">Tutti</a>
       </div>
@@ -352,29 +316,6 @@
         </li>
         {% else %}
         <li class="list-group-item ga-muted">Nessun sinistro aperto.</li>
-        {% endfor %}
-      </ul>
-    </div>
-  </div>
-
-  <div class="col-xl-6">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-funnel me-1"></i> Opportunità aperte</span>
-        <a class="small" href="{{ url_for('opportunities.board') }}">Pipeline</a>
-      </div>
-      <ul class="list-group list-group-flush">
-        {% for o in opportunita_recenti %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <div>
-            <a href="{{ url_for('clients.detail', client_id=o.client_id) }}#opportunita" class="text-decoration-none fw-semibold">{{ o.titolo }}</a>
-            <div class="small ga-muted">{{ o.cliente.ragione_sociale }} · {{ o.fase_label }}</div>
-          </div>
-          {% if o.premio_stimato %}<span class="badge badge-soft tabular">{{ o.premio_stimato | euro }}</span>{% endif %}
-        </li>
-        {% else %}
-        <li class="list-group-item ga-muted">Nessuna opportunità aperta.
-          {% if puo_modificare %}<a href="{{ url_for('opportunities.new_opportunity') }}">Creane una</a>.{% endif %}</li>
         {% endfor %}
       </ul>
     </div>

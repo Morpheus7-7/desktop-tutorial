@@ -249,12 +249,6 @@ def dashboard():
         .limit(8)
         .all()
     )
-    prossimi_followup = (
-        FollowUp.query.filter(FollowUp.stato == "aperto")
-        .order_by(FollowUp.data_scadenza.asc())
-        .limit(8)
-        .all()
-    )
     ultimi_sinistri = sinistri_aperti.order_by(Claim.data_evento.desc()).limit(6).all()
     ultime_notifiche = (
         Notification.query.filter_by(letta=False)
@@ -292,7 +286,6 @@ def dashboard():
         prossime_scadenze=prossime_scadenze,
         prossimi_eventi=prossimi_eventi,
         titoli_urgenti=titoli_urgenti,
-        prossimi_followup=prossimi_followup,
         ultimi_sinistri=ultimi_sinistri,
         ultime_notifiche=ultime_notifiche,
         opportunita_recenti=opportunita_recenti,

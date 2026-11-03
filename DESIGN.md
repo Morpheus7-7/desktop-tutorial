@@ -144,6 +144,8 @@ Restrained ma con un guscio colorato: neutri tinti di verde, un verde d'azione e
 ### Named Rules
 **The One Ribbon Rule.** Il rosso nastro compare una sola volta per schermata e solo sul prossimo passo. Se non c'è un prossimo passo, non c'è nastro.
 
+**The Alternate Covers Rule.** Ogni utente può scegliere in «Aspetto» un colore diverso per copertina e azioni (blu, ottanio, smeraldo, viola, bordeaux, grafite): cambiano solo i token `--dc-cover`, `--dc-green*` e il primary di Bootstrap, al chiaro e al buio. Nastro, stati e struttura restano quelli dell'agenda verde, che è la scelta predefinita.
+
 **The Two Reds Rule.** Il pericolo (ritardi, scadute, eliminazioni) usa un rosso diverso dal nastro. Il nastro indica una direzione, il pericolo uno stato: non confonderli.
 
 ## Typography
@@ -190,6 +192,10 @@ Angoli moderati e coerenti: 0.6rem per le card, 0.45-0.5rem per pulsanti, voci d
 - **Primary:** verde azione con testo bianco; al buio verde chiaro con testo scuro.
 - **Hover / Focus:** il verde si scurisce. Il focus da tastiera è un contorno verde di 2px, distanziato di 2px.
 - **Secondary:** fondo foglio, bordo filetto, testo attenuato. Le varianti outline success/danger usano le tonalità da inchiostro degli stati.
+
+### Riquadro di stato
+- Un gruppo di stato dentro una scheda (es. compliance del cliente) è un tono del foglio (foglio-2, o avviso velato se c'è qualcosa da completare) con intestazione in label: mai una card dentro una card.
+- Gli indicatori in allarme (titoli arretrati, sinistri da denunciare) si velano di pericolo o avviso e ne prendono il filetto, senza barre laterali.
 
 ### Chips
 - **Style:** fondo foglio-2, testo attenuato, 0.78rem, peso 600 (tipo di attività, numero di polizza nella lista «Oggi»).

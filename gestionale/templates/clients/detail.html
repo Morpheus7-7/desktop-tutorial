@@ -193,15 +193,15 @@
         </dl>
         {% endif %}
         <h2 class="section-title">Descrizione attività</h2>
-        <p class="border rounded p-3 bg-light small">{{ client.descrizione_attivita or 'Nessuna descrizione inserita: aggiungila per poter eseguire l\'analisi automatica dei rischi.' }}</p>
+        <p class="descrizione-attivita">{{ client.descrizione_attivita or 'Nessuna descrizione inserita: aggiungila per poter eseguire l\'analisi automatica dei rischi.' }}</p>
         {% if client.note %}
         <h2 class="section-title">Note interne</h2>
         <p class="small">{{ client.note }}</p>
         {% endif %}
       </div>
       <div class="col-lg-4">
-        <div class="card {% if client.compliance_problemi %}border-warning{% else %}border-success{% endif %}">
-          <div class="card-header"><i class="bi bi-shield-lock me-1"></i> Compliance</div>
+        <section class="riquadro-stato {% if client.compliance_problemi %}riquadro-avviso{% endif %}" aria-labelledby="titolo-compliance">
+          <h2 class="section-title px-3 pt-3 mb-1" id="titolo-compliance"><i class="bi bi-shield-lock me-1" aria-hidden="true"></i> Compliance</h2>
           <ul class="list-group list-group-flush small">
             <li class="list-group-item d-flex justify-content-between">
               <span>Consenso privacy (GDPR)</span>
@@ -231,9 +231,9 @@
             {% endif %}
           </ul>
           {% if client.compliance_problemi and puo_modificare %}
-          <div class="card-body py-2"><a class="small" href="{{ url_for('clients.edit_client', client_id=client.id) }}"><i class="bi bi-pencil"></i> Completa i dati di compliance</a></div>
+          <div class="px-3 py-2"><a class="small" href="{{ url_for('clients.edit_client', client_id=client.id) }}"><i class="bi bi-pencil" aria-hidden="true"></i> Completa i dati di compliance</a></div>
           {% endif %}
-        </div>
+        </section>
         {% set obblighi, avvertenze = client.obblighi_e_avvertenze %}
         {% if obblighi or avvertenze %}
         {% set scoperti = obblighi | rejectattr('coperto') | rejectattr('condizionale') | list %}
