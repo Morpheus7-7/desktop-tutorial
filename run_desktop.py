@@ -479,7 +479,7 @@ def configura_log(cartella: Path) -> None:
     radice.setLevel(logging.INFO)
 
 
-def registra_errore_avvio(testo: str) -> Path | None:
+def registra_errore_avvio(testo: str, intestazione: bool = True) -> Path | None:
     """Scrive il dettaglio dell'errore in ``avvio.log`` (cartella dati, o di ripiego)."""
     candidati = [_cartella_log, cartella_utente(), Path(tempfile.gettempdir())]
     for cartella in candidati:
@@ -489,7 +489,10 @@ def registra_errore_avvio(testo: str) -> Path | None:
             Path(cartella).mkdir(parents=True, exist_ok=True)
             percorso = Path(cartella) / FILE_LOG_AVVIO
             with open(percorso, "a", encoding="utf-8") as fh:
-                fh.write(f"\n=== {datetime.now():%d/%m/%Y %H:%M:%S} ===\n{testo}\n")
+                if intestazione:
+                    fh.write(f"\n=== {datetime.now():%d/%m/%Y %H:%M:%S} ===\n{testo}\n")
+                else:
+                    fh.write(f"{datetime.now():%d/%m/%Y %H:%M:%S} {testo}\n")
             return percorso
         except OSError:
             continue
@@ -516,6 +519,25 @@ def apri_console() -> None:
         sys.stdin = open("CONIN$", encoding="utf-8")
         sys.stdout = sys.stderr = open("CONOUT$", "w", encoding="utf-8")
     except Exception:  # noqa: BLE001
+        pass
+
+
+def traccia(passo: str) -> None:
+    """Annota in ``avvio.log`` i passi dell'avvio: se il programma sembra non partire
+    si vede dove si è fermato (l'exe non ha console)."""
+    registra_errore_avvio(f"[avvio] {passo}", intestazione=False)
+
+
+def chiudi_splash(testo: str | None = None) -> None:
+    """Chiude la schermata di caricamento dell'exe (se presente)."""
+    try:
+        import pyi_splash  # disponibile solo nell'eseguibile con schermata di avvio
+
+        if testo:
+            pyi_splash.update_text(testo)
+        else:
+            pyi_splash.close()
+    except Exception:  # noqa: BLE001 - nessuna schermata: niente da fare
         pass
 
 
@@ -622,6 +644,7 @@ def apri_finestra(url: str, webview=None, cartella: Path | None = None) -> bool:
         webview.start(**avvio)
     except Exception:  # noqa: BLE001 - es. WebView2 mancante: si ripiega sul browser
         logging.getLogger("gestionale.avvio").exception("Finestra non disponibile, uso il browser")
+        registra_errore_avvio("Finestra non disponibile, uso il browser:\n" + traceback.format_exc())
         return False
     return True
 
@@ -640,12 +663,15 @@ def _main(argv: list[str]) -> int:
                         if scelta.esplicita else "Controlla i permessi della cartella.")
         raise ErroreAvvio(f"Impossibile scrivere nella cartella dati {cartella}. {suggerimento}")
     _cartella_log = cartella
+    traccia(f"avvio del programma, cartella dati {cartella}")
 
     # Istanza unica: il blocco viene preso prima di scrivere log o copiare dati.
     reimposta = len(argv) >= 2 and argv[0] == "--reimposta-password"
     if not reimposta:
         _blocco = BloccoIstanza(cartella / FILE_BLOCCO)
         if not _blocco.acquisisci():
+            traccia("il programma risulta già aperto: apro un'altra finestra sull'istanza attiva")
+            chiudi_splash()
             # Il programma è già aperto: un'altra finestra (o il browser) sulla stessa istanza.
             url = apri_istanza_esistente(cartella, apri=lambda u: None)
             if url:
@@ -695,6 +721,7 @@ def _main(argv: list[str]) -> int:
     from gestionale.scheduler import start_scheduler
 
     start_scheduler(app)
+    traccia(f"motore avviato su {url}")
 
     print("=" * 60)
     print("  Gestionale Assicurativo è in esecuzione.")
@@ -716,10 +743,13 @@ def _main(argv: list[str]) -> int:
             serve(app, sockets=[sock], threads=8)
 
     webview = modulo_finestra()
+    traccia("apro la finestra del programma" if webview is not None else "finestra non disponibile: uso il browser")
+    chiudi_splash()
     if webview is not None:
         # Il motore gira in sottofondo; chiudendo la finestra si chiude il programma.
         threading.Thread(target=avvia_server, name="server", daemon=True).start()
         if apri_finestra(url, webview, cartella):
+            traccia("finestra chiusa: programma terminato")
             log.info("Finestra chiusa: programma terminato")
             return 0
     # Senza finestra propria: browser predefinito, server in primo piano.
@@ -744,6 +774,10 @@ def _main(argv: list[str]) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Avvia il programma; qualsiasi errore viene registrato e mostrato senza chiudere la finestra."""
     argv = sys.argv[1:] if argv is None else argv
+    if "--diagnosi" in argv:
+        # Doppio clic con --diagnosi (es. da un collegamento): console con tutti i messaggi.
+        argv = [a for a in argv if a != "--diagnosi"]
+        apri_console()
     try:
         return _main(argv)
     except KeyboardInterrupt:
@@ -751,6 +785,7 @@ def main(argv: list[str] | None = None) -> int:
     except SystemExit:
         raise
     except BaseException as exc:  # noqa: BLE001 - l'utente deve sempre vedere cosa è successo
+        chiudi_splash()
         percorso = registra_errore_avvio(traceback.format_exc())
         dettaglio = str(exc) if isinstance(exc, ErroreAvvio) else f"{exc.__class__.__name__}: {exc}"
         testo = "Il Gestionale Assicurativo si è fermato per un errore.\n\n" + dettaglio

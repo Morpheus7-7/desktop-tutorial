@@ -63,9 +63,35 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# Schermata di caricamento mostrata subito al doppio clic, mentre l'exe si
+# prepara (i primi secondi, soprattutto al primo avvio o con l'antivirus).
+# Richiede Tcl/Tk nel Python usato per la build (incluso nell'installer di
+# python.org); se non disponibile, l'exe si crea lo stesso senza.
+import importlib.util
+
+splash = None
+try:
+    if importlib.util.find_spec("_tkinter") is None:
+        raise RuntimeError("Tcl/Tk non installato nel Python di build")
+    splash = Splash(
+        "packaging/splash.png",
+        binaries=a.binaries,
+        datas=a.datas,
+        text_pos=(20, 215),
+        text_size=10,
+        text_color="#475569",
+        text_default="Avvio in corso…",
+        minify_script=True,
+        always_on_top=False,
+    )
+except (Exception, SystemExit) as errore:  # noqa: BLE001 - PyInstaller segnala con SystemExit
+    splash = None
+    print(f"Schermata di avvio non disponibile: {errore}")
+
 exe = EXE(
     pyz,
     a.scripts,
+    *([splash, splash.binaries] if splash else []),
     a.binaries,
     a.zipfiles,
     a.datas,

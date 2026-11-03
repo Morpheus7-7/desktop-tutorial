@@ -452,3 +452,11 @@ def test_impostazioni_pywebview_a_chiavi_fisse():
     finto.settings = UserDict({"ALLOW_DOWNLOADS": False, "OPEN_EXTERNAL_LINKS_IN_BROWSER": False})
     assert rd.apri_finestra("http://127.0.0.1:5000", finto)
     assert finto.settings["ALLOW_DOWNLOADS"] is True and finto.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] is True
+
+
+def test_traccia_dell_avvio_in_avvio_log(tmp_path, monkeypatch):
+    monkeypatch.setattr(rd, "_cartella_log", tmp_path)
+    rd.traccia("motore avviato su http://127.0.0.1:5000")
+    rd.chiudi_splash()  # senza schermata di avvio non fa nulla
+    testo = (tmp_path / "avvio.log").read_text(encoding="utf-8")
+    assert "[avvio] motore avviato" in testo and "===" not in testo
