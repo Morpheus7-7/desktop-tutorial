@@ -442,3 +442,13 @@ def test_finestra_ricorda_dimensione_e_posizione(tmp_path):
     (tmp_path / rd.FILE_FINESTRA).write_text('{"width": 10, "height": 99999, "x": -5000, "y": 1}')
     assert rd.leggi_geometria(tmp_path) == {}  # valori assurdi ignorati
     assert rd.leggi_geometria(None) == {}
+
+
+def test_impostazioni_pywebview_a_chiavi_fisse():
+    """pywebview.settings è un UserDict a chiavi fisse, non un dict: i download vanno abilitati lo stesso."""
+    from collections import UserDict
+
+    finto = _WebviewFinto()
+    finto.settings = UserDict({"ALLOW_DOWNLOADS": False, "OPEN_EXTERNAL_LINKS_IN_BROWSER": False})
+    assert rd.apri_finestra("http://127.0.0.1:5000", finto)
+    assert finto.settings["ALLOW_DOWNLOADS"] is True and finto.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] is True

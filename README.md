@@ -167,7 +167,9 @@ Vuoi provarla senza installare Python? È possibile impacchettare il gestionale
 in un **eseguibile unico** (`GestionaleAssicurativo.exe` su Windows) che si apre
 in una **finestra propria**, come un normale programma, con tutti i dati salvati
 sul PC. Il modo più semplice per ottenere il
-`.exe` è la build automatica su GitHub Actions. Tutti i dettagli in
+`.exe` è fare **doppio clic su `CREA_EXE.bat`** su un PC Windows con Python 3.11 o
+successivo: prepara tutto da solo e apre la cartella con l'eseguibile pronto. In
+alternativa c'è la build automatica su GitHub Actions. Tutti i dettagli in
 **[PACKAGING.md](PACKAGING.md)**.
 
 ## Requisiti

@@ -32,6 +32,15 @@ già i dati accanto all'eseguibile.
 
 ---
 
+
+## Il modo più semplice: `CREA_EXE.bat`
+
+Su un PC Windows con **Python 3.11 o successivo** (da python.org, spuntando «Add
+Python to PATH»), scompatta la cartella del progetto e fai **doppio clic su
+`CREA_EXE.bat`**. Lo script crea un ambiente separato, installa i componenti,
+costruisce l'eseguibile e apre la cartella `dist` con `GestionaleAssicurativo.exe`
+pronto. Per aggiornare il programma basta rilanciarlo sulla nuova versione.
+
 ## Opzione A — Build su GitHub (senza Windows né Python)
 
 Il workflow [`.github/workflows/build.yml`](.github/workflows/build.yml) è già

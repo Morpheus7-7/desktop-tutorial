@@ -482,7 +482,12 @@ class Client(db.Model):
         professionista, quelle dello studio di appartenenza. Per i sanitari
         l'RC dipende dall'inquadramento (L. 24/2017, art. 10).
         """
-        obblighi, _ = self._obblighi_di_legge()
+        return self.obblighi_e_avvertenze[0]
+
+    @property
+    def obblighi_e_avvertenze(self):
+        """Obblighi (con lo stato in portafoglio) e avvertenze, calcolati insieme."""
+        obblighi, avvertenze = self._obblighi_di_legge()
         # Valide: in vigore o già emesse con decorrenza futura. Scadute da
         # rinnovare o sospese per mancato pagamento non soddisfano l'obbligo.
         valide = ("in_vigore", "non_in_vigore", "disdetta_inviata", "tacito_da_registrare")
@@ -512,7 +517,7 @@ class Client(db.Model):
                 obbligo["massimale_minimo"] and obbligo["massimale_polizza"]
                 and obbligo["massimale_polizza"] < obbligo["massimale_minimo"]
             )
-        return obblighi
+        return obblighi, avvertenze
 
     @property
     def avvertenze_assicurative(self):

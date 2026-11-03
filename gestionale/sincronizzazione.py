@@ -153,11 +153,21 @@ def modifiche_locali() -> int:
     ).count()
 
 
-def situazione() -> dict:
-    """Riepilogo per la pagina e per l'avviso in dashboard."""
+def situazione(controllo_scrittura: bool = True) -> dict:
+    """Riepilogo per la pagina e per l'avviso in dashboard.
+
+    Per la dashboard (``controllo_scrittura=False``) non si scrive nulla nella
+    cartella: aprire la pagina non deve far partire la sincronizzazione di
+    OneDrive né scrivere sulla chiavetta.
+    """
     dati = stato()
     cartella_sync = dati.get("cartella")
-    errore = verifica_cartella(cartella_sync) if cartella_sync else None
+    if not cartella_sync:
+        errore = None
+    elif controllo_scrittura:
+        errore = verifica_cartella(cartella_sync)
+    else:
+        errore = None if os.path.isdir(cartella_sync) else "Cartella di sincronizzazione non collegata."
     trovato = pacchetto(cartella_sync) if cartella_sync and not errore else None
     return {
         "cartella": cartella_sync,

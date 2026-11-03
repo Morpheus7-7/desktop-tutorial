@@ -63,7 +63,7 @@ def _sincronizzazione_da_caricare() -> dict | None:
     if g.get("user") is None or not g.user.is_admin or not sincronizzazione.cartella():
         return None
     try:
-        return sincronizzazione.situazione()
+        return sincronizzazione.situazione(controllo_scrittura=False)
     except Exception:  # noqa: BLE001 - l'avviso non deve mai bloccare la dashboard
         return None
 

@@ -62,7 +62,7 @@ def login():
             audit("login", "utente", user.id, "Accesso effettuato", user=user)
             db.session.commit()
             login_user(user)
-            return redirect(safe_next(request.args.get("next"), url_for("main.dashboard")))
+            return _ricorda_aspetto(redirect(safe_next(request.args.get("next"), url_for("main.dashboard"))), user)
 
         dettaglio = ""
         if esito in (ESITO_BLOCCATO, ESITO_BLOCCATO_ORA):
@@ -186,5 +186,12 @@ def aspetto():
         user.aspetto = modalita if modalita in dict(ASPETTI) else "auto"
         db.session.commit()
         flash("Aspetto aggiornato.", "success")
-        return redirect(url_for("auth.aspetto"))
+        return _ricorda_aspetto(redirect(url_for("auth.aspetto")), user)
     return render_template("auth/aspetto.html", temi=TEMI, aspetti=ASPETTI)
+
+
+def _ricorda_aspetto(risposta, user):
+    """Ricorda tema e modalità anche per la pagina di accesso (cookie non riservati)."""
+    for nome, valore in (("ga_tema", user.tema or "blu"), ("ga_aspetto", user.aspetto or "auto")):
+        risposta.set_cookie(nome, valore, max_age=3600 * 24 * 365, samesite="Lax", httponly=True)
+    return risposta

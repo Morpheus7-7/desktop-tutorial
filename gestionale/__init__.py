@@ -419,6 +419,10 @@ def create_app(test_config: dict | None = None) -> Flask:
     from .models import CARTELLE_DOCUMENTI
 
     app.jinja_env.globals["cartelle_documenti"] = CARTELLE_DOCUMENTI
+    from .models import ASPETTI, TEMI
+
+    app.jinja_env.globals["temi_chiavi"] = [t[0] for t in TEMI]
+    app.jinja_env.globals["aspetti_chiavi"] = [a[0] for a in ASPETTI]
 
     @app.context_processor
     def inject_globals():

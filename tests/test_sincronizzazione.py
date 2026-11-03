@@ -111,3 +111,20 @@ def test_riservata_agli_amministratori(app, client):
     login(c, "operatore", "password-oper-1")
     assert c.get("/sincronizza/").status_code == 403
     assert client.get("/sincronizza/").status_code == 200
+
+
+def test_la_dashboard_non_scrive_nella_cartella(due_pc):
+    import os
+
+    (fisso, cf), _ = due_pc[0]
+    cartella = due_pc[1]
+    cf.post("/sincronizza/cartella", data={"cartella": cartella})
+    prima = set(os.listdir(cartella))
+    scritture = []
+    originale = sync.verifica_cartella
+    sync.verifica_cartella = lambda c: scritture.append(c) or originale(c)
+    try:
+        assert cf.get("/").status_code == 200
+    finally:
+        sync.verifica_cartella = originale
+    assert scritture == [] and set(os.listdir(cartella)) == prima

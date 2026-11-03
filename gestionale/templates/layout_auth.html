@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="it" data-tema="blu" data-aspetto="auto">
+{% set tema = request.cookies.get('ga_tema') %}{% set modo = request.cookies.get('ga_aspetto') %}
+<html lang="it" data-tema="{{ tema if tema in temi_chiavi else 'blu' }}" data-aspetto="{{ modo if modo in aspetti_chiavi else 'auto' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">

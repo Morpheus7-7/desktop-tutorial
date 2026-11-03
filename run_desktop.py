@@ -519,17 +519,22 @@ def apri_console() -> None:
         pass
 
 
-def mostra_errore(testo: str) -> None:
-    """Mostra un errore anche senza console (eseguibile a finestra)."""
+def mostra_messaggio(testo: str, icona: int = 0x10) -> None:
+    """Messaggio di Windows (0x10 errore, 0x40 informazione), anche senza console; altrove stampa."""
     if sys.platform == "win32":
         try:
             import ctypes
 
-            ctypes.windll.user32.MessageBoxW(None, testo, TITOLO_FINESTRA, 0x10)  # MB_ICONERROR
+            ctypes.windll.user32.MessageBoxW(None, testo, TITOLO_FINESTRA, icona)
             return
         except Exception:  # noqa: BLE001 - ripiego sulla console
             pass
     print(testo)
+
+
+def mostra_errore(testo: str) -> None:
+    """Mostra un errore anche senza console (eseguibile a finestra)."""
+    mostra_messaggio(testo, icona=0x10)
 
 
 # ----------------------------------------------------------------------
@@ -594,9 +599,13 @@ def apri_finestra(url: str, webview=None, cartella: Path | None = None) -> bool:
         return False
     try:
         # Backup, esportazioni CSV e calendario si scaricano anche dalla finestra.
+        # pywebview.settings è un dizionario a chiavi fisse (UserDict, non dict).
         impostazioni = getattr(webview, "settings", None)
-        if isinstance(impostazioni, dict):
-            impostazioni["ALLOW_DOWNLOADS"] = True
+        for chiave in ("ALLOW_DOWNLOADS", "OPEN_EXTERNAL_LINKS_IN_BROWSER"):
+            try:
+                impostazioni[chiave] = True  # email, PEC e siti si aprono nei programmi predefiniti
+            except (TypeError, KeyError):
+                pass
         opzioni = {"width": 1366, "height": 860, **leggi_geometria(cartella)}
         finestra = webview.create_window(
             TITOLO_FINESTRA, url, min_size=(1024, 640), text_select=True,
@@ -719,6 +728,14 @@ def _main(argv: list[str]) -> int:
     apertura.start()
     if webview is None:
         avvia_server()
+    elif sys.platform == "win32" and sys.stdout is None:
+        # Exe senza console: un messaggio resta aperto finché il programma è in uso,
+        # così c'è sempre un modo per chiuderlo.
+        mostra_messaggio(
+            "La finestra del programma non è disponibile su questo PC (manca Microsoft Edge WebView2): "
+            "il gestionale si è aperto nel browser.\n\nPremi OK per chiudere il Gestionale Assicurativo.",
+            icona=0x40,
+        )
     else:  # il server è già partito nel thread: si resta in attesa
         threading.Event().wait()
     return 0

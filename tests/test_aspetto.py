@@ -29,3 +29,13 @@ def test_anche_la_sola_consultazione_sceglie_il_proprio_aspetto(app):
 def test_icona_del_programma(client):
     assert client.get("/static/icona.png").mimetype == "image/png"
     assert client.get("/static/aspetto.js").status_code == 200
+
+
+def test_la_pagina_di_accesso_ricorda_l_aspetto(client):
+    risposta = client.post("/profilo/aspetto", data={"tema": "viola", "aspetto": "scuro"})
+    assert "ga_tema=viola" in " ".join(risposta.headers.getlist("Set-Cookie"))
+    client.post("/esci")
+    pagina = client.get("/accesso").get_data(as_text=True)
+    assert 'data-tema="viola"' in pagina and 'data-aspetto="scuro"' in pagina
+    client.set_cookie("ga_tema", "<script>")
+    assert 'data-tema="blu"' in client.get("/accesso").get_data(as_text=True)

@@ -195,8 +195,7 @@
           <div class="card-body py-2"><a class="small" href="{{ url_for('clients.edit_client', client_id=client.id) }}"><i class="bi bi-pencil"></i> Completa i dati di compliance</a></div>
           {% endif %}
         </div>
-        {% set obblighi = client.obblighi_assicurativi %}
-        {% set avvertenze = client.avvertenze_assicurative %}
+        {% set obblighi, avvertenze = client.obblighi_e_avvertenze %}
         {% if obblighi or avvertenze %}
         {% set scoperti = obblighi | rejectattr('coperto') | rejectattr('condizionale') | list %}
         {% set sotto_minimo = obblighi | selectattr('massimale_insufficiente') | list %}
