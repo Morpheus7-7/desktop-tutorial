@@ -6,9 +6,14 @@ def register_blueprints(app: Flask) -> None:
         audit,
         auth,
         claims,
+        academy,
+        client_sheets,
+        privacy,
         clients,
         documents,
         followups,
+        importazione,
+        note,
         main,
         notifications,
         opportunities,
@@ -33,3 +38,8 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(users.bp)
     app.register_blueprint(audit.bp)
     app.register_blueprint(sincronizzazione.bp)
+    app.register_blueprint(academy.bp)
+    app.register_blueprint(client_sheets.bp)
+    app.register_blueprint(privacy.bp)
+    app.register_blueprint(importazione.bp)
+    app.register_blueprint(note.bp)

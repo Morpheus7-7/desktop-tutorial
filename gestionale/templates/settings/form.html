@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Impostazioni — Gestionale Assicurativo{% endblock %}
+{% block title %}Impostazioni — Deal Combined{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
@@ -7,6 +7,7 @@
     <div class="page-subtitle">Dati dello studio, notifiche via email, automatismi e backup</div>
   </div>
 </div>
+{% include "settings/_nav.html" %}
 
 {% if not scheduler_attivo %}
 <div class="alert alert-warning small">

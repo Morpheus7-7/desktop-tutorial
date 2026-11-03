@@ -182,7 +182,7 @@ def aspetto():
     if request.method == "POST":
         tema = request.form.get("tema")
         modalita = request.form.get("aspetto")
-        user.tema = tema if tema in {t[0] for t in TEMI} else "blu"
+        user.tema = tema if tema in {t[0] for t in TEMI} else "agenda"
         user.aspetto = modalita if modalita in dict(ASPETTI) else "auto"
         db.session.commit()
         flash("Aspetto aggiornato.", "success")
@@ -192,6 +192,6 @@ def aspetto():
 
 def _ricorda_aspetto(risposta, user):
     """Ricorda tema e modalità anche per la pagina di accesso (cookie non riservati)."""
-    for nome, valore in (("ga_tema", user.tema or "blu"), ("ga_aspetto", user.aspetto or "auto")):
+    for nome, valore in (("ga_tema", user.tema or "agenda"), ("ga_aspetto", user.aspetto or "auto")):
         risposta.set_cookie(nome, valore, max_age=3600 * 24 * 365, samesite="Lax", httponly=True)
     return risposta

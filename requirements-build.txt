@@ -1,6 +1,9 @@
 -r requirements.txt
 pyinstaller>=6.16  # supporto a Python 3.14
-# Finestra propria del programma (su Windows usa WebView2, già presente in Windows 10/11).
-pywebview>=5.0
+# Finestra propria del programma (Edge WebView2, già presente in Windows 10/11)
+pywebview>=5.3
 # Ponte .NET usato dalla finestra su Windows: dalla 3.2 supporta Python 3.14.
 pythonnet>=3.2; sys_platform == "win32"
+# Icona vicino all'orologio e notifiche di Windows
+pystray>=0.19; sys_platform == "win32"
+Pillow>=10

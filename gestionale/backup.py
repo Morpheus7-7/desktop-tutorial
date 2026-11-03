@@ -119,7 +119,7 @@ def _manifest() -> dict:
     from . import __version__
 
     return {
-        "applicazione": "Gestionale Assicurativo",
+        "applicazione": "Deal Combined",
         "versione": __version__,
         "creato_il": now().isoformat(timespec="seconds"),
         "clienti": Client.query.count(),
@@ -360,7 +360,7 @@ def _verifica_membri(zf: zipfile.ZipFile) -> list[str]:
             continue
         raise BackupError(
             f"L'archivio contiene un file non previsto («{nome}»): "
-            "non sembra un backup del Gestionale Assicurativo."
+            "non sembra un backup di Deal Combined."
         )
     return documenti
 
@@ -376,7 +376,7 @@ def _verifica_database(percorso: str) -> None:
             raise BackupError("Il database nell'archivio risulta danneggiato.")
         tabelle = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         if not TABELLE_OBBLIGATORIE <= tabelle:
-            raise BackupError("L'archivio non contiene un database del Gestionale Assicurativo.")
+            raise BackupError("L'archivio non contiene un database di Deal Combined.")
         if "users" not in tabelle:
             # Senza utenti la «configurazione iniziale» tornerebbe accessibile a chiunque.
             raise BackupError(

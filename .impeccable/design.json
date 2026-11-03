@@ -1,0 +1,372 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-27T11:38:54+00:00",
+  "title": "Design System: Deal Combined",
+  "extensions": {
+    "colorMeta": {
+      "copertina": {
+        "role": "primary",
+        "displayName": "Verde copertina",
+        "canonical": "#1d3b30",
+        "tonalRamp": [
+          "#1d2f29",
+          "#2f5144",
+          "#3f7460",
+          "#4d987d",
+          "#72b69d",
+          "#9dc8b8",
+          "#c9ded6",
+          "#f0f5f3"
+        ]
+      },
+      "verde-azione": {
+        "role": "primary",
+        "displayName": "Verde azione",
+        "canonical": "#24533f",
+        "tonalRamp": [
+          "#1c3128",
+          "#2c5343",
+          "#3b785e",
+          "#479e79",
+          "#6dbb9a",
+          "#9acbb6",
+          "#c8e0d5",
+          "#eff5f3"
+        ]
+      },
+      "nastro": {
+        "role": "secondary",
+        "displayName": "Rosso nastro",
+        "canonical": "#9f1239",
+        "tonalRamp": [
+          "#3b111d",
+          "#67182e",
+          "#971c3e",
+          "#ca1b4c",
+          "#e34571",
+          "#e4819c",
+          "#ecbbc9",
+          "#f8ecf0"
+        ]
+      },
+      "pagina": {
+        "role": "neutral",
+        "displayName": "Pagina velata",
+        "canonical": "#f2f5f1",
+        "tonalRamp": [
+          "#242b22",
+          "#3c4838",
+          "#53664c",
+          "#6a8560",
+          "#8ca483",
+          "#adbda8",
+          "#d1d9cf",
+          "#f2f4f1"
+        ]
+      },
+      "foglio": {
+        "role": "neutral",
+        "displayName": "Foglio",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#262626",
+          "#404040",
+          "#595959",
+          "#737373",
+          "#949494",
+          "#b2b2b2",
+          "#d4d4d4",
+          "#f2f2f2"
+        ]
+      },
+      "filetto": {
+        "role": "neutral",
+        "displayName": "Filetto",
+        "canonical": "#d6dfd5",
+        "tonalRamp": [
+          "#232a23",
+          "#3a4639",
+          "#51644f",
+          "#678264",
+          "#89a186",
+          "#acbbaa",
+          "#d0d8d0",
+          "#f1f3f1"
+        ]
+      },
+      "inchiostro": {
+        "role": "neutral",
+        "displayName": "Inchiostro",
+        "canonical": "#16211b",
+        "tonalRamp": [
+          "#212b26",
+          "#364a3f",
+          "#4a6958",
+          "#5d8971",
+          "#80a892",
+          "#a6bfb1",
+          "#cedad3",
+          "#f1f4f2"
+        ]
+      },
+      "inchiostro-attenuato": {
+        "role": "neutral",
+        "displayName": "Inchiostro attenuato",
+        "canonical": "#4d5c54",
+        "tonalRamp": [
+          "#242926",
+          "#3b443f",
+          "#526059",
+          "#697c72",
+          "#8b9d93",
+          "#adb8b2",
+          "#d1d6d3",
+          "#f2f3f2"
+        ]
+      },
+      "pericolo": {
+        "role": "neutral",
+        "displayName": "Pericolo",
+        "canonical": "#b42318",
+        "tonalRamp": [
+          "#3a1512",
+          "#661f1a",
+          "#94271e",
+          "#c72b1f",
+          "#e05348",
+          "#e28983",
+          "#ebc0bc",
+          "#f8edec"
+        ]
+      },
+      "avviso": {
+        "role": "neutral",
+        "displayName": "Avviso",
+        "canonical": "#a15c07",
+        "tonalRamp": [
+          "#3e290e",
+          "#6d4412",
+          "#a06112",
+          "#d77d0e",
+          "#ef9d39",
+          "#ecb879",
+          "#f0d7b8",
+          "#f9f3eb"
+        ]
+      },
+      "successo": {
+        "role": "neutral",
+        "displayName": "Successo",
+        "canonical": "#15803d",
+        "tonalRamp": [
+          "#133922",
+          "#1c6337",
+          "#22914b",
+          "#24c15f",
+          "#4ddb82",
+          "#85e0a7",
+          "#beeace",
+          "#edf8f1"
+        ]
+      },
+      "pagina-buio": {
+        "role": "neutral",
+        "displayName": "Pagina al buio",
+        "canonical": "#101814",
+        "tonalRamp": [
+          "#212b26",
+          "#364a40",
+          "#4a6959",
+          "#5d8973",
+          "#80a894",
+          "#a6bfb2",
+          "#cedad4",
+          "#f1f4f2"
+        ]
+      },
+      "nastro-buio": {
+        "role": "secondary",
+        "displayName": "Nastro al buio",
+        "canonical": "#be123c",
+        "tonalRamp": [
+          "#3c111b",
+          "#69172b",
+          "#991939",
+          "#cd1844",
+          "#e6426a",
+          "#e67f98",
+          "#edbac7",
+          "#f9ecef"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Numero del giorno",
+        "purpose": "Solo il numero del giorno nella pagina «Oggi»."
+      },
+      "headline": {
+        "displayName": "Titolo di pagina",
+        "purpose": "Titoli delle pagine."
+      },
+      "title": {
+        "displayName": "Titolo",
+        "purpose": "Intestazioni delle card e titoli delle voci."
+      },
+      "body": {
+        "displayName": "Testo",
+        "purpose": "Testo corrente; lezioni con misura massima di 36em."
+      },
+      "numeri": {
+        "displayName": "Numeri",
+        "purpose": "Importi, conteggi, giorni di ritardo, KPI: tabellari e condensati."
+      },
+      "label": {
+        "displayName": "Etichetta",
+        "purpose": "Gruppi della lista, intestazioni delle tabelle, gruppi del menu."
+      }
+    },
+    "shadows": [
+      {
+        "name": "foglio",
+        "value": "0 1px 2px rgba(22,33,27,.06), 0 2px 8px rgba(22,33,27,.05)",
+        "purpose": "Card a riposo, solo tema chiaro."
+      },
+      {
+        "name": "sollevato",
+        "value": "0 6px 18px rgba(22,33,27,.1)",
+        "purpose": "Hover delle card dei moduli dell'Accademia."
+      }
+    ],
+    "motion": [
+      {
+        "name": "stato",
+        "value": "150ms ease",
+        "purpose": "Hover di voci di menu, pulsanti e card; disattivato con prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg-rail",
+        "value": "992px"
+      },
+      {
+        "name": "xl",
+        "value": "1200px"
+      },
+      {
+        "name": "pieghevole-cerniera",
+        "value": "(horizontal-viewport-segments: 2)"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Pulsante primario",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Azione principale della schermata.",
+      "html": "<button class=\"ds-btn-primary\">Nuovo cliente</button>",
+      "css": ".ds-btn-primary{background:#24533f;color:#fff;border:1px solid #24533f;border-radius:.375rem;padding:.4rem .8rem;font:550 1rem Archivo,system-ui,sans-serif;transition:background .15s ease}.ds-btn-primary:hover{background:#1b4333}.ds-btn-primary:focus-visible{outline:2px solid #24533f;outline-offset:2px}"
+    },
+    {
+      "name": "Pulsante secondario",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Azioni secondarie e azioni di riga.",
+      "html": "<button class=\"ds-btn-secondary\">Tutti i follow-up</button>",
+      "css": ".ds-btn-secondary{background:#fff;color:#4d5c54;border:1px solid #d6dfd5;border-radius:.375rem;padding:.4rem .8rem;font:550 1rem Archivo,system-ui,sans-serif;transition:background .15s ease}.ds-btn-secondary:hover{background:#e9efe8;color:#16211b;border-color:#4d5c54}.ds-btn-secondary:focus-visible{outline:2px solid #24533f;outline-offset:2px}"
+    },
+    {
+      "name": "Ricerca",
+      "kind": "input",
+      "refersTo": "search",
+      "description": "Campo di ricerca globale nella barra superiore.",
+      "html": "<label class=\"ds-search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"#4d5c54\"><path d=\"M11.7 10.3a6.5 6.5 0 1 0-1.4 1.4l3.6 3.6 1.4-1.4zM6.5 11a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z\"/></svg><input placeholder=\"Cerca clienti e polizze\"></label>",
+      "css": ".ds-search{display:flex;align-items:center;gap:.5rem;background:#fff;border:1px solid #d6dfd5;border-radius:999px;padding:.4rem .9rem;width:22rem}.ds-search input{border:0;outline:0;background:transparent;font:400 1rem Archivo,system-ui,sans-serif;color:#16211b;flex:1}.ds-search input::placeholder{color:#4d5c54}.ds-search:focus-within{box-shadow:0 0 0 .25rem rgba(36,83,63,.3)}"
+    },
+    {
+      "name": "Barra laterale",
+      "kind": "nav",
+      "refersTo": "rail",
+      "description": "La copertina: navigazione principale.",
+      "html": "<nav class=\"ds-rail\"><div class=\"ds-rail-group\">Lavoro</div><a class=\"ds-rail-item is-active\" href=\"#\">Oggi</a><a class=\"ds-rail-item\" href=\"#\">Pipeline</a><div class=\"ds-rail-group\">Formazione</div><a class=\"ds-rail-item\" href=\"#\">Accademia</a></nav>",
+      "css": ".ds-rail{background:#1d3b30;padding:1rem .85rem;width:15rem;display:flex;flex-direction:column;gap:.1rem;font-family:Archivo,system-ui,sans-serif}.ds-rail-group{margin:.8rem .6rem .35rem;font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#a9bcb1}.ds-rail-item{padding:.5rem .6rem;border-radius:.45rem;color:#a9bcb1;text-decoration:none;font-weight:500;transition:background .15s ease,color .15s ease}.ds-rail-item:hover{background:rgba(255,255,255,.07);color:#e6eee8}.ds-rail-item.is-active{background:rgba(255,255,255,.13);color:#fff;font-weight:650}.ds-rail-item:focus-visible{outline:2px solid #e6eee8;outline-offset:2px}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Contenitore di lavoro con intestazione e azione.",
+      "html": "<section class=\"ds-card\"><header class=\"ds-card-head\"><span>Trattative aperte</span><a href=\"#\">Pipeline</a></header><div class=\"ds-card-body\">Polizza salute famiglia · € 900,00</div></section>",
+      "css": ".ds-card{background:#fff;border:1px solid #d6dfd5;border-radius:.6rem;box-shadow:0 1px 2px rgba(22,33,27,.06),0 2px 8px rgba(22,33,27,.05);font-family:Archivo,system-ui,sans-serif;color:#16211b;width:22rem}.ds-card-head{display:flex;justify-content:space-between;padding:.75rem 1rem;border-bottom:1px solid #d6dfd5;font-weight:600}.ds-card-head a{color:#24533f;text-decoration:none;font-weight:500}.ds-card-head a:hover{text-decoration:underline}.ds-card-body{padding:1rem}"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Tipo di attività o numero di polizza accanto al titolo.",
+      "html": "<span class=\"ds-chip\">Polizza UNI-77103</span>",
+      "css": ".ds-chip{display:inline-block;font:600 .78rem Archivo,system-ui,sans-serif;padding:.1rem .45rem;border-radius:.3rem;background:#e9efe8;color:#4d5c54}"
+    },
+    {
+      "name": "Il nastro",
+      "kind": "custom",
+      "refersTo": "nastro",
+      "description": "Segnalibro piatto sul prossimo passo: uno per schermata.",
+      "html": "<div class=\"ds-card-demo\"><div class=\"ds-nastro\" role=\"note\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 16 16\" fill=\"#fff\"><path d=\"M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5L8 12l-6 3.5z\"/></svg>Prossimo passo <span>· inizia da qui</span></div><div class=\"ds-riga\"><b>−12 gg</b> Rinnovo RC Terzi</div></div>",
+      "css": ".ds-card-demo{background:#fff;border:1px solid #d6dfd5;border-radius:.6rem;padding:1rem 1.25rem;width:24rem;margin-left:2rem;font-family:Archivo,system-ui,sans-serif}.ds-nastro{display:flex;align-items:center;gap:.45rem;min-height:1.7rem;margin-left:-1.55rem;padding:.2rem 1rem .2rem 1.45rem;background:#9f1239;color:#fff;clip-path:polygon(0 0,100% 0,100% 100%,0 100%,.6rem 50%);font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-stretch:88%}.ds-nastro span{font-weight:500;letter-spacing:.02em;text-transform:none}.ds-riga{padding:.7rem 0;color:#16211b}.ds-riga b{color:#b42318;font-stretch:78%;margin-right:.75rem}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Il nastro sul prossimo passo",
+    "overview": "Deal Combined è l'agenda annuale del consulente, resa come strumento di lavoro contemporaneo. La barra laterale è la copertina in tela verde bottiglia, il contenuto è la pagina: bianca, appena velata di verde, scritta in inchiostro verde-nero. Su ogni schermata c'è un solo nastro segnalibro rosso, che marca il prossimo passo: la prossima attività di oggi, la trattativa da muovere, il prossimo follow-up del cliente, la prossima lezione.\n\nLa densità è media, perché lo strumento serve sia al consulente esperto sia a chi è in formazione. Il mondo dell'agenda presta solo caratteri, palette, densità e il nastro: navigazione, pulsanti, tabelle e campi restano i comandi standard che chiunque sa usare. Al buio l'agenda è chiusa: stesse regole, fondo verde quasi nero. La carta stampata è sempre chiara.",
+    "keyCharacteristics": [
+      "Copertina verde come guscio dell'app; il colore fa un lavoro, non decora.",
+      "Date e numeri grandi, condensati e tabellari, come nella pagina del giorno.",
+      "Un nastro rosso per schermata, sempre sul prossimo passo.",
+      "Componenti Bootstrap standard, ritinti dai token; nessun costume del mondo.",
+      "Tema chiaro e scuro con gli stessi ruoli; la stampa resta chiara."
+    ],
+    "rules": [
+      {
+        "name": "The One Ribbon Rule",
+        "body": "Il rosso nastro compare una sola volta per schermata e solo sul prossimo passo. Se non c'è un prossimo passo, non c'è nastro.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Reds Rule",
+        "body": "Il pericolo (ritardi, scadute, eliminazioni) usa un rosso diverso dal nastro. Il nastro indica una direzione, il pericolo uno stato: non confonderli.",
+        "section": "colors"
+      },
+      {
+        "name": "The Width Not Weight Rule",
+        "body": "Per dare enfasi a un numero si stringe la larghezza (font-stretch) e si alza il peso; non si cambia famiglia e non si usa il corsivo.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Dark Rule",
+        "body": "Al buio niente ombre: la profondità è affidata ai toni e ai filetti.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** usare un solo nastro per schermata, sul prossimo passo reale (The One Ribbon Rule).",
+      "**Do** scrivere date, importi e conteggi in numeri tabellari condensati.",
+      "**Do** ritingere i componenti Bootstrap tramite i token `--dc-*`, in entrambi i temi.",
+      "**Do** forzare la carta chiara nelle schede da stampare (`data-bs-theme=\"light\"`) e in stampa.",
+      "**Do** tenere il contrasto del testo ≥4.5:1 in chiaro e in scuro, nastro compreso."
+    ],
+    "donts": [
+      "**Don't** usare il rosso nastro per errori, badge o decorazioni (The Two Reds Rule).",
+      "**Don't** usare fondi crema o carta ingiallita: la pagina è bianca velata di verde.",
+      "**Don't** imitare materiali (raso del nastro, trama della tela, rilegatura): il mondo entra con palette, caratteri, densità e il nastro piatto.",
+      "**Don't** marcare lo stato con barre colorate laterali su card, righe o voci di menu.",
+      "**Don't** mettere etichette sopra i titoli: il contesto (settimana, area) va sotto il titolo."
+    ]
+  }
+}

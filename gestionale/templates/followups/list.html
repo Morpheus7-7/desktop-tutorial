@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}Follow-up — Gestionale Assicurativo{% endblock %}
+{% block title %}Follow-up — Deal Combined{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <h1 class="page-title"><i class="bi bi-check2-square me-2"></i>Follow-up</h1>
+  <a class="btn btn-outline-secondary ms-auto" href="{{ url_for('followups.calendar_ics') }}"><i class="bi bi-calendar3"></i> Scarica per Google Calendar (.ics)</a>
 </div>
 
 <ul class="nav nav-pills mb-3">
@@ -35,6 +36,8 @@
           <td class="text-end text-nowrap">
             {% if puo_modificare %}
             {% if f.stato == 'aperto' %}
+            <a class="btn btn-sm btn-outline-secondary" href="{{ link_calendar(f) }}" target="_blank" rel="noopener"
+               title="Aggiungi a Google Calendar" aria-label="Aggiungi «{{ f.titolo }}» a Google Calendar"><i class="bi bi-calendar-plus"></i></a>
             <form class="d-inline" method="post" action="{{ url_for('followups.complete', followup_id=f.id) }}">
               {{ csrf_field() }}
               <input type="hidden" name="da_lista" value="1">

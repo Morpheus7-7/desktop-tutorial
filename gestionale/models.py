@@ -54,6 +54,9 @@ CLIENT_TYPE_BADGES = {
     "privato": "tipo-privato",
 }
 TIPI_PERSONA_FISICA = ("professionista", "dipendente", "privato")
+# Dati anagrafici delle sole persone fisiche (non di aziende e studi).
+CAMPI_PERSONA = ("nome", "cognome", "luogo_nascita", "stato_civile", "nucleo_familiare", "interessi",
+                 "residenza_indirizzo", "residenza_citta", "residenza_cap", "residenza_provincia")
 
 # Campi dell'anagrafica pertinenti a ciascun tipo di cliente: il modulo mostra
 # solo questi e il salvataggio azzera gli altri (es. niente dipendenti e
@@ -67,7 +70,8 @@ CAMPI_PER_TIPO = {
     "professione": {"studio", "professionista", "dipendente", "privato"},
     "specializzazioni": {"studio", "professionista"},
     "attivita_svolte": {"studio", "professionista"},
-    "albo_ordine": {"studio", "professionista"},
+    "albo": {"studio", "professionista"},
+    "albo_provincia": {"studio", "professionista"},
     "albo_numero": {"studio", "professionista"},
     "albo_data_iscrizione": {"studio", "professionista"},
     "inquadramento": {"professionista"},
@@ -189,6 +193,7 @@ CARTELLE_DOCUMENTI = [
         ("incarico_broker", "Incarico / mandato all'intermediario"),
     ]),
     ("altro", "Altri documenti", "bi-folder", None, [
+        ("scheda", "Scheda compilata"),
         ("altro", "Altro"),
     ]),
 ]
@@ -203,6 +208,53 @@ def cartelle_per_tipo_cliente(tipo_cliente: str) -> list[tuple]:
 
 
 DOCUMENT_CATEGORY_LABELS = dict(DOCUMENT_CATEGORIES)
+
+# Ruoli delle persone collegate a un cliente (amministratori, soci, familiari…)
+RUOLI_PERSONA = [
+    ("amministratore_unico", "Amministratore unico"),
+    ("amministratore_delegato", "Amministratore delegato"),
+    ("presidente_cda", "Presidente del CdA"),
+    ("consigliere", "Consigliere"),
+    ("legale_rappresentante", "Legale rappresentante"),
+    ("socio", "Socio"),
+    ("procuratore", "Procuratore"),
+    ("sindaco", "Sindaco / Revisore"),
+    ("titolare_effettivo", "Titolare effettivo"),
+    ("dipendente", "Dipendente"),
+    ("coniuge", "Coniuge / Convivente"),
+    ("familiare", "Familiare"),
+    ("altro", "Altro"),
+]
+RUOLI_PERSONA_LABELS = dict(RUOLI_PERSONA)
+# I ruoli proposti per primi sul pulsante delle aziende
+RUOLI_SOCIETARI = ("amministratore_unico", "amministratore_delegato", "presidente_cda", "consigliere",
+                   "legale_rappresentante", "socio", "procuratore", "sindaco", "titolare_effettivo")
+
+STATI_CIVILI = ["Celibe / Nubile", "Coniugato/a", "Unito/a civilmente", "Convivente",
+                "Separato/a", "Divorziato/a", "Vedovo/a"]
+
+# Sezioni del diario delle attività (Note)
+SEZIONI_NOTE = [
+    ("chiamate", "Chiamate", "bi-telephone"),
+    ("appuntamenti", "Appuntamenti", "bi-people"),
+    ("preventivi", "Preventivi e proposte", "bi-file-earmark-text"),
+    ("pratiche", "Pratiche e sinistri", "bi-folder-check"),
+    ("prospezione", "Nuovi contatti", "bi-person-plus"),
+    ("amministrazione", "Amministrazione", "bi-calculator"),
+    ("formazione", "Formazione", "bi-mortarboard"),
+    ("personale", "Personale", "bi-heart"),
+    ("altro", "Altro", "bi-three-dots"),
+]
+SEZIONI_NOTE_LABELS = {codice: etichetta for codice, etichetta, _ in SEZIONI_NOTE}
+SEZIONI_NOTE_ICONE = {codice: icona for codice, _, icona in SEZIONI_NOTE}
+
+# Esito di un preventivo
+ESITI_PREVENTIVO = [
+    ("in_attesa", "In attesa di risposta"),
+    ("accettato", "Accettato"),
+    ("rifiutato", "Rifiutato"),
+]
+ESITI_PREVENTIVO_LABELS = dict(ESITI_PREVENTIVO)
 
 # Fasi della pipeline commerciale (opportunità di vendita), stile CRM.
 OPPORTUNITY_STAGES = [
@@ -330,6 +382,24 @@ class Client(db.Model):
     tipo = db.Column(db.String(20), nullable=False, default="azienda")
     ragione_sociale = db.Column(db.String(200), nullable=False)
     referente = db.Column(db.String(120))
+    # Persone (professionisti e privati): il nominativo è «Nome Cognome»
+    nome = db.Column(db.String(80))
+    cognome = db.Column(db.String(80))
+    data_nascita = db.Column(db.Date)
+    luogo_nascita = db.Column(db.String(100))
+    stato_civile = db.Column(db.String(30))
+    nucleo_familiare = db.Column(db.Text)  # coniuge, figli ed età, persone a carico
+    interessi = db.Column(db.Text)  # hobby, sport, abitudini: utili in trattativa
+    # Residenza (se diversa dall'indirizzo principale)
+    residenza_indirizzo = db.Column(db.String(200))
+    residenza_citta = db.Column(db.String(100))
+    residenza_cap = db.Column(db.String(5))
+    residenza_provincia = db.Column(db.String(2))
+    # Iscrizione all'albo (professionisti)
+    albo = db.Column(db.String(150))  # es. Ordine degli Ingegneri
+    albo_provincia = db.Column(db.String(60))
+    albo_numero = db.Column(db.String(40))
+    albo_data_iscrizione = db.Column(db.Date)
     codice_fiscale = db.Column(db.String(16))
     partita_iva = db.Column(db.String(11))
     codice_ateco = db.Column(db.String(10))
@@ -346,20 +416,16 @@ class Client(db.Model):
     numero_dipendenti = db.Column(db.Integer)
     fatturato_annuo = db.Column(db.Float)  # volume d'affari per il professionista
     # Aziende e studi: forma giuridica. Professionisti e studi: specializzazioni
-    # e attività svolte (voci separate da «; »), iscrizione all'albo.
+    # e attività svolte (voci separate da «; »); l'albo è più sopra.
     forma_giuridica = db.Column(db.String(40))
     specializzazioni = db.Column(db.Text)
     attivita_svolte = db.Column(db.Text)
-    albo_ordine = db.Column(db.String(150))
-    albo_numero = db.Column(db.String(40))
-    albo_data_iscrizione = db.Column(db.Date)
     inquadramento = db.Column(db.String(30))  # vedi professioni.INQUADRAMENTI
     numero_professionisti = db.Column(db.Integer)  # soci / associati dello studio
     studio_id = db.Column(db.Integer, db.ForeignKey("clients.id", ondelete="SET NULL"), index=True)
     descrizione_attivita = db.Column(db.Text)
     note = db.Column(db.Text)
     # Persone fisiche e compliance (GDPR, IVASS Reg. 40/2018, antiriciclaggio).
-    data_nascita = db.Column(db.Date)
     data_consenso_privacy = db.Column(db.Date)
     consenso_marketing = db.Column(db.Boolean, default=False, nullable=False)
     data_adeguatezza = db.Column(db.Date)  # ultimo questionario demands & needs
@@ -409,6 +475,32 @@ class Client(db.Model):
     studio = db.relationship(
         "Client", remote_side=[id], lazy=True,
         backref=db.backref("professionisti", lazy=True, order_by="Client.ragione_sociale"),
+    )
+    # Le note restano anche se il cliente viene eliminato (perdono solo il collegamento).
+    diario = db.relationship("Nota", backref="cliente", lazy=True, order_by="Nota.giorno.desc(), Nota.id.desc()")
+    persone = db.relationship(
+        "PersonaCollegata",
+        backref="cliente",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="PersonaCollegata.id",
+        foreign_keys="PersonaCollegata.client_id",
+    )
+    # Le stesse persone viste dall'altra parte: i ruoli di questo cliente
+    # privato nelle aziende (amministratore di…, dipendente di…).
+    ruoli_in_aziende = db.relationship(
+        "PersonaCollegata",
+        backref="persona_cliente",
+        lazy=True,
+        order_by="PersonaCollegata.id",
+        foreign_keys="PersonaCollegata.persona_client_id",
+    )
+    schede = db.relationship(
+        "SchedaCompilata",
+        backref="cliente",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="SchedaCompilata.updated_at.desc()",
     )
 
     @property
@@ -643,6 +735,13 @@ class Client(db.Model):
         return CLIENT_TYPE_BADGES.get(self.tipo, "bg-secondary")
 
     @property
+    def nome_completo(self):
+        """«Nome Cognome» per le persone, altrimenti la ragione sociale."""
+        if self.persona_fisica and (self.nome or self.cognome):
+            return " ".join(x for x in (self.nome, self.cognome) if x)
+        return self.ragione_sociale
+
+    @property
     def polizze_attive(self):
         """Polizze attive e già in vigore (escluse quelle con decorrenza futura)."""
         return [p for p in self.polizze if p.attiva and not p.non_ancora_in_vigore]
@@ -653,6 +752,111 @@ class Client(db.Model):
 
     def __repr__(self):  # pragma: no cover
         return f"<Client {self.ragione_sociale!r}>"
+
+
+def _eta(nascita):
+    if not nascita or nascita > date.today():
+        return None
+    oggi = date.today()
+    return oggi.year - nascita.year - ((oggi.month, oggi.day) < (nascita.month, nascita.day))
+
+
+class PersonaCollegata(db.Model):
+    """Amministratori, consiglieri, soci, familiari… di un cliente."""
+
+    __tablename__ = "client_persons"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True)
+    # La stessa persona come cliente privato (sue polizze, sua anagrafica).
+    persona_client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), index=True)
+    ruolo = db.Column(db.String(40), nullable=False, default="amministratore_unico")
+    ruolo_altro = db.Column(db.String(100))  # testo libero se ruolo = «altro»
+    nome = db.Column(db.String(80))
+    cognome = db.Column(db.String(80), nullable=False)
+    codice_fiscale = db.Column(db.String(16))
+    data_nascita = db.Column(db.Date)
+    luogo_nascita = db.Column(db.String(100))
+    indirizzo = db.Column(db.String(200))
+    citta = db.Column(db.String(100))
+    cap = db.Column(db.String(5))
+    provincia = db.Column(db.String(2))
+    email = db.Column(db.String(120))
+    telefono = db.Column(db.String(30))
+    quota_perc = db.Column(db.Float)  # quota di partecipazione dei soci
+    dal = db.Column(db.Date)  # in carica dal
+    note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=now)
+
+    # Con la scheda privata collegata, i dati anagrafici vengono da lì: si
+    # aggiornano in un posto solo.
+    _ANAGRAFICI = ("nome", "cognome", "codice_fiscale", "data_nascita", "luogo_nascita", "email", "telefono")
+    _INDIRIZZO = ("indirizzo", "citta", "cap", "provincia")
+
+    def dato(self, campo):
+        c = self.persona_cliente
+        if c is None:
+            return getattr(self, campo)
+        if campo in self._ANAGRAFICI:
+            return getattr(c, campo)
+        if campo in self._INDIRIZZO:
+            # La residenza se c'è, altrimenti l'indirizzo principale (dove abita).
+            if c.residenza_indirizzo or c.residenza_citta:
+                return getattr(c, f"residenza_{campo}")
+            return getattr(c, campo)
+        return getattr(self, campo)
+
+    @property
+    def nome_completo(self):
+        if self.persona_cliente is not None:
+            return self.persona_cliente.nome_completo
+        return " ".join(x for x in (self.nome, self.cognome) if x)
+
+    @property
+    def ruolo_label(self):
+        if self.ruolo == "altro" and self.ruolo_altro:
+            return self.ruolo_altro
+        return RUOLI_PERSONA_LABELS.get(self.ruolo, self.ruolo)
+
+    @property
+    def eta(self):
+        return _eta(self.dato("data_nascita"))
+
+
+class Nota(db.Model):
+    """Una nota del diario: un'attività svolta (o da fare) in un giorno, con
+    eventuale promemoria via email e Google Calendar."""
+
+    __tablename__ = "notes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    giorno = db.Column(db.Date, nullable=False, default=date.today, index=True)
+    ora = db.Column(db.String(5))  # «HH:MM», facoltativa
+    sezione = db.Column(db.String(30), nullable=False, default="altro", index=True)
+    titolo = db.Column(db.String(200), nullable=False)
+    testo = db.Column(db.Text)
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), index=True)
+    promemoria_il = db.Column(db.DateTime, index=True)  # ora locale del PC
+    promemoria_email = db.Column(db.Boolean, nullable=False, default=False)
+    promemoria_fatto = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=now)
+    updated_at = db.Column(db.DateTime, default=now, onupdate=now)
+
+    @property
+    def sezione_label(self):
+        return SEZIONI_NOTE_LABELS.get(self.sezione, self.sezione)
+
+    @property
+    def sezione_icona(self):
+        return SEZIONI_NOTE_ICONE.get(self.sezione, "bi-journal")
+
+    @property
+    def promemoria_aperto(self):
+        return bool(self.promemoria_il) and not self.promemoria_fatto
+
+    @property
+    def promemoria_scaduto(self):
+        return self.promemoria_aperto and self.promemoria_il <= datetime.now()
 
 
 class Policy(db.Model):
@@ -969,6 +1173,40 @@ class Opportunity(db.Model):
             return self.premio_stimato * self.provvigione_perc / 100.0
         return None
 
+    preventivi = db.relationship(
+        "Preventivo", backref="opportunita", cascade="all, delete-orphan", lazy=True,
+        order_by="Preventivo.data.desc(), Preventivo.id.desc()",
+    )
+
+
+class Preventivo(db.Model):
+    """Un preventivo fatto per una proposta (opportunità): compagnia, premio,
+    validità ed esito, con il file salvato tra i documenti del cliente."""
+
+    __tablename__ = "quotes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    opportunity_id = db.Column(db.Integer, db.ForeignKey("opportunities.id"), nullable=False, index=True)
+    compagnia = db.Column(db.String(120))
+    descrizione = db.Column(db.String(200))  # es. «RCT/O massimale 3 mln, franchigia 500 €»
+    premio = db.Column(db.Float)
+    data = db.Column(db.Date, nullable=False, default=date.today)
+    valido_fino = db.Column(db.Date)
+    esito = db.Column(db.String(20), nullable=False, default="in_attesa")
+    note = db.Column(db.Text)
+    document_id = db.Column(db.Integer, db.ForeignKey("documents.id"), index=True)
+    created_at = db.Column(db.DateTime, default=now)
+
+    documento = db.relationship("Document", backref=db.backref("preventivi", lazy=True))
+
+    @property
+    def esito_label(self):
+        return ESITI_PREVENTIVO_LABELS.get(self.esito, self.esito)
+
+    @property
+    def scaduto(self):
+        return self.esito == "in_attesa" and self.valido_fino is not None and self.valido_fino < date.today()
+
 
 class RiskAnalysis(db.Model):
     __tablename__ = "risk_analyses"
@@ -1044,6 +1282,12 @@ class Settings(db.Model):
     scadenza_automatica = db.Column(db.Boolean, default=True, nullable=False)
     tolleranza_scadenza_giorni = db.Column(db.Integer, default=30)
     ultimo_backup_at = db.Column(db.DateTime)
+    # Privacy: PIN all'apertura (hash scrypt), codice di recupero, blocco per inattività
+    pin_hash = db.Column(db.String(200))
+    pin_recupero_hash = db.Column(db.String(200))
+    blocco_minuti = db.Column(db.Integer, default=10)
+    pin_tentativi = db.Column(db.Integer, default=0)
+    pin_attesa_fino = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime, default=now, onupdate=now)
 
     @staticmethod
@@ -1356,6 +1600,7 @@ class ClaimNote(db.Model):
 
 # Aspetto scelto da ogni utente (pagina «Aspetto»): tema di colore e modalità.
 TEMI = [
+    ("agenda", "Agenda verde (Deal Combined)", "#1d3b30", "#24533f"),
     ("blu", "Blu fiducia", "#0f1d3d", "#2563eb"),
     ("ottanio", "Ottanio", "#082a33", "#0e7490"),
     ("smeraldo", "Verde smeraldo", "#052e26", "#059669"),
@@ -1385,7 +1630,7 @@ class User(db.Model):
     bloccato_fino = db.Column(db.DateTime)
     ultimo_accesso = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=now)
-    tema = db.Column(db.String(20), default="blu", nullable=False)
+    tema = db.Column(db.String(20), default="agenda", nullable=False)
     aspetto = db.Column(db.String(10), default="auto", nullable=False)
 
     def set_password(self, password: str) -> None:
@@ -1458,3 +1703,68 @@ class AuditLog(db.Model):
     entita_id = db.Column(db.Integer)
     descrizione = db.Column(db.String(500))
     ip = db.Column(db.String(45))
+
+
+class AcademyProgress(db.Model):
+    """Lezione dell'Accademia segnata come completata."""
+
+    __tablename__ = "academy_progress"
+
+    id = db.Column(db.Integer, primary_key=True)
+    lezione_id = db.Column(db.String(80), unique=True, nullable=False)
+    completata_at = db.Column(db.DateTime, default=now, nullable=False)
+
+
+class QuizAttempt(db.Model):
+    """Tentativo di quiz di un modulo dell'Accademia."""
+
+    __tablename__ = "quiz_attempts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    modulo_id = db.Column(db.String(80), nullable=False, index=True)
+    punteggio = db.Column(db.Integer, nullable=False)
+    totale = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=now, nullable=False)
+
+    @property
+    def percentuale(self) -> int:
+        return round(100 * self.punteggio / self.totale) if self.totale else 0
+
+
+class SchedaCompilata(db.Model):
+    """Scheda dell'Accademia compilata dal gestionale e salvata nel cliente.
+
+    `contenuto` conserva sia la struttura della scheda al momento del
+    salvataggio (così una modifica futura ai modelli non altera le schede già
+    compilate) sia i valori inseriti.
+    """
+
+    __tablename__ = "schede_compilate"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=False, index=True)
+    scheda_id = db.Column(db.String(60), nullable=False)
+    titolo = db.Column(db.String(200), nullable=False)
+    data_compilazione = db.Column(db.Date, default=date.today, nullable=False)
+    consulente = db.Column(db.String(120))
+    contenuto_json = db.Column(db.Text, nullable=False, default="{}")
+    created_at = db.Column(db.DateTime, default=now)
+    updated_at = db.Column(db.DateTime, default=now, onupdate=now)
+
+    @property
+    def contenuto(self) -> dict:
+        try:
+            return json.loads(self.contenuto_json or "{}")
+        except ValueError:
+            return {}
+
+    @contenuto.setter
+    def contenuto(self, value: dict) -> None:
+        self.contenuto_json = json.dumps(value, ensure_ascii=False)
+
+    @property
+    def compilazione(self) -> tuple[int, int]:
+        """(campi compilati, campi totali): misura quanto è completa la scheda."""
+        valori = self.contenuto.get("valori", {})
+        pieni = sum(1 for v in valori.values() if v not in ("", None, False))
+        return pieni, len(valori)

@@ -1,10 +1,10 @@
 <!doctype html>
 {% set tema = request.cookies.get('ga_tema') %}{% set modo = request.cookies.get('ga_aspetto') %}
-<html lang="it" data-tema="{{ tema if tema in temi_chiavi else 'blu' }}" data-aspetto="{{ modo if modo in aspetti_chiavi else 'auto' }}">
+<html lang="it" data-tema="{{ tema if tema in temi_chiavi else 'agenda' }}" data-aspetto="{{ modo if modo in aspetti_chiavi else 'auto' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Gestionale Assicurativo{% endblock %}</title>
+  <title>{% block title %}Deal Combined{% endblock %}</title>
   <script src="{{ url_for('static', filename='aspetto.js') }}"></script>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='icona.png') }}">
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
@@ -15,7 +15,7 @@
   <main class="ga-auth-box">
     <div class="text-center mb-4">
       <span class="ga-brand-logo ga-brand-logo-lg"><i class="bi bi-shield-check"></i></span>
-      <h1 class="h4 mt-3 mb-0 fw-bold">Gestionale Assicurativo</h1>
+      <h1 class="h4 mt-3 mb-0 fw-bold">Deal Combined</h1>
       <div class="ga-muted small">Clienti · Polizze · Incassi · Sinistri</div>
     </div>
     {% with messages = get_flashed_messages(with_categories=true) %}

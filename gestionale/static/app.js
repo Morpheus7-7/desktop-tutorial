@@ -1,4 +1,4 @@
-/* Gestionale Assicurativo — comportamenti comuni dell'interfaccia. */
+/* Deal Combined — comportamenti comuni dell'interfaccia. */
 (function () {
   'use strict';
 
@@ -220,6 +220,52 @@
         dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.remove('dragover'); });
       });
       dz.addEventListener('drop', function (e) { input.files = e.dataTransfer.files; mostra(); });
+    });
+
+    // --- Modulo cliente: amministratori / familiari aggiunti al volo.
+    const righe = document.getElementById('righe-persone');
+    const modello = document.getElementById('modello-persona');
+    const aggiungi = document.getElementById('aggiungi-persona');
+    const tipoSelect = document.getElementById('tipo-cliente');
+    if (righe && modello && aggiungi) {
+      const ruoloPredefinito = function (riga) {
+        const s = riga.querySelector('select');
+        if (s && !s.dataset.toccato && tipoSelect) {
+          s.value = (tipoSelect.value === 'azienda' || tipoSelect.value === 'studio') ? 'amministratore_unico' : 'coniuge';
+        }
+      };
+      aggiungi.addEventListener('click', function () {
+        const riga = modello.content.firstElementChild.cloneNode(true);
+        righe.appendChild(riga);
+        ruoloPredefinito(riga);
+        riga.querySelector('input[name="persona_cognome"]').focus();
+      });
+      righe.addEventListener('change', function (e) { if (e.target.tagName === 'SELECT') e.target.dataset.toccato = '1'; });
+      righe.addEventListener('click', function (e) {
+        const via = e.target.closest('.rimuovi-persona');
+        if (via) via.closest('.riga-persona').remove();
+      });
+      if (tipoSelect) tipoSelect.addEventListener('change', function () { righe.querySelectorAll('.riga-persona').forEach(ruoloPredefinito); });
+      righe.querySelectorAll('.riga-persona').forEach(ruoloPredefinito);
+    }
+    // Dipendente: con l'azienda scelta tra i clienti il nome del datore si compila da solo.
+    const datore = document.getElementById('datore_lavoro_id');
+    const testoDatore = document.getElementById('riga-datore-testo');
+    if (datore && testoDatore) {
+      const aggiornaDatore = function () {
+        const nascosto = !!datore.value;
+        testoDatore.classList.toggle('d-none', nascosto);
+      };
+      datore.addEventListener('change', aggiornaDatore);
+      aggiornaDatore();
+    }
+
+    // --- Pulsanti che si disattivano all'invio (es. «Scarica e installa»).
+    document.querySelectorAll('form[data-disabilita-invio]').forEach(function (form) {
+      form.addEventListener('submit', function () {
+        const b = form.querySelector('button');
+        if (b && b.dataset.testoInvio) b.textContent = b.dataset.testoInvio;
+      });
     });
   });
 

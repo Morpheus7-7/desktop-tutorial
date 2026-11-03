@@ -6,7 +6,7 @@ from conftest import add_user, login
 
 def test_scelta_tema_e_modalita(client, app):
     pagina = client.get("/profilo/aspetto").get_data(as_text=True)
-    assert "Verde smeraldo" in pagina and 'data-tema="blu"' in pagina and 'data-aspetto="auto"' in pagina
+    assert "Verde smeraldo" in pagina and 'data-tema="agenda"' in pagina and 'data-aspetto="auto"' in pagina
     assert client.post("/profilo/aspetto", data={"tema": "smeraldo", "aspetto": "scuro"}).status_code == 302
     pagina = client.get("/").get_data(as_text=True)
     assert 'data-tema="smeraldo"' in pagina and 'data-aspetto="scuro"' in pagina and "aspetto.js" in pagina
@@ -14,7 +14,7 @@ def test_scelta_tema_e_modalita(client, app):
     client.post("/profilo/aspetto", data={"tema": "<script>", "aspetto": "neon"})
     with app.app_context():
         u = User.query.filter_by(username="admin").one()
-        assert (u.tema, u.aspetto) == ("blu", "auto")
+        assert (u.tema, u.aspetto) == ("agenda", "auto")
 
 
 def test_anche_la_sola_consultazione_sceglie_il_proprio_aspetto(app):
@@ -38,4 +38,4 @@ def test_la_pagina_di_accesso_ricorda_l_aspetto(client):
     pagina = client.get("/accesso").get_data(as_text=True)
     assert 'data-tema="viola"' in pagina and 'data-aspetto="scuro"' in pagina
     client.set_cookie("ga_tema", "<script>")
-    assert 'data-tema="blu"' in client.get("/accesso").get_data(as_text=True)
+    assert 'data-tema="agenda"' in client.get("/accesso").get_data(as_text=True)

@@ -18,6 +18,7 @@ from werkzeug.security import safe_join
 from ..export import csv_response
 from ..models import (
     CAMPI_PER_TIPO,
+    CAMPI_PERSONA,
     CLAIM_STATUSES,
     CLIENT_TYPE_DESCRIZIONI,
     CLIENT_TYPES,
@@ -29,7 +30,14 @@ from ..models import (
     PAYMENT_METHODS,
     POLICY_BRANCHES,
     POLICY_STATUSES,
+    RUOLI_PERSONA,
+    RUOLI_PERSONA_LABELS,
+    SEZIONI_NOTE,
+    RUOLI_SOCIETARI,
+    STATI_CIVILI,
+    TIPI_PERSONA_FISICA,
     Client,
+    PersonaCollegata,
     RiskAnalysis,
     db,
 )
@@ -59,14 +67,37 @@ from ..validators import (
     valida_partita_iva,
     valida_provincia,
 )
+from .. import diario
+from ..academy import get_scheda
+from ..schede import SCHEDE_CLIENTE
 
 bp = Blueprint("clients", __name__, url_prefix="/clienti")
 
 
-def _testo(form, nome: str, lunghezza: int, upper: bool = False) -> str | None:
-    """Testo ripulito e limitato alla lunghezza della colonna."""
-    valore = clean(form, nome, upper=upper)
-    return valore[:lunghezza].strip() if valore else None
+def _testo(form, nome: str, lunghezza: int | None = None, upper: bool = False,
+           maiuscolo: bool = False) -> str | None:
+    """Testo ripulito e (se indicata) limitato alla lunghezza della colonna."""
+    valore = clean(form, nome, upper=upper or maiuscolo)
+    if not valore:
+        return None
+    return (valore[:lunghezza].strip() if lunghezza else valore) or None
+
+
+def _date_or_none(value):
+    try:
+        return date.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
+def _float_or_none(value):
+    """Importi anche all'italiana: «1.250,50», «€ 900», «12%»."""
+    from ..import_excel import _numero
+
+    try:
+        return _numero(value.strip() if isinstance(value, str) else value)
+    except (ValueError, TypeError):
+        return None
 
 
 def _populate_from_form(client: Client, form) -> list[str]:
@@ -76,6 +107,24 @@ def _populate_from_form(client: Client, form) -> list[str]:
     tipo = form.get("tipo")
     client.tipo = tipo if tipo in dict(CLIENT_TYPES) else "azienda"
     client.ragione_sociale = (form.get("ragione_sociale") or "").strip()
+    if client.tipo in TIPI_PERSONA_FISICA:
+        client.nome = _testo(form, "nome", 80)
+        client.cognome = _testo(form, "cognome", 80)
+        if client.nome or client.cognome:
+            # Per le persone il nominativo è sempre «Nome Cognome».
+            client.ragione_sociale = " ".join(x for x in (client.nome, client.cognome) if x)
+        client.luogo_nascita = _testo(form, "luogo_nascita", 100)
+        stato_civile = form.get("stato_civile") or None
+        client.stato_civile = stato_civile if stato_civile in STATI_CIVILI else None
+        client.nucleo_familiare = clean(form, "nucleo_familiare")
+        client.interessi = clean(form, "interessi")
+        client.residenza_indirizzo = _testo(form, "residenza_indirizzo", 200)
+        client.residenza_citta = _testo(form, "residenza_citta", 100)
+        client.residenza_cap = _testo(form, "residenza_cap", 5)
+        client.residenza_provincia = _testo(form, "residenza_provincia", 2, upper=True)
+    else:
+        for campo in CAMPI_PERSONA:
+            setattr(client, campo, None)
     client.referente = _testo(form, "referente", 120)
     client.codice_fiscale = (clean(form, "codice_fiscale", upper=True) or "").replace(" ", "") or None
     client.partita_iva = (clean(form, "partita_iva") or "").replace(" ", "").upper().removeprefix("IT") or None
@@ -90,8 +139,9 @@ def _populate_from_form(client: Client, form) -> list[str]:
     client.professione = _testo(form, nome_professione if nome_professione in form else "professione", 120)
     client.specializzazioni = unisci_voci(form.getlist("specializzazioni"), form.get("specializzazioni_altre"))
     client.attivita_svolte = unisci_voci(form.getlist("attivita_svolte"), form.get("attivita_altre"))
-    client.albo_ordine = _testo(form, "albo_ordine", 150)
+    client.albo = _testo(form, "albo", 150)
     client.albo_numero = _testo(form, "albo_numero", 40, upper=True)
+    client.albo_provincia = _testo(form, "albo_provincia", 60)
     inquadramento = form.get("inquadramento")
     client.inquadramento = inquadramento if inquadramento in dict(INQUADRAMENTI) else None
     client.datore_lavoro = _testo(form, "datore_lavoro", 200)
@@ -255,7 +305,18 @@ def _form(client, nuovo):
         inquadramenti=INQUADRAMENTI,
         condizioni_privato=CONDIZIONI_PRIVATO,
         studi=studi,
+        stati_civili=STATI_CIVILI,
+        aziende=_aziende(escludi=client.id),
+        datore=_datore_collegato(client),
+        ruoli=RUOLI_PERSONA,
     )
+
+
+def _persona_cercata(like):
+    """Un'azienda si trova anche cercando il nome di un amministratore."""
+    completo = db.func.coalesce(PersonaCollegata.nome, "") + " " + PersonaCollegata.cognome
+    return db.or_(completo.ilike(like), PersonaCollegata.cognome.ilike(like),
+                  PersonaCollegata.codice_fiscale.ilike(like))
 
 
 def _query_clienti():
@@ -275,6 +336,9 @@ def _query_clienti():
                 Client.specializzazioni.ilike(like),
                 Client.referente.ilike(like),
                 Client.email.ilike(like),
+                Client.nome.ilike(like),
+                Client.cognome.ilike(like),
+                Client.persone.any(_persona_cercata(like)),
             )
         )
     if tipo in dict(CLIENT_TYPES):
@@ -311,7 +375,7 @@ def export_clients():
         [
             (c.ragione_sociale, c.tipo_label, c.forma_giuridica, c.referente, c.partita_iva,
              c.codice_fiscale, c.codice_ateco, c.professione, c.specializzazioni, c.attivita_svolte,
-             c.inquadramento_label, c.albo_ordine, c.albo_numero, c.albo_data_iscrizione,
+             c.inquadramento_label, c.albo, c.albo_numero, c.albo_data_iscrizione,
              c.studio.ragione_sociale if c.studio else None, c.numero_professionisti,
              c.datore_lavoro, c.settore, c.indirizzo, c.cap, c.citta, c.provincia, c.email, c.pec,
              c.telefono, c.numero_dipendenti, c.fatturato_annuo, c.data_nascita,
@@ -320,6 +384,66 @@ def export_clients():
             for c in clienti
         ],
     )
+
+
+def _aziende(escludi: int | None = None):
+    query = Client.query.filter(Client.tipo == "azienda")
+    if escludi:
+        query = query.filter(Client.id != escludi)
+    return query.order_by(Client.ragione_sociale).all()
+
+
+def _datore_collegato(client: Client | None) -> PersonaCollegata | None:
+    if client is None or client.id is None:
+        return None
+    return next((r for r in client.ruoli_in_aziende if r.ruolo == "dipendente"), None)
+
+
+def _copia_anagrafica(p: PersonaCollegata, c: Client) -> None:
+    """Tiene nella persona una copia di nome e codice fiscale del cliente
+    privato collegato: serve alla ricerca («trova l'azienda dal nome»)."""
+    p.nome, p.cognome = c.nome, c.cognome or c.ragione_sociale
+    p.codice_fiscale = c.codice_fiscale
+
+
+def _aggiorna_datore(client: Client, form) -> None:
+    """Dipendente: collega il cliente all'azienda scelta tra i clienti."""
+    if "datore_lavoro_id" not in form:
+        return
+    azienda = None
+    scelta = form.get("datore_lavoro_id", type=int)
+    if client.tipo == "dipendente" and scelta:
+        azienda = db.session.get(Client, scelta)
+        if azienda is None or azienda.tipo != "azienda" or azienda.id == client.id:
+            azienda = None
+    attuale = _datore_collegato(client)
+    if attuale is not None and (azienda is None or attuale.client_id != azienda.id):
+        db.session.delete(attuale)
+    if azienda is not None:
+        if attuale is None or attuale.client_id != azienda.id:
+            p = PersonaCollegata(client_id=azienda.id, persona_client_id=client.id, ruolo="dipendente")
+            _copia_anagrafica(p, client)
+            db.session.add(p)
+        client.datore_lavoro = azienda.ragione_sociale
+
+
+def _aggiungi_persone(client: Client, form) -> int:
+    """Righe «amministratore / familiare» compilate nel modulo del cliente.
+    Le righe senza cognome si ignorano. Restituisce quante ne ha aggiunte."""
+    colonne = [form.getlist(k) for k in ("persona_ruolo", "persona_nome", "persona_cognome", "persona_cf",
+                                          "persona_telefono")]
+    aggiunte = 0
+    for ruolo, nome, cognome, cf, telefono in zip(*colonne):
+        cognome = cognome.strip()[:80]
+        if not cognome:
+            continue
+        db.session.add(PersonaCollegata(
+            client_id=client.id, ruolo=ruolo if ruolo in RUOLI_PERSONA_LABELS else "altro",
+            nome=nome.strip()[:80] or None, cognome=cognome, codice_fiscale=cf.strip().upper()[:16] or None,
+            telefono=telefono.strip()[:30] or None,
+        ))
+        aggiunte += 1
+    return aggiunte
 
 
 @bp.route("/nuovo", methods=["GET", "POST"])
@@ -339,12 +463,16 @@ def new_client():
         _avvisa_duplicati(client)
         db.session.add(client)
         db.session.flush()
+        _aggiorna_datore(client, request.form)
+        persone = _aggiungi_persone(client, request.form)
         audit("crea", "cliente", client.id, f"Nuovo cliente «{client.ragione_sociale}» ({client.tipo_label})")
         db.session.commit()
-        flash(f"Cliente «{client.ragione_sociale}» creato.", "success")
+        flash(f"Cliente «{client.ragione_sociale}» creato"
+              + (f" con {persone} {'persona collegata' if persone == 1 else 'persone collegate'}." if persone else "."),
+              "success")
         if request.form.get("analizza_subito") and client.descrizione_attivita:
             return redirect(url_for("clients.run_analysis", client_id=client.id), code=307)
-        return redirect(url_for("clients.detail", client_id=client.id))
+        return redirect(url_for("clients.detail", client_id=client.id) + ("#persone" if persone else ""))
     return _form(client, nuovo=True)
 
 
@@ -357,11 +485,14 @@ def render_detail(client: Client, form_polizza=None):
     """Scheda cliente; ``form_polizza`` ripresenta i dati di una polizza non salvata."""
     from .policies import compagnie_note
 
+    aperti = [f for f in client.followups if f.stato == "aperto"]
     return render_template(
         "clients/detail.html",
         client=client,
         form_polizza=form_polizza,
         compagnie=compagnie_note(),
+        prossimo_followup=min(aperti, key=lambda f: f.data_scadenza) if aperti else None,
+        schede_cliente=[get_scheda(i) for i in SCHEDE_CLIENTE],
         policy_branches=POLICY_BRANCHES,
         policy_statuses=POLICY_STATUSES,
         payment_frequencies=PAYMENT_FREQUENCIES,
@@ -371,6 +502,11 @@ def render_detail(client: Client, form_polizza=None):
         followup_priorities=FOLLOWUP_PRIORITIES,
         claim_statuses=CLAIM_STATUSES,
         id_document_types=dict(ID_DOCUMENT_TYPES),
+        ruoli=RUOLI_PERSONA,
+        ruoli_societari=RUOLI_SOCIETARI,
+        sezioni_note=SEZIONI_NOTE,
+        email_pronta=diario.destinatari_configurati(),
+        suggerimenti={p.id: s for p in client.persone if (s := _cliente_privato_esistente(p, client.id))},
     )
 
 
@@ -398,11 +534,188 @@ def edit_client(client_id):
                 f"{plurale(scollegati, 'professionista scollegato', 'professionisti scollegati')}.",
                 "info",
             )
+        _aggiorna_datore(client, request.form)
+        _aggiungi_persone(client, request.form)
+        for ruolo in client.ruoli_in_aziende:
+            _copia_anagrafica(ruolo, client)
         audit("modifica", "cliente", client.id, f"Modificata l'anagrafica di «{client.ragione_sociale}»")
         db.session.commit()
         flash("Anagrafica aggiornata.", "success")
         return redirect(url_for("clients.detail", client_id=client.id))
     return _form(client, nuovo=False)
+
+
+# ----------------------------------------------------------------------
+# Persone collegate: amministratori, consiglieri, soci, familiari…
+# ----------------------------------------------------------------------
+def _persona_or_404(client_id: int, persona_id: int) -> PersonaCollegata:
+    persona = db.get_or_404(PersonaCollegata, persona_id)
+    if persona.client_id != client_id:
+        abort(404)
+    return persona
+
+
+def _compila_persona(p: PersonaCollegata, form) -> str | None:
+    """Riempie la persona dal modulo; restituisce un errore o None."""
+    ruolo = form.get("ruolo", "altro")
+    p.ruolo = ruolo if ruolo in RUOLI_PERSONA_LABELS else "altro"
+    p.ruolo_altro = _testo(form, "ruolo_altro") if p.ruolo == "altro" else None
+    p.quota_perc = _float_or_none(form.get("quota_perc"))
+    p.dal = _date_or_none(form.get("dal"))
+    p.note = _testo(form, "note")
+    if p.quota_perc is not None and not 0 <= p.quota_perc <= 100:
+        return "La quota deve essere una percentuale tra 0 e 100."
+    if p.persona_client_id:
+        return None  # l'anagrafica si modifica nella scheda privata
+    p.nome = _testo(form, "nome")
+    p.cognome = _testo(form, "cognome")
+    p.codice_fiscale = _testo(form, "codice_fiscale", maiuscolo=True)
+    p.data_nascita = _date_or_none(form.get("data_nascita"))
+    p.luogo_nascita = _testo(form, "luogo_nascita")
+    p.indirizzo = _testo(form, "indirizzo")
+    p.citta = _testo(form, "citta")
+    p.cap = _testo(form, "cap")
+    p.provincia = _testo(form, "provincia", maiuscolo=True)
+    p.email = _testo(form, "email")
+    p.telefono = _testo(form, "telefono")
+    if not p.cognome:
+        return "Il cognome è obbligatorio."
+    return None
+
+
+def _cliente_privato_esistente(p: PersonaCollegata, escludi: int) -> Client | None:
+    """Un cliente privato che sembra la stessa persona (stesso codice fiscale
+    o, senza codice fiscale, stesso nome e cognome)."""
+    if p.persona_client_id:
+        return None
+    persone = Client.query.filter(Client.tipo.in_(TIPI_PERSONA_FISICA), Client.id != escludi)
+    if p.codice_fiscale:
+        return persone.filter(db.func.upper(Client.codice_fiscale) == p.codice_fiscale.upper()).first()
+    if p.cognome:
+        nome = " ".join(x for x in (p.nome, p.cognome) if x).lower()
+        return persone.filter(db.func.lower(Client.ragione_sociale) == nome).first()
+    return None
+
+
+@bp.route("/<int:client_id>/persone/<int:persona_id>/scheda-privata", methods=["POST"])
+def person_to_client(client_id, persona_id):
+    """Gestire l'amministratore (o il dipendente…) anche come cliente privato."""
+    azienda = db.get_or_404(Client, client_id)
+    p = _persona_or_404(client_id, persona_id)
+    if p.persona_cliente is not None:
+        return redirect(url_for("clients.detail", client_id=p.persona_client_id))
+    privato = _cliente_privato_esistente(p, client_id)
+    if privato is None:
+        privato = Client(
+            tipo="dipendente" if p.ruolo == "dipendente" else "privato", nome=p.nome, cognome=p.cognome, ragione_sociale=p.nome_completo,
+            codice_fiscale=p.codice_fiscale, data_nascita=p.data_nascita, luogo_nascita=p.luogo_nascita,
+            indirizzo=p.indirizzo, citta=p.citta, cap=p.cap, provincia=p.provincia,
+            email=p.email, telefono=p.telefono,
+            datore_lavoro=azienda.ragione_sociale if p.ruolo == "dipendente" else None,
+        )
+        db.session.add(privato)
+        db.session.flush()
+        messaggio = f"Creata la scheda di cliente privato di {privato.ragione_sociale}"
+    else:
+        messaggio = f"Collegato alla scheda già esistente di {privato.ragione_sociale}"
+    p.persona_client_id = privato.id
+    db.session.commit()
+    flash(f"{messaggio}: {p.ruolo_label.lower()} di {azienda.ragione_sociale}.", "success")
+    return redirect(url_for("clients.detail", client_id=privato.id) + "#persone")
+
+
+@bp.route("/<int:client_id>/persone/<int:persona_id>/collega", methods=["POST"])
+def link_person(client_id, persona_id):
+    p = _persona_or_404(client_id, persona_id)
+    scelta = request.form.get("persona_client_id", type=int)
+    if scelta:
+        privato = db.session.get(Client, scelta)
+        if privato is None or not privato.persona_fisica or privato.id == client_id:
+            abort(400)
+        p.persona_client_id = privato.id
+        _copia_anagrafica(p, privato)
+        flash(f"{p.nome_completo} collegato alla sua scheda di cliente privato.", "success")
+    else:
+        # Scollegando, la persona conserva i dati attuali della scheda privata.
+        privato = p.persona_cliente
+        if privato is not None:
+            for campo in ("nome", "cognome", "codice_fiscale", "data_nascita", "luogo_nascita", "indirizzo",
+                          "citta", "cap", "provincia", "email", "telefono"):
+                setattr(p, campo, p.dato(campo))
+        p.persona_client_id = None
+        flash("Collegamento alla scheda privata rimosso.", "success")
+    db.session.commit()
+    return redirect(url_for("clients.detail", client_id=client_id) + "#persone")
+
+
+@bp.route("/<int:client_id>/ruoli/nuovo", methods=["GET", "POST"])
+def new_role(client_id):
+    """Dalla scheda di un privato: «è amministratore / socio / dipendente di…»."""
+    privato = db.get_or_404(Client, client_id)
+    if not privato.persona_fisica:
+        abort(404)
+    ruolo = request.values.get("ruolo", "amministratore_unico")
+    p = PersonaCollegata(persona_client_id=privato.id, ruolo=ruolo if ruolo in RUOLI_PERSONA_LABELS else "altro")
+    if request.method == "POST":
+        azienda = db.session.get(Client, request.form.get("azienda_id", type=int) or 0)
+        errore = _compila_persona(p, request.form)
+        if azienda is None or azienda.id == privato.id:
+            errore = "Scegli l'azienda."
+        if errore:
+            flash(errore, "danger")
+        else:
+            p.client_id = azienda.id
+            _copia_anagrafica(p, privato)
+            db.session.add(p)
+            if p.ruolo == "dipendente" and privato.tipo == "dipendente":
+                privato.datore_lavoro = azienda.ragione_sociale
+            db.session.commit()
+            flash(f"{privato.nome_completo}: {p.ruolo_label.lower()} di {azienda.ragione_sociale}.", "success")
+            return redirect(url_for("clients.detail", client_id=privato.id) + "#persone")
+    return render_template("clients/ruolo_form.html", privato=privato, persona=p, ruoli=RUOLI_PERSONA,
+                           aziende=_aziende(escludi=privato.id))
+
+
+@bp.route("/<int:client_id>/persone/nuova", methods=["GET", "POST"])
+def new_person(client_id):
+    client = db.get_or_404(Client, client_id)
+    persona = PersonaCollegata(client_id=client.id, ruolo=request.args.get("ruolo", "amministratore_unico"))
+    if persona.ruolo not in RUOLI_PERSONA_LABELS:
+        persona.ruolo = "altro"
+    if request.method == "POST":
+        errore = _compila_persona(persona, request.form)
+        if errore:
+            flash(errore, "danger")
+        else:
+            db.session.add(persona)
+            db.session.commit()
+            flash(f"{persona.ruolo_label} «{persona.nome_completo}» aggiunto.", "success")
+            return redirect(url_for("clients.detail", client_id=client.id) + "#persone")
+    return render_template("clients/persona_form.html", client=client, persona=persona, ruoli=RUOLI_PERSONA)
+
+
+@bp.route("/<int:client_id>/persone/<int:persona_id>/modifica", methods=["GET", "POST"])
+def edit_person(client_id, persona_id):
+    client = db.get_or_404(Client, client_id)
+    persona = _persona_or_404(client_id, persona_id)
+    if request.method == "POST":
+        errore = _compila_persona(persona, request.form)
+        if errore:
+            flash(errore, "danger")
+        else:
+            db.session.commit()
+            flash("Dati aggiornati.", "success")
+            return redirect(url_for("clients.detail", client_id=client.id) + "#persone")
+    return render_template("clients/persona_form.html", client=client, persona=persona, ruoli=RUOLI_PERSONA)
+
+
+@bp.route("/<int:client_id>/persone/<int:persona_id>/elimina", methods=["POST"])
+def delete_person(client_id, persona_id):
+    persona = _persona_or_404(client_id, persona_id)
+    db.session.delete(persona)
+    db.session.commit()
+    flash(f"«{persona.nome_completo}» rimosso.", "success")
+    return redirect(url_for("clients.detail", client_id=client_id) + "#persone")
 
 
 @bp.route("/<int:client_id>/elimina", methods=["POST"])
@@ -428,6 +741,14 @@ def delete_client(client_id):
     elimina_notifiche(*prefissi)
     audit("elimina", "cliente", client.id,
           f"Eliminato il cliente «{nome}» con {len(client.polizze)} polizze e {len(client.documenti)} documenti")
+    # Se era amministratore o dipendente di aziende clienti, lì resta con i
+    # suoi dati (copiati prima di eliminare la scheda privata).
+    for ruolo in client.ruoli_in_aziende:
+        for campo in ("nome", "cognome", "codice_fiscale", "data_nascita", "luogo_nascita", "indirizzo",
+                      "citta", "cap", "provincia", "email", "telefono"):
+            setattr(ruolo, campo, ruolo.dato(campo))
+        ruolo.cognome = ruolo.cognome or nome
+        ruolo.persona_client_id = None
     db.session.delete(client)
     db.session.commit()
     for percorso in file_da_rimuovere:

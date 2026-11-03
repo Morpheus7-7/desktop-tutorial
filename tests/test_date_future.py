@@ -566,13 +566,19 @@ def test_filtri_dei_template(app):
 def test_csp_senza_script_inline_e_template_senza_gestori(client, app):
     import pathlib
     import re
-    csp = client.get("/").headers["Content-Security-Policy"]
-    assert "script-src 'self';" in csp and "'unsafe-inline'" not in csp.split("script-src")[1].split(";")[0]
+    risposta = client.get("/")
+    csp = risposta.headers["Content-Security-Policy"]
+    script_src = csp.split("script-src")[1].split(";")[0]
+    assert "'self'" in script_src and "'unsafe-inline'" not in script_src
+    # Gli unici script inline ammessi portano la chiave monouso della pagina.
+    nonce = re.search(r"'nonce-([^']+)'", script_src).group(1)
+    assert f'<script nonce="{nonce}">' in risposta.get_data(as_text=True)
+    assert client.get("/").headers["Content-Security-Policy"] != csp  # nuova chiave a ogni pagina
     cartella = pathlib.Path(app.root_path) / "templates"
     for f in cartella.rglob("*.html"):
         testo = f.read_text()
         assert not re.search(r"\son[a-z]+\s*=\s*\"", testo), f"gestore inline in {f.name}"
-        assert not re.search(r"<script(?![^>]*\bsrc=)", testo), f"script inline in {f.name}"
+        assert not re.search(r"<script(?![^>]*\b(?:src|nonce)=)", testo), f"script inline senza nonce in {f.name}"
 
 
 # ----------------------------------------------------------------------

@@ -19,7 +19,7 @@ import hashlib
 import hmac
 import re
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import urlsplit
 
@@ -42,13 +42,24 @@ from werkzeug.security import check_password_hash
 from .models import AuditLog, User, db, now
 
 # Pagine raggiungibili senza aver effettuato l'accesso.
-PUBLIC_ENDPOINTS = {"static", "auth.login", "auth.setup"}
+PUBLIC_ENDPOINTS = {
+    "static", "auth.login", "auth.setup",
+    # Finestra del programma: chiusura, riapertura dalla barra e avviso
+    # «archivio aperto sull'altro PC» (che compare prima dell'accesso).
+    "settings.shutdown", "settings.show_window", "settings.in_use", "settings.open_anyway",
+}
+# Comandi inviati dal programma stesso con l'intestazione X-DC-Azione: un altro
+# sito non può aggiungerla (servirebbe un permesso CORS che l'app non concede).
+ENDPOINT_COMANDI_FINESTRA = {"settings.shutdown", "settings.show_window"}
 # Endpoint consentiti anche al profilo in sola consultazione, sia come modulo
 # (GET) sia come invio (POST): non toccano i dati del gestionale.
 READONLY_ALLOWED_POST = {
     "auth.logout",
     "auth.change_password",
     "auth.aspetto",
+    "privacy.unlock",
+    "privacy.recover",
+    "privacy.lock_now",
     "notifications.mark_read",
     "notifications.mark_all_read",
 }
@@ -56,7 +67,7 @@ READONLY_ALLOWED_POST = {
 # quando la route accetta solo GET (es. un modulo inviato a un'altra route).
 PREFISSI_MODULI = ("new_", "edit_", "nuovo", "nuova", "modifica")
 # Endpoint che accettano upload più grandi del limite generale (ripristino backup).
-LARGE_UPLOAD_ENDPOINTS = {"settings.restore_backup"}
+LARGE_UPLOAD_ENDPOINTS = {"settings.restore_backup", "settings.import_archive"}
 MAX_TENTATIVI_LOGIN = 5
 MINUTI_BLOCCO_LOGIN = 15
 LUNGHEZZA_MINIMA_PASSWORD = 8
@@ -76,7 +87,7 @@ ESITO_BLOCCATO = "bloccato"  # account già bloccato: password non verificata
 # Gli stili inline (attributi style, es. larghezza delle barre) restano ammessi.
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
-    "script-src 'self'; "
+    "script-src 'self' 'nonce-{nonce}'; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data:; "
     "font-src 'self'; "
@@ -103,6 +114,16 @@ def csrf_token() -> str:
     return token
 
 
+def csp_nonce() -> str:
+    """Chiave monouso della pagina: solo gli script inline che la riportano
+    (``<script nonce="{{ csp_nonce() }}">``) vengono eseguiti."""
+    if not has_request_context():
+        return ""
+    if "csp_nonce" not in g:
+        g.csp_nonce = secrets.token_urlsafe(16)
+    return g.csp_nonce
+
+
 def csrf_field() -> Markup:
     return Markup('<input type="hidden" name="csrf_token" value="%s">') % csrf_token()
 
@@ -115,6 +136,8 @@ def _check_csrf():
     if not current_app.config.get("CSRF_ENABLED", True):
         return None
     if request.method in ("GET", "HEAD", "OPTIONS"):
+        return None
+    if request.endpoint in ENDPOINT_COMANDI_FINESTRA and request.headers.get("X-DC-Azione"):
         return None
     inviato = request.form.get("csrf_token") or request.headers.get("X-CSRFToken") or ""
     atteso = session.get("_csrf") or ""
@@ -370,6 +393,9 @@ def login_user(user: User) -> None:
     session["ver"] = user.sessione_versione or 0
     session["impronta"] = _impronta(user)
     session.permanent = True  # durata: PERMANENT_SESSION_LIFETIME
+    # L'accesso con la password vale anche come sblocco del PIN di privacy.
+    session["dc_sbloccato"] = True
+    session["dc_attivita"] = datetime.utcnow().timestamp()
     csrf_token()
 
 
@@ -461,7 +487,7 @@ def _security_headers(response):
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     response.headers.setdefault("Referrer-Policy", "same-origin")
     if response.mimetype == "text/html":
-        response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+        response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY.format(nonce=csp_nonce()))
     if request.endpoint != "static" and g.get("user") is not None:
         # Dati riservati: niente copie nella cache del browser (tasto «indietro» dopo l'uscita).
         response.headers.setdefault("Cache-Control", "no-store")
@@ -476,6 +502,7 @@ def init_security(app: Flask) -> None:
     app.after_request(_security_headers)
     app.jinja_env.globals["csrf_token"] = csrf_token
     app.jinja_env.globals["csrf_field"] = csrf_field
+    app.jinja_env.globals["csp_nonce"] = csp_nonce
 
     @app.context_processor
     def inject_user():

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Allenamento obiezioni — Accademia{% endblock %}
+{% block content %}
+{% include "academy/_nav.html" %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <h1 class="h3 mb-3"><i class="bi bi-lightning-charge me-2"></i>Allenamento sulle obiezioni</h1>
+    <p class="text-muted misura">Leggi l'obiezione, rispondi <strong>ad alta voce</strong> come faresti con un cliente (meglio se ti registri),
+      poi confronta con la soluzione. La pratica ripetuta con feedback immediato è il modo più efficace per trasformare una tecnica in abitudine.</p>
+
+    <div class="card flashcard mb-3">
+      <div class="card-body text-center d-flex flex-column justify-content-center">
+        <div class="mb-2"><span class="badge bg-secondary">{{ categorie_labels[o.categoria] }}</span></div>
+        <div class="obiezione-testo">«{{ o.obiezione }}»</div>
+        <div class="text-muted small mt-2">Il cliente ti guarda e aspetta. Cosa rispondi?</div>
+      </div>
+    </div>
+
+    <details class="card mb-3">
+      <summary class="card-header" style="cursor: pointer;"><i class="bi bi-eye me-1"></i> Mostra la soluzione</summary>
+      <div class="card-body">
+        <p><strong>Cosa può nascondere:</strong> {{ o.cosa_nasconde }}</p>
+        <p><strong>Tecnica:</strong> <span class="badge bg-primary">{{ o.tecnica }}</span></p>
+        <blockquote class="box-esempio mb-2">{{ o.risposta }}</blockquote>
+        <p><strong>Rilancio:</strong> {{ o.rilancio }}</p>
+        <div class="trattativa"><span class="trattativa-title"><i class="bi bi-lightbulb"></i> Pensiero laterale:</span> {{ o.laterale }}</div>
+        <hr>
+        <div class="small text-muted">Autovalutazione: ho ascoltato e confermato prima di rispondere? Ho fatto una domanda di esplorazione?
+          Ho chiuso con un rilancio o un prossimo passo?</div>
+      </div>
+    </details>
+
+    <a class="btn btn-warning" href="{{ url_for('academy.drill', dopo=o.id) }}"><i class="bi bi-shuffle"></i> Prossima obiezione</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('academy.objections') }}#{{ o.id }}">Vai alla libreria</a>
+  </div>
+</div>
+{% endblock %}

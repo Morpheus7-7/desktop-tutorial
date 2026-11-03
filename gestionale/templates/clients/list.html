@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}Clienti — Gestionale Assicurativo{% endblock %}
+{% block title %}Clienti — Deal Combined{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
@@ -9,6 +9,7 @@
   </div>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{{ url_for('clients.export_clients', q=q, tipo=tipo) }}"><i class="bi bi-filetype-csv"></i> Esporta</a>
+    {% if puo_modificare %}<a class="btn btn-outline-primary" href="{{ url_for('importazione.start') }}"><i class="bi bi-file-earmark-spreadsheet"></i> Importa da Excel</a>{% endif %}
     {% if puo_modificare %}<a class="btn btn-primary" href="{{ url_for('clients.new_client') }}"><i class="bi bi-person-plus"></i> Nuovo cliente</a>{% endif %}
   </div>
 </div>

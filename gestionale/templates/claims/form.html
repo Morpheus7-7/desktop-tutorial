@@ -2,7 +2,7 @@
 {% set modifica = claim.id is not none %}
 {% set v = valori or {} %}
 {% set inviato = v | length > 0 %}
-{% block title %}{{ 'Modifica sinistro' if modifica else 'Nuovo sinistro' }} — Gestionale Assicurativo{% endblock %}
+{% block title %}{{ 'Modifica sinistro' if modifica else 'Nuovo sinistro' }} — Deal Combined{% endblock %}
 {% block content %}
 <nav aria-label="breadcrumb"><ol class="breadcrumb">
   <li class="breadcrumb-item"><a href="{{ url_for('claims.list_claims') }}">Sinistri</a></li>

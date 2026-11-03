@@ -1,266 +1,20 @@
-"""Test dell'avvio desktop (cartella dati, istanza unica, porta, errori di
-avvio, tipi MIME), di app.py e della gestione su disco dei documenti.
+"""Test dell'avvio desktop (finestra di ripiego con Edge, schermata di avvio),
+di app.py, dei tipi MIME e della gestione su disco dei documenti.
 
-La logica di run_desktop è in funzioni pure con ambiente, sistema operativo e
-cartelle iniettabili: così si verificano anche i casi Windows (cartella
-temporanea dello ZIP, Programmi, OneDrive) senza un PC Windows.
+Cartella dati, backup all'avvio e archivio aperto su un altro PC sono
+verificati in test_desktop.py.
 """
 import importlib
 import io
 import mimetypes
 import os
-import socket
-import sqlite3
 import sys
 
 import pytest
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import make_url
 
 import run_desktop as rd
+from gestionale import _registra_tipi_mime
 from gestionale.models import Client, Document, db
-
-
-# ----------------------------------------------------------------------
-# Cartella dei dati
-# ----------------------------------------------------------------------
-def test_cartella_utente_per_sistema(tmp_path):
-    home = tmp_path / "home"
-    assert rd.cartella_utente("win32", {"LOCALAPPDATA": str(tmp_path / "Local")}, home) == \
-        tmp_path / "Local" / "GestionaleAssicurativo"
-    assert rd.cartella_utente("win32", {}, home) == home / "AppData" / "Local" / "GestionaleAssicurativo"
-    assert rd.cartella_utente("darwin", {}, home) == \
-        home / "Library" / "Application Support" / "GestionaleAssicurativo"
-    assert rd.cartella_utente("linux", {}, home) == home / ".local" / "share" / "GestionaleAssicurativo"
-    assert rd.cartella_utente("linux", {"XDG_DATA_HOME": str(tmp_path / "xdg")}, home) == \
-        tmp_path / "xdg" / "GestionaleAssicurativo"
-
-
-def test_posizione_instabile(tmp_path):
-    temp = tmp_path / "Temp"
-    env = {
-        "PROGRAMFILES": str(tmp_path / "Program Files"),
-        "ONEDRIVE": str(tmp_path / "OneDrive - Agenzia Rossi"),
-    }
-    assert rd.posizione_instabile(temp / "Temp1_GestionaleAssicurativo-windows.zip", env, temp) == "temporanea"
-    assert rd.posizione_instabile(tmp_path / "Program Files" / "Gestionale", env, temp) == "programmi"
-    assert rd.posizione_instabile(tmp_path / "OneDrive - Agenzia Rossi" / "Desktop", env, temp) == "onedrive"
-    # Riconosciuti anche dal nome, se le variabili d'ambiente non bastano.
-    assert rd.posizione_instabile(tmp_path / "x" / "Temp2_Gestionale.zip", {}, temp) == "temporanea"
-    assert rd.posizione_instabile(tmp_path / "x" / "7zO1A2B3C4D", {}, temp) == "temporanea"
-    assert rd.posizione_instabile(tmp_path / "OneDrive" / "Documenti", {}, temp) == "onedrive"
-    assert rd.posizione_instabile(tmp_path / "Documenti" / "Gestionale", env, temp) is None
-
-
-def _crea_db(percorso, tabella="clients"):
-    percorso.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(percorso)
-    conn.execute(f"CREATE TABLE {tabella} (id INTEGER PRIMARY KEY, nome TEXT)")
-    conn.execute(f"INSERT INTO {tabella} (nome) VALUES ('Alfa')")
-    conn.commit()
-    conn.close()
-
-
-def _scegli(base, tmp_path, **kwargs):
-    kwargs.setdefault("env", {"LOCALAPPDATA": str(tmp_path / "Local")})
-    return rd.scegli_cartella_dati(
-        base, sistema="win32", home=tmp_path / "home", temp=tmp_path / "Temp", **kwargs
-    )
-
-
-def test_scelta_predefinita_cartella_utente(tmp_path):
-    utente = tmp_path / "Local" / "GestionaleAssicurativo"
-    # Programma estratto in una cartella normale: dati comunque nella cartella utente.
-    scelta = _scegli(tmp_path / "Documenti" / "Gestionale", tmp_path)
-    assert scelta.cartella == utente and scelta.migra_da is None and not scelta.avvisi
-    # Programma avviato dall'interno dello ZIP (cartella temporanea): avviso, dati al sicuro.
-    scelta = _scegli(tmp_path / "Temp" / "Temp1_Gestionale.zip", tmp_path)
-    assert scelta.cartella == utente and "temporanea" in scelta.avvisi[0]
-    # Programma copiato in Programmi: nessun tentativo di scrivere lì.
-    env = {"LOCALAPPDATA": str(tmp_path / "Local"), "PROGRAMFILES": str(tmp_path / "Program Files")}
-    assert _scegli(tmp_path / "Program Files" / "Gestionale", tmp_path, env=env).cartella == utente
-
-
-def test_scelta_cartella_esistente_accanto_al_programma(tmp_path):
-    base = tmp_path / "Documenti" / "Gestionale"
-    _crea_db(base / "dati_gestionale" / "gestionale.db")
-    scelta = _scegli(base, tmp_path)
-    assert scelta.cartella == base / "dati_gestionale" and scelta.migra_da is None
-
-    # Esistente ma su OneDrive: si continua a usarla, con un avviso.
-    base = tmp_path / "OneDrive" / "Desktop" / "Gestionale"
-    _crea_db(base / "dati_gestionale" / "gestionale.db")
-    scelta = _scegli(base, tmp_path)
-    assert scelta.cartella == base / "dati_gestionale" and "OneDrive" in scelta.avvisi[0]
-
-
-def test_scelta_migra_dati_da_cartella_temporanea_o_non_scrivibile(tmp_path):
-    utente = tmp_path / "Local" / "GestionaleAssicurativo"
-    base = tmp_path / "Temp" / "Temp1_Gestionale.zip"
-    _crea_db(base / "dati_gestionale" / "gestionale.db")
-    scelta = _scegli(base, tmp_path)
-    assert scelta.cartella == utente and scelta.migra_da == base / "dati_gestionale"
-
-    altra = tmp_path / "Documenti" / "Sola lettura"
-    _crea_db(altra / "dati_gestionale" / "gestionale.db")
-    scelta = _scegli(altra, tmp_path, scrivibile=lambda p: False)
-    assert scelta.cartella == utente and scelta.migra_da == altra / "dati_gestionale"
-    assert "non è scrivibile" in scelta.avvisi[0]
-
-    # Se la cartella utente ha già un database non si sovrascrive nulla.
-    _crea_db(utente / "gestionale.db")
-    scelta = _scegli(base, tmp_path)
-    assert scelta.cartella == utente and scelta.migra_da is None
-
-
-def test_scelta_portatile_e_variabile_esplicita(tmp_path):
-    base = tmp_path / "Chiavetta" / "Gestionale"
-    base.mkdir(parents=True)
-    (base / "portatile.txt").write_text("")
-    scelta = _scegli(base, tmp_path)
-    assert scelta.cartella == base / "dati_gestionale" and scelta.motivo == "modalità portatile"
-
-    # Portatile ma dentro lo ZIP: ignorata (i dati andrebbero persi).
-    temp_base = tmp_path / "Temp" / "Temp1_Gestionale.zip"
-    temp_base.mkdir(parents=True)
-    (temp_base / "portatile.txt").write_text("")
-    scelta = _scegli(temp_base, tmp_path)
-    assert scelta.cartella == tmp_path / "Local" / "GestionaleAssicurativo"
-    assert "portatile ignorata" in scelta.avvisi[0]
-
-    env = {"GESTIONALE_DATI": str(tmp_path / "Dati espliciti")}
-    scelta = _scegli(base, tmp_path, env=env)
-    assert scelta.cartella == tmp_path / "Dati espliciti" and scelta.esplicita
-
-
-def test_migra_dati_copia_database_e_documenti(tmp_path):
-    sorgente, destinazione = tmp_path / "vecchia", tmp_path / "nuova"
-    _crea_db(sorgente / "gestionale.db")
-    (sorgente / "uploads").mkdir()
-    (sorgente / "uploads" / "abc_doc.pdf").write_bytes(b"pdf")
-    (sorgente / "secret_key").write_text("chiave")
-    (sorgente / "gestionale.lock").write_text("")
-    rd.migra_dati(sorgente, destinazione)
-    conn = sqlite3.connect(destinazione / "gestionale.db")
-    assert conn.execute("SELECT nome FROM clients").fetchone() == ("Alfa",)
-    conn.close()
-    assert (destinazione / "uploads" / "abc_doc.pdf").read_bytes() == b"pdf"
-    assert (destinazione / "secret_key").read_text() == "chiave"
-    assert not (destinazione / "gestionale.lock").exists()
-
-
-def test_cartella_scrivibile(tmp_path):
-    assert rd.cartella_scrivibile(tmp_path / "nuova" / "dati")
-    file_al_posto_della_cartella = tmp_path / "file"
-    file_al_posto_della_cartella.write_text("x")
-    assert not rd.cartella_scrivibile(file_al_posto_della_cartella)
-
-
-# ----------------------------------------------------------------------
-# URL del database e variabili d'ambiente
-# ----------------------------------------------------------------------
-def test_url_sqlite_con_caratteri_speciali(tmp_path):
-    percorso = tmp_path / "Gestionale%20v2 è #1?x=y" / "dati" / "gestionale.db"
-    percorso.parent.mkdir(parents=True)
-    url = rd.url_sqlite(percorso)
-    assert make_url(url).database == str(percorso)
-    engine = create_engine(url)
-    with engine.begin() as conn:
-        conn.execute(text("CREATE TABLE prova (id INTEGER)"))
-    engine.dispose()
-    assert percorso.is_file()  # proprio il file indicato, non un altro percorso decodificato
-
-
-def test_configura_ambiente(tmp_path):
-    env = {}
-    rd.configura_ambiente(tmp_path / "dati 100%", env)
-    assert make_url(env["DATABASE_URL"]).database == str(tmp_path / "dati 100%" / "gestionale.db")
-    assert env["UPLOAD_FOLDER"] == str(tmp_path / "dati 100%" / "uploads")
-    assert env["BACKUP_FOLDER"] == str(tmp_path / "dati 100%" / "backup")
-    assert env["SECRET_KEY_FILE"] == str(tmp_path / "dati 100%" / "secret_key")
-    # I valori già impostati dall'utente hanno la precedenza.
-    env = {"DATABASE_URL": "sqlite:////altro.db"}
-    rd.configura_ambiente(tmp_path, env)
-    assert env["DATABASE_URL"] == "sqlite:////altro.db"
-
-
-# ----------------------------------------------------------------------
-# Istanza unica e porta
-# ----------------------------------------------------------------------
-def test_blocco_istanza_unica(tmp_path):
-    primo, secondo = rd.BloccoIstanza(tmp_path / "gestionale.lock"), rd.BloccoIstanza(tmp_path / "gestionale.lock")
-    assert primo.acquisisci()
-    try:
-        assert not secondo.acquisisci()
-    finally:
-        primo.rilascia()
-    assert secondo.acquisisci()
-    secondo.rilascia()
-
-
-def test_socket_server_ripiega_su_porta_libera():
-    primo = rd.crea_socket_server(0)
-    try:
-        occupata = primo.getsockname()[1]
-        secondo = rd.crea_socket_server(occupata)
-        try:
-            assert secondo.getsockname()[1] != occupata
-            assert rd.porta_in_ascolto(secondo.getsockname()[1])
-        finally:
-            secondo.close()
-    finally:
-        primo.close()
-
-
-def test_porta_preferita():
-    assert rd.porta_preferita({}) == 5000
-    assert rd.porta_preferita({"PORT": "8080"}) == 8080
-    assert rd.porta_preferita({"PORT": "abc"}) == 5000
-    assert rd.porta_preferita({"PORT": "70000"}) == 5000
-
-
-def test_seconda_istanza_apre_il_browser_sulla_prima(tmp_path):
-    aperti = []
-    # Nessuna istanza in ascolto: dopo l'attesa si rinuncia.
-    assert rd.apri_istanza_esistente(tmp_path, attesa_s=0, apri=aperti.append) is None
-    server = socket.socket()
-    server.bind(("127.0.0.1", 0))
-    server.listen(1)
-    try:
-        porta = server.getsockname()[1]
-        rd.scrivi_porta(tmp_path, porta)
-        assert rd.leggi_porta(tmp_path) == porta
-        url = rd.apri_istanza_esistente(tmp_path, attesa_s=0, apri=aperti.append)
-    finally:
-        server.close()
-    assert url == f"http://127.0.0.1:{porta}" and aperti == [url]
-
-
-# ----------------------------------------------------------------------
-# Errori di avvio
-# ----------------------------------------------------------------------
-def test_errore_di_avvio_registrato_e_finestra_aperta(tmp_path, monkeypatch, capsys):
-    attese = []
-    monkeypatch.setattr(rd, "_cartella_log", tmp_path)
-    monkeypatch.setattr(rd, "attendi_invio", lambda *a, **k: attese.append(True))
-
-    def _guasto(argv):
-        raise PermissionError("[Errno 13] Accesso negato: 'C:\\\\Program Files\\\\Gestionale'")
-
-    monkeypatch.setattr(rd, "_main", _guasto)
-    assert rd.main([]) == 1
-    assert attese == [True]
-    log = (tmp_path / "avvio.log").read_text(encoding="utf-8")
-    assert "Traceback" in log and "PermissionError" in log
-    uscita = capsys.readouterr().out
-    assert "si è fermato per un errore" in uscita and str(tmp_path / "avvio.log") in uscita
-
-    def _errore_chiaro(argv):
-        raise rd.ErroreAvvio("Impossibile scrivere nella cartella dati X.")
-
-    monkeypatch.setattr(rd, "_main", _errore_chiaro)
-    assert rd.main([]) == 1
-    assert "Impossibile scrivere nella cartella dati X." in capsys.readouterr().out
 
 
 # ----------------------------------------------------------------------
@@ -272,13 +26,13 @@ def test_tipi_mime_statici_corretti_anche_con_registro_errato(client):
     mimetypes.add_type("text/plain", ".css")
     try:
         assert client.get("/static/app.js").mimetype == "text/plain"  # il problema
-        rd.registra_tipi_mime()
+        _registra_tipi_mime()
         risposta = client.get("/static/app.js")
         assert risposta.mimetype == "text/javascript"
         assert risposta.headers["X-Content-Type-Options"] == "nosniff"
         assert client.get("/static/style.css").mimetype == "text/css"
     finally:
-        rd.registra_tipi_mime()
+        _registra_tipi_mime()
 
 
 # ----------------------------------------------------------------------
@@ -286,7 +40,7 @@ def test_tipi_mime_statici_corretti_anche_con_registro_errato(client):
 # ----------------------------------------------------------------------
 @pytest.fixture
 def modulo_app(tmp_path, monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", rd.url_sqlite(tmp_path / "app.db"))
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///" + (tmp_path / "app.db").as_posix())
     monkeypatch.setenv("UPLOAD_FOLDER", str(tmp_path / "uploads"))
     monkeypatch.setenv("BACKUP_FOLDER", str(tmp_path / "backup"))
     monkeypatch.setenv("SECRET_KEY_FILE", str(tmp_path / "secret_key"))
@@ -401,69 +155,7 @@ def test_eliminazione_non_tocca_file_fuori_dalla_cartella(client, app, tmp_path)
 
 
 # ----------------------------------------------------------------------
-# Finestra propria del programma
-# ----------------------------------------------------------------------
-class _WebviewFinto:
-    def __init__(self, guasto=False):
-        self.settings = {}
-        self.finestre = []
-        self.avviato = False
-        self.guasto = guasto
-
-    def create_window(self, titolo, url, **opzioni):
-        self.finestre.append((titolo, url, opzioni))
-
-    def start(self, **opzioni):
-        if self.guasto:
-            raise RuntimeError("WebView2 non installato")
-        self.avviato = True
-
-
-def test_finestra_propria_con_download_abilitati():
-    finto = _WebviewFinto()
-    assert rd.apri_finestra("http://127.0.0.1:5000", finto) is True
-    assert finto.avviato and finto.finestre[0][:2] == ("Gestionale Assicurativo", "http://127.0.0.1:5000")
-    assert finto.settings["ALLOW_DOWNLOADS"] is True
-
-
-def test_senza_finestra_si_usa_il_browser(monkeypatch):
-    assert rd.apri_finestra("http://127.0.0.1:5000", _WebviewFinto(guasto=True)) is False
-    assert rd.modulo_finestra({"GESTIONALE_BROWSER": "1"}) is None
-    monkeypatch.setitem(__import__("sys").modules, "webview", None)  # pywebview non installato
-    assert rd.modulo_finestra({}) is None
-
-
-def test_finestra_ricorda_dimensione_e_posizione(tmp_path):
-    class _Finestra:
-        width, height, x, y = 1500, 900, 40, 30
-
-    rd.salva_geometria(tmp_path, _Finestra())
-    assert rd.leggi_geometria(tmp_path) == {"width": 1500, "height": 900, "x": 40, "y": 30}
-    (tmp_path / rd.FILE_FINESTRA).write_text('{"width": 10, "height": 99999, "x": -5000, "y": 1}')
-    assert rd.leggi_geometria(tmp_path) == {}  # valori assurdi ignorati
-    assert rd.leggi_geometria(None) == {}
-
-
-def test_impostazioni_pywebview_a_chiavi_fisse():
-    """pywebview.settings è un UserDict a chiavi fisse, non un dict: i download vanno abilitati lo stesso."""
-    from collections import UserDict
-
-    finto = _WebviewFinto()
-    finto.settings = UserDict({"ALLOW_DOWNLOADS": False, "OPEN_EXTERNAL_LINKS_IN_BROWSER": False})
-    assert rd.apri_finestra("http://127.0.0.1:5000", finto)
-    assert finto.settings["ALLOW_DOWNLOADS"] is True and finto.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] is True
-
-
-def test_traccia_dell_avvio_in_avvio_log(tmp_path, monkeypatch):
-    monkeypatch.setattr(rd, "_cartella_log", tmp_path)
-    rd.traccia("motore avviato su http://127.0.0.1:5000")
-    rd.chiudi_splash()  # senza schermata di avvio non fa nulla
-    testo = (tmp_path / "avvio.log").read_text(encoding="utf-8")
-    assert "[avvio] motore avviato" in testo and "===" not in testo
-
-
-# ----------------------------------------------------------------------
-# Finestra con Microsoft Edge in modalità applicazione (Windows)
+# Finestra del programma
 # ----------------------------------------------------------------------
 def test_trova_edge_poi_chrome():
     env = {"PROGRAMFILES(X86)": r"C:\Program Files (x86)", "PROGRAMFILES": r"C:\Program Files"}
@@ -472,80 +164,29 @@ def test_trova_edge_poi_chrome():
     assert rd.trova_browser_app(env, esiste=lambda p: p in {edge, chrome}) == edge
     assert rd.trova_browser_app(env, esiste=lambda p: p == chrome) == chrome
     assert rd.trova_browser_app(env, esiste=lambda p: False) is None
-    assert rd.trova_browser_app({**env, "GESTIONALE_BROWSER": "1"}, esiste=lambda p: True) is None
 
 
-def test_finestra_edge_in_modalita_applicazione(tmp_path, monkeypatch):
-    lanciati, messaggi = [], []
-    monkeypatch.setattr(rd, "mostra_messaggio", lambda testo, icona=0x10: messaggi.append(testo))
-
-    class _Processo:
-        def __init__(self, comando):
-            lanciati.append(comando)
-
-        def poll(self):
-            return 0  # Edge passa subito la finestra a un suo processo interno
-
-        def wait(self):
-            return 0
-
-    # Il profilo resta bloccato per tre controlli (finestra aperta), poi si libera.
-    stati = iter([True, True, True, False, False])
-    assert rd.apri_finestra_app("http://127.0.0.1:5000", tmp_path, "msedge.exe", avvia=_Processo,
-                                in_uso=lambda p: next(stati), pausa_s=0)
-    comando = lanciati[0]
+def test_finestra_edge_in_modalita_applicazione(tmp_path):
+    comando = rd.comando_finestra_app("msedge.exe", "http://127.0.0.1:5000", tmp_path)
     assert comando[0] == "msedge.exe" and "--app=http://127.0.0.1:5000" in comando
-    assert f"--user-data-dir={tmp_path / rd.CARTELLA_PROFILO_FINESTRA}" in comando
-    assert messaggi == []  # nessun messaggio «premi OK per chiudere»
+    assert f"--user-data-dir={tmp_path / 'finestra_edge'}" in comando
 
 
-def test_blocco_del_profilo_edge(tmp_path):
-    profilo = tmp_path / "profilo"
-    profilo.mkdir()
-    assert not rd.edge_in_uso(profilo)
-    (profilo / "lockfile").write_text("")
-    assert not rd.edge_in_uso(profilo) and not (profilo / "lockfile").exists()  # file libero: Edge chiuso
+def test_senza_edge_si_ripiega_sul_browser(tmp_path, monkeypatch):
+    monkeypatch.setattr(rd, "trova_browser_app", lambda: None)
+    assert rd._apri_finestra_edge("http://127.0.0.1:5000", tmp_path) is False
 
 
-def test_finestra_nativa_in_processo_separato(tmp_path, monkeypatch):
-    class _Processo:
-        def __init__(self, comando, codice=0, pronta=True):
-            self.comando, self.codice = comando, codice
-            if pronta:
-                (tmp_path / rd.FILE_FINESTRA_PRONTA).write_text("1")
-
-        def poll(self):
-            return self.codice
-
-        def wait(self):
-            return self.codice
-
-        def kill(self):
-            pass
-
-    lanciati = []
-    assert rd.apri_finestra_nativa("http://127.0.0.1:5000", tmp_path,
-                                   avvia=lambda c: lanciati.append(c) or _Processo(c))
-    assert rd.ARG_FINESTRA in lanciati[0] and "http://127.0.0.1:5000" in lanciati[0]
-    # Crash del componente grafico (es. WebView2): si passa all'altra finestra.
-    assert not rd.apri_finestra_nativa("http://x", tmp_path, avvia=lambda c: _Processo(c, codice=-1073741819))
-    log = (tmp_path / "avvio.log").read_text(encoding="utf-8") if (tmp_path / "avvio.log").exists() else ""
-    assert log == "" or "errore" in log
+def test_schermata_di_avvio_chiusa_senza_errori():
+    rd._chiudi_splash()  # da sorgente non c'è la schermata: non fa nulla
 
 
-def test_finestra_nativa_bloccata_viene_chiusa(tmp_path, monkeypatch):
-    uccisi = []
+def test_finestra_nativa_fallita_si_ricorda_per_versione(tmp_path):
+    from gestionale import __version__
 
-    class _Bloccato:
-        def poll(self):
-            return None
-
-        def kill(self):
-            uccisi.append(True)
-
-        def wait(self):
-            return 1
-
-    monkeypatch.setattr(rd, "SECONDI_ATTESA_FINESTRA", 0.3)
-    assert not rd.apri_finestra_nativa("http://x", tmp_path, avvia=lambda c: _Bloccato())
-    assert uccisi == [True]
+    prova = tmp_path / rd.FILE_PROVA_FINESTRA
+    assert rd._leggi_testo(prova) is None
+    prova.write_text(__version__, encoding="utf-8")
+    assert rd._leggi_testo(prova) == __version__  # stessa versione: si usa Edge
+    prova.write_text("0.0.1", encoding="utf-8")
+    assert rd._leggi_testo(prova) != __version__  # programma aggiornato: si riprova la finestra nativa

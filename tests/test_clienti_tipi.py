@@ -129,7 +129,7 @@ def test_professionista_non_salva_i_dati_da_azienda(client, app):
         "tipo": "professionista", "ragione_sociale": "Giulia Ferri", "professione": "Avvocato",
         "specializzazioni": ["Civilista", "Penalista"], "specializzazioni_altre": "Diritto agrario, civilista",
         "attivita_svolte": ["Mediatore civile"], "attivita_altre": "Docenza",
-        "inquadramento": "libero_professionista", "albo_ordine": "Ordine degli Avvocati di Milano",
+        "inquadramento": "libero_professionista", "albo": "Ordine degli Avvocati di Milano",
         "albo_numero": "m123", "albo_data_iscrizione": "2010-05-01", "fatturato_annuo": "85.000",
         # Campi da azienda inviati per errore (es. senza JavaScript): vanno ignorati.
         "numero_dipendenti": "7", "referente": "Segreteria", "forma_giuridica": "S.r.l.",

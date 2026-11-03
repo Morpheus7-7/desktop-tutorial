@@ -65,3 +65,20 @@ def client(app):
 @pytest.fixture
 def anon_client(app):
     return app.test_client()
+
+
+def client_con_accesso(app):
+    """Client già entrato come amministratore, per i test dei moduli arrivati
+    da Deal Combined (scritti quando il programma non aveva utenti): stessa
+    configurazione dei test del gestionale (CSRF verificata in test_security)."""
+    app.config.update(CSRF_ENABLED=False, NOTIFICHE_REFRESH_SECONDI=0,
+                      PASSWORD_HASH_METHOD="pbkdf2:sha256:1000")
+    with app.app_context():
+        if User.query.filter_by(username=ADMIN_USER).first() is None:
+            user = User(username=ADMIN_USER, ruolo="admin", nome="Amministratore")
+            user.set_password(ADMIN_PASSWORD)
+            db.session.add(user)
+            db.session.commit()
+    c = app.test_client()
+    assert login(c).status_code == 302, "login dell'amministratore di test non riuscito"
+    return c

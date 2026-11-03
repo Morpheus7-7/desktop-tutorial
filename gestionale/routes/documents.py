@@ -63,6 +63,45 @@ def nome_su_disco(originale: str) -> str:
     return prefisso + tronca_nome(sicuro, LUNGHEZZA_MAX_NOME_FILE - len(prefisso))
 
 
+def salva_file(file, client_id: int, categoria: str, note: str | None = None,
+               policy_id: int | None = None) -> Document | None:
+    """Salva il file caricato tra i documenti del cliente (senza commit).
+    None se il tipo di file non è consentito o il salvataggio non riesce."""
+    original = file.filename or ""
+    if not _allowed(original):
+        return None
+    cartella = cartella_documenti()
+    os.makedirs(cartella, exist_ok=True)
+    stored_name = nome_su_disco(original)
+    path = os.path.join(cartella, stored_name)
+    try:
+        file.save(path)
+    except OSError:
+        current_app.logger.exception("Salvataggio del documento %s non riuscito", path)
+        return None
+    try:
+        dimensione = os.path.getsize(path)
+    except OSError:
+        dimensione = None
+    doc = Document(client_id=client_id, policy_id=policy_id,
+                   categoria=categoria if categoria in dict(DOCUMENT_CATEGORIES) else "altro",
+                   filename=stored_name, original_name=tronca_nome(original, LUNGHEZZA_MAX_NOME_ORIGINALE),
+                   dimensione=dimensione, note=note)
+    db.session.add(doc)
+    return doc
+
+
+def elimina_file(doc: Document) -> None:
+    """Elimina il documento (senza commit) e, se possibile, il suo file."""
+    path = safe_join(cartella_documenti(), doc.filename)
+    if path:
+        try:
+            os.remove(path)
+        except OSError:
+            current_app.logger.warning("File del documento non rimosso: %s", path, exc_info=True)
+    db.session.delete(doc)
+
+
 @bp.route("/")
 def list_documents():
     categoria = request.args.get("categoria", "")

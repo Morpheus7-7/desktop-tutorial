@@ -1,177 +1,246 @@
-# Impacchettare il Gestionale in un eseguibile
+# Deal Combined come programma installato sul PC
 
-Il gestionale può essere distribuito come **eseguibile unico** che avvia il
-gestionale in una **finestra propria**, come un normale programma Windows:
-chi lo usa non deve installare Python né conoscere la riga di comando. Basta
-fare doppio clic. Tutti i dati restano sul PC: il motore interno risponde solo
-a questo computer e non serve internet.
+Deal Combined si installa come un normale programma Windows: icona sul desktop
+e nel menu Start, finestra propria (non il browser), disinstallazione da
+*Impostazioni di Windows → App*. Funziona senza internet e salva tutto sul PC.
 
-La finestra usa **Microsoft Edge WebView2**, già presente in Windows 10 e 11
-aggiornati (se mancasse, si scarica gratis da Microsoft cercando «WebView2
-Runtime»). Se la finestra non si può aprire, il programma ripiega sul browser
-predefinito; per usare sempre il browser imposta `GESTIONALE_BROWSER=1`.
+## Aggiornare dalla versione 2.x (dati già presenti)
 
-- Su **Windows** si ottiene `GestionaleAssicurativo.exe`
-- Su **macOS/Linux** si ottiene un binario `GestionaleAssicurativo`
+Installando la versione 3.0 sopra quella già presente, **i dati restano in
+`Documenti\Deal Combined`**: all'avvio il programma fa il solito backup in
+`Backup\` e poi aggiunge da solo le colonne e le tabelle nuove (titoli,
+sinistri, utenti…), senza toccare clienti, polizze, note, preventivi, schede e
+progressi dell'Accademia. Alla prima apertura chiede di **creare l'utente
+amministratore** (nome utente e password): da lì in poi si entra con utente e
+password, e il **PIN**, se impostato, resta per il blocco dopo i minuti di
+inattività. Altri utenti (operatori, sola consultazione) si aggiungono dal menu
+**Utenti**.
 
-L'eseguibile salva i dati (database SQLite, documenti caricati, backup
-automatici, chiave di sessione e log) nella **cartella dati dell'utente**, così
-restano al sicuro anche se l'eseguibile viene spostato, avviato dall'interno
-dello ZIP o copiato in *Programmi*:
+Password dimenticata dell'unico amministratore: chiudi il programma e da
+*Prompt dei comandi* lancia
+`"%LOCALAPPDATA%\Programs\Deal Combined\DealCombined.exe" --reimposta-password NOMEUTENTE`
+(il percorso è quello dell'installazione; con il solo `.exe` usa il suo percorso).
 
-| Sistema | Cartella dati predefinita |
-|---------|---------------------------|
-| Windows | `%LOCALAPPDATA%\GestionaleAssicurativo` (es. `C:\Users\Mario\AppData\Local\GestionaleAssicurativo`) |
-| macOS   | `~/Library/Application Support/GestionaleAssicurativo` |
-| Linux   | `~/.local/share/GestionaleAssicurativo` |
+## Dove sono i dati
 
-Il percorso esatto è stampato nella console a ogni avvio. Al primo avvio il
-gestionale chiede di creare l'account amministratore. Vedi
-[Cartella dei dati](#cartella-dei-dati) per la modalità portatile e per chi ha
-già i dati accanto all'eseguibile.
+- **Cartella:** `Documenti\Deal Combined`. Se Windows ha spostato Documenti
+  dentro OneDrive, la cartella è lì.
+  - `gestionale.db`: clienti, polizze, schede, trattative, progressi dell'Accademia;
+  - `uploads\`: i documenti caricati;
+  - `Backup\`: copie automatiche del database, una a ogni avvio, conservate le ultime 10,
+    più i backup completi (database e documenti) giornalieri e prima di ogni ripristino;
+  - `deal-combined.log`: messaggi tecnici del programma, utili in caso di problemi.
+- **Disinstallare il programma non cancella i dati.**
+- **Versioni precedenti:** se i dati stavano accanto all'eseguibile, nella
+  cartella `dati_gestionale`, al primo avvio vengono copiati nella nuova
+  cartella automaticamente.
+- **Gestione:** da *Impostazioni → Dati e backup* vedi dove sono i dati, fai
+  un backup al volo, esporti o importi l'archivio e sposti la cartella.
 
----
+## Usarlo da due PC
 
+Ogni PC ha il suo archivio. Per lavorare con gli stessi dati su due PC ci
+sono due modi.
 
-## Il modo più semplice: `CREA_EXE.bat`
+1. **Cartella sincronizzata (automatico).** Su entrambi i PC, in
+   *Impostazioni → Dati e backup → Sposta la cartella dati*, indica la stessa
+   cartella di OneDrive, Google Drive o Dropbox, poi chiudi e riapri il
+   programma. Sul primo PC lascia spuntato «Copia lì i dati attuali»; sul
+   secondo il programma troverà l'archivio già presente e userà quello.
+   - **Un PC alla volta:** il database non va aperto su due PC nello stesso
+     momento. Deal Combined scrive nella cartella su quale PC è aperto: se
+     provi ad aprirlo sull'altro, ti avvisa e ti chiede di chiuderlo prima.
+     Prima di passare all'altro PC aspetta che la sincronizzazione sia finita.
+   - **Chiusura anomala:** se il programma si è chiuso male, ad esempio per
+     un PC spento di colpo, dopo 3 minuti l'avviso non compare più.
+   - **Finestra chiusa = archivio libero:** chiudendo la finestra il
+     programma resta solo come icona vicino all'orologio (per i promemoria)
+     e l'archivio risulta libero, quindi puoi aprirlo sull'altro PC.
+2. **Archivio da portare (manuale).** *Esporta archivio* crea un unico `.zip`
+   con database e documenti. Sull'altro PC usa *Importa*. Prima di sostituire
+   i dati viene salvata una copia completa di quelli attuali in `Backup\`.
+3. **«Sincronizza PC» (a fine lavoro).** Dal menu *Amministrazione →
+   Sincronizza PC* scegli una cartella comune (chiavetta USB, OneDrive,
+   Dropbox, Google Drive). A fine lavoro clicca **«Salva per l'altro PC»**;
+   sull'altro PC clicca **«Carica dall'altro PC»**. Il programma avvisa se
+   rischi di sovrascrivere modifiche non ancora portate dall'altra parte e fa
+   sempre prima una copia di sicurezza.
 
-Su un PC Windows con **Python dalla 3.11 alla 3.14** (da python.org, spuntando «Add
-Python to PATH»), scompatta la cartella del progetto e fai **doppio clic su
-`CREA_EXE.bat`**. Lo script crea un ambiente separato, installa i componenti,
-costruisce l'eseguibile e apre la cartella `dist` con `GestionaleAssicurativo.exe`
-pronto. Per aggiornare il programma basta rilanciarlo sulla nuova versione.
+## Icona vicino all'orologio e promemoria
 
-## Opzione A — Build su GitHub (senza Windows né Python)
+- Chiudendo la finestra (la X), Deal Combined **resta attivo come icona**
+  vicino all'orologio di Windows. Doppio clic o *Apri Deal Combined* la
+  riapre; tasto destro → **Esci** chiude davvero il programma.
+- Ogni 15 minuti controlla i **follow-up di oggi o in ritardo** e le
+  **polizze che scadono entro 7 giorni** e, se c'è qualcosa di nuovo, mostra
+  una notifica di Windows (una sola volta al giorno per ogni voce).
+- Con la finestra chiusa il gestionale non scrive nulla nell'archivio (le
+  email automatiche ripartono alla riapertura) e, se è attivo il PIN, alla
+  riapertura lo richiede.
+- **Avvio con Windows:** si sceglie durante l'installazione o in
+  *Impostazioni → Programma*. All'accensione del PC parte solo l'icona, senza
+  aprire la finestra.
+- Se apri il programma mentre è già nella barra, si riapre la finestra
+  esistente invece di avviarne un secondo.
 
-Il workflow [`.github/workflows/build.yml`](.github/workflows/build.yml) è già
-incluso e, quando viene eseguito, compila l'eseguibile Windows su un runner
-GitHub e lo pubblica come *artifact* scaricabile.
+## PIN e privacy
 
-> **Serve avere GitHub Actions abilitato sull'account/repository.** Se Actions è
-> disattivato o l'account ha esaurito i minuti/fatturazione, i job vengono
-> interrotti all'avvio (senza runner) e non producono l'eseguibile: in quel caso
-> usa l'**Opzione B** qui sotto. Abilita/verifica Actions da
-> *Settings → Actions* del repository e *Settings → Billing* dell'account.
+*Impostazioni → Privacy*: un PIN (4–12 cifre) chiesto all'apertura e dopo i
+minuti di inattività scelti, con un pulsante **Blocca ora** in alto. Al
+momento di impostarlo il programma mostra **una sola volta** un codice di
+recupero: conservalo, serve se dimentichi il PIN. Dopo 5 tentativi sbagliati
+bisogna attendere un minuto. Il PIN protegge lo schermo, non i file: per
+proteggere i dati se il portatile viene perso serve **BitLocker**, di cui la
+stessa pagina mostra lo stato.
 
-Per lanciarlo:
+## Google: Gmail, Drive e Calendar
 
-1. Vai su **Actions → «Test e build» → Run workflow** e scegli il branch
-   (in alternativa, il workflow parte da solo quando pubblichi un **tag** di
-   release, es. `v1.0.0`). GitHub allora:
-   - esegue i test su Linux;
-   - compila l'eseguibile su un runner **Windows**;
-   - pubblica il risultato come *artifact*.
-2. Apri l'esecuzione riuscita e scarica l'artifact **`GestionaleAssicurativo-windows`**.
-3. **Estrai lo zip** (tasto destro → *Estrai tutto*) in una cartella stabile,
-   ad esempio `C:\Gestionale` o `Documenti\Gestionale` (non in *Programmi*),
-   poi fai doppio clic su `GestionaleAssicurativo.exe` estratto: si apre la
-   finestra del gestionale. Se lo avvii direttamente dall'interno dello zip
-   i dati vengono comunque salvati nella cartella dati dell'utente.
+Da *Impostazioni → Google*, senza registrare app su Google Cloud:
 
-> Nota: il workflow **non** parte a ogni push, per non generare esiti rossi
-> quando Actions non è disponibile. L'artifact resta scaricabile per il periodo
-> di retention di GitHub (di norma 90 giorni); per una distribuzione stabile
-> puoi allegarlo a una *Release*.
+- **Gmail:** le schede compilate si inviano al cliente come PDF allegato
+  (pulsante *Invia per email* nella scheda), con una *password per le app*
+  di Google. Le email compaiono in «Posta inviata».
+- **Google Drive:** con *Google Drive per desktop* installato, i PDF si
+  salvano in `Il mio Drive\Deal Combined\Clienti\<cliente>` e Drive li carica.
+  La cartella si imposta per ogni PC.
+- **Google Calendar:** ogni follow-up aperto ha un pulsante che apre Calendar
+  con l'evento già compilato; *Esporta in Calendar (.ics)* li importa tutti.
 
----
+## Note e promemoria
 
-## Opzione B — Build in locale
+Il menu **Note** è il diario delle attività: ogni cosa fatta (o da fare) è una
+nota singola con giorno, ora, sezione e, se serve, il cliente. Le note si
+vedono giorno per giorno, si filtrano per sezione, cliente e periodo e si
+cercano; ogni cliente ha anche la sua scheda *Note*.
 
-Serve avere **Python 3.11+** installato sul sistema con cui vuoi produrre
-l'eseguibile (PyInstaller **non** fa cross-compilazione: per ottenere un `.exe`
-Windows bisogna compilare su Windows).
+Ogni nota può avere un **promemoria**:
 
-```bash
-# 1. Installa le dipendenze di build (app + PyInstaller)
-pip install -r requirements-build.txt
+- **Email:** all'ora scelta Deal Combined manda un'email dal tuo Gmail
+  (impostato in *Impostazioni → Google*), anche con la finestra chiusa vicino
+  all'orologio. Se usi due PC con la cartella condivisa, l'email parte una
+  volta sola. Se il PC è spento all'ora del promemoria, l'email non parte
+  (dopo 6 ore non viene più mandata).
+- **Google Calendar:** il pulsante della nota apre Calendar con l'evento già
+  compilato all'ora del promemoria: premi *Salva* e Google ti avvisa anche sul
+  telefono, pure a PC spento. *Promemoria in Calendar (.ics)* li esporta
+  tutti in una volta.
+- **Windows e «Oggi»:** all'ora del promemoria arriva anche una notifica di
+  Windows e la voce compare nell'agenda di *Oggi* finché non premi *Fatto*.
 
-# 2. Compila usando la ricetta inclusa
-pyinstaller gestionale.spec --noconfirm
+## Importare clienti e polizze da Excel
 
-# 3. L'eseguibile è nella cartella dist/
-#    Windows:      dist\GestionaleAssicurativo.exe
-#    macOS/Linux:  dist/GestionaleAssicurativo
-```
+*Clienti → Importa da Excel*: scarica il modello (fogli *Clienti*, *Polizze*
+e *Amministratori*; le persone con nome, cognome, nascita, residenza e albo;
+menu a tendina per ramo, stato, ruolo e frazionamento) oppure carica il tuo
+Excel/CSV: le intestazioni comuni (Ragione sociale, P.IVA, Compagnia,
+N. polizza, Scadenza…) sono riconosciute. Prima vedi un'**anteprima** con
+nuovi, già presenti ed errori riga per riga; niente viene salvato finché non
+confermi. I clienti esistenti non vengono sovrascritti (si completano solo i
+campi vuoti), le polizze già presenti si saltano e prima dell'importazione si
+fa un backup.
 
-Doppio clic sull'eseguibile: si apre la finestra del gestionale. Per fermarlo
-chiudi la finestra (i backup vengono scritti con un nome temporaneo e
-rinominati solo a fine scrittura: chiudere a metà non lascia archivi corrotti).
+## Aggiornamenti
 
-### Provare l'avvio «desktop» senza compilare
+*Impostazioni → Programma* mostra la versione installata e, all'avvio,
+controlla se su GitHub c'è una versione nuova (si può disattivare): in quel
+caso compare un'icona verde in alto. *Scarica e installa* fa un backup,
+scarica l'installatore, **ne verifica l'impronta SHA-256**, chiude il
+programma, lo aggiorna e lo riapre. I dati non vengono toccati.
 
-Puoi verificare il comportamento dell'eseguibile lanciando direttamente lo
-stesso entry point:
+**Per pubblicare una versione:**
+1. aggiorna `__version__` in `gestionale/__init__.py` (es. `2.2.0`);
+2. esegui `build_windows.bat`: crea `dist\Installa-DealCombined.exe` e
+   `dist\Installa-DealCombined.exe.sha256`;
+3. su GitHub crea una *Release* con tag `v2.2.0` e allega **entrambi** i file.
+   Senza il file `.sha256` il programma mostra solo il link alla pagina della
+   versione, senza installare nulla.
+
+In alternativa, se GitHub Actions è attivo, basta creare e spingere il tag
+`v2.2.0`: il workflow compila e pubblica la Release con i due file.
+
+## Ottenere l'installatore
+
+Serve un PC Windows. PyInstaller non sa creare un `.exe` Windows partendo da
+Linux o macOS.
+
+### Opzione A: sul tuo PC con un doppio clic
+
+1. Installa **Python da 3.11 a 3.14** da python.org e, durante
+   l'installazione, spunta *Add Python to PATH*.
+2. Installa **Inno Setup 6**, gratuito: https://jrsoftware.org/isinfo.php
+   (serve solo per l'installatore).
+3. Nella cartella del progetto fai doppio clic su **`CREA_EXE.bat`**: prepara
+   un ambiente separato (`.venv-build`), installa i componenti, crea il
+   programma e, se trova Inno Setup, l'installatore. Alla fine apre la
+   cartella `dist\`. (`build_windows.bat` fa lo stesso con il Python nel PATH.)
+
+Alla fine trovi in `dist\`:
+
+- **`Installa-DealCombined.exe`**: l'installatore da usare e da dare agli
+  altri consulenti;
+- **`DealCombined.exe`**: il programma da solo, utile per provarlo senza
+  installarlo.
+
+### Opzione B: su GitHub
+
+Il workflow [`.github/workflows/build.yml`](.github/workflows/build.yml) fa le
+stesse cose su un computer Windows di GitHub: esegue i test, crea `.exe` e
+installatore e li pubblica nell'artifact **`DealCombined-windows`**.
+
+- **Come lanciarlo:** *Actions → «Test e build» → Run workflow*, oppure
+  pubblicando un tag (es. `v3.0.0`).
+- **Requisito:** GitHub Actions deve essere attivo sul repository
+  (*Settings → Actions*) e l'account deve avere minuti o fatturazione
+  disponibili (*Settings → Billing*). Altrimenti il job si chiude in pochi
+  secondi senza fare nulla.
+
+## Provare senza compilare
 
 ```bash
 pip install -r requirements.txt
 python run_desktop.py
 ```
 
----
+Senza `pywebview` installato, l'app si apre nel browser. In quel caso si chiude
+con **Chiudi Deal Combined** in fondo alla barra laterale.
 
-## Come è fatto il pacchetto
+## Come è fatto
 
-- **Entry point:** `run_desktop.py` — sceglie la cartella dati, impedisce un
-  secondo avvio sulla stessa cartella, apre la porta (5000 o, se occupata, una
-  libera), avvia lo scheduler delle notifiche, apre la finestra (pywebview, con ripiego sul browser) e serve l'app con
-  [waitress](https://github.com/Pylons/waitress) (server WSGI puro Python; se
-  non disponibile, usa il server integrato di Flask come fallback). All'avvio
-  forza i tipi MIME di `.js`, `.css`, `.svg` e dei font, che su alcuni PC
-  Windows il registro associa a `text/plain` (il browser bloccherebbe gli
-  script).
-- **Ricetta PyInstaller:** `gestionale.spec` — include i template Jinja e i file
-  statici, dichiara i blueprint importati dinamicamente ed esclude il pacchetto
-  `cryptography` (non necessario: l'invio email usa `ssl`/`smtplib` della
-  libreria standard).
-- **Dati persistenti:** cartella dati (vedi sotto) con `gestionale.db`,
-  `uploads/`, `backup/`, `secret_key`, `gestionale.log` (log del programma, a
-  rotazione) e `avvio.log` (eventuali errori di avvio).
-
-## Cartella dei dati
-
-Il launcher sceglie la cartella dati in quest'ordine:
-
-1. la cartella indicata dalla variabile d'ambiente `GESTIONALE_DATI`;
-2. la cartella `dati_gestionale` **accanto all'eseguibile, se contiene già un
-   database**: chi usava le versioni precedenti continua a ritrovare i suoi
-   dati senza fare nulla (se la cartella si trova in *Programmi* o su OneDrive
-   compare un avviso con il consiglio di spostarla);
-3. **modalità portatile** (es. chiavetta USB): se accanto all'eseguibile c'è un
-   file `portatile.txt` (anche vuoto), oppure con `GESTIONALE_PORTATILE=1`, i
-   dati vanno in `dati_gestionale` accanto all'eseguibile;
-4. altrimenti la cartella dati dell'utente indicata all'inizio di questa pagina.
-
-I dati non vengono mai salvati in una cartella temporanea: se trova dati creati
-da un avvio precedente dall'interno dello zip (es.
-`%TEMP%\Temp1_GestionaleAssicurativo-windows.zip\dati_gestionale`), il launcher
-li copia nella cartella dati dell'utente. Lo stesso accade se la cartella
-`dati_gestionale` accanto all'eseguibile non è scrivibile.
-
-Per spostare i dati su un altro PC copia l'intera cartella dati (a programma
-chiuso) oppure usa **Impostazioni → Backup**.
+- **`run_desktop.py`** è il punto di ingresso:
+  - sceglie la cartella dati, copia lì quelli delle versioni precedenti;
+  - fa il backup, scrive e aggiorna il blocco tra PC;
+  - avvia il server locale ([waitress](https://github.com/Pylons/waitress)) e
+    apre la finestra con [pywebview](https://pywebview.flowrl.com/), che usa
+    Edge WebView2, già presente in Windows 10 e 11;
+  - se la finestra non è disponibile, o se all'avvio precedente si era chiusa
+    da sola appena aperta, usa una finestra di Microsoft Edge in modalità
+    applicazione (senza barra degli indirizzi né schede); in mancanza, il browser.
+- **`gestionale/desktop.py`**: cartella dati, file di configurazione dell'utente
+  (`%APPDATA%\Deal Combined\config.json`), backup, blocco tra PC.
+- **`gestionale/archivio.py`**: esporta e importa l'archivio `.zip`, con
+  controlli su contenuto, percorsi e dimensione.
+- **`gestionale.spec`**: ricetta di PyInstaller. Produce `DealCombined.exe`
+  senza finestra di console, con l'icona `installer/deal-combined.ico`.
+- **`installer/DealCombined.iss`**: installatore Inno Setup. L'installazione è
+  per il solo utente, quindi non chiede permessi da amministratore. Crea le
+  icone su desktop e menu Start e non tocca mai la cartella dati.
+- **Sicurezza:** il server ascolta solo su `127.0.0.1`, quindi non è
+  raggiungibile da altri dispositivi. Si entra con utente e password (ruoli
+  amministratore, operatore, sola consultazione), ogni modulo porta un codice
+  anti-CSRF, le richieste di modifica che arrivano da altri siti vengono
+  rifiutate e le pagine accettano solo i propri script (Content Security Policy).
 
 ## Risoluzione problemi
 
-- **Windows SmartScreen / antivirus**: gli eseguibili PyInstaller non sono
-  firmati e possono generare un avviso. Scegli «Ulteriori informazioni →
-  Esegui comunque», oppure firma l'eseguibile con un certificato tuo.
-- **La porta 5000 è occupata**: il launcher passa automaticamente a una porta
-  libera (scritta in `porta.txt` nella cartella dati).
-- **Ho fatto doppio clic due volte**: il programma gira una sola volta per
-  cartella dati. Il secondo avvio apre un'altra finestra sul gestionale già in
-  esecuzione (niente doppio server né email doppie).
-- **Compare un errore all'avvio**: un messaggio lo descrive e il dettaglio
-  tecnico viene salvato in `avvio.log` nella
-  cartella dati (il percorso è indicato nel messaggio): invialo all'assistenza.
-- **Dove sono i miei dati?** Il percorso è stampato nella console a ogni avvio
-  («Dati salvati in: …»); in **Impostazioni → Backup** trovi la cartella dei
-  backup, che sta dentro la cartella dati.
-- **Voglio configurare le email**: accedi come amministratore, vai su
-  **Impostazioni → Notifiche via email** e inserisci i parametri SMTP. Vedi il
-  README per l'elenco delle variabili d'ambiente equivalenti.
-- **Ho dimenticato la password**: un altro amministratore può reimpostarla
-  dalla pagina **Utenti**. Se l'unico amministratore ha perso l'accesso, apri
-  un prompt dei comandi nella cartella dell'eseguibile e lancia
-  `GestionaleAssicurativo.exe --reimposta-password NOMEUTENTE` (in sviluppo:
-  `flask --app app reimposta-password NOMEUTENTE`): verrà chiesta la nuova
-  password e l'utente sarà anche sbloccato e riattivato.
+- **Avviso di Windows SmartScreen o dell'antivirus.** Eseguibile e
+  installatore non sono firmati digitalmente. Scegli *Ulteriori informazioni →
+  Esegui comunque*. Per farlo sparire serve un certificato di firma del
+  codice.
+- **Si apre una finestra di Edge invece di quella del programma.** La finestra
+  nativa non è partita (manca Edge WebView2, raro su Windows 10 e 11, oppure
+  si è chiusa da sola all'avvio precedente). Funziona allo stesso modo; si
+  chiude con **Chiudi Deal Combined** in fondo alla barra laterale. Con la
+  versione successiva del programma si riprova la finestra nativa.
+- **Il programma non parte.** Guarda `Documenti\Deal Combined\deal-combined.log`.
+- **Email:** si configurano da *Impostazioni → Generali ed email*. Le variabili
+  d'ambiente equivalenti sono elencate nel README.

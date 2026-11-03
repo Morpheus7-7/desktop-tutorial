@@ -1,4 +1,4 @@
-"""Gestionale Assicurativo — applicazione Flask.
+"""Deal Combined — applicazione Flask (gestionale assicurativo).
 
 Gestionale per intermediari assicurativi: anagrafiche clienti
 (professionisti, aziende e dipendenti), polizze, titoli e incassi, sinistri,
@@ -12,8 +12,9 @@ import re
 import secrets
 import time
 from datetime import date, timedelta
+from urllib.parse import urlparse
 
-from flask import Flask, g, render_template, request, url_for
+from flask import Flask, abort, g, render_template, request, url_for
 from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import Engine
 
@@ -21,7 +22,7 @@ from .models import db
 from .professioni import normalizza
 from .utils import formatta_euro, plurale
 
-__version__ = "2.0.0"
+__version__ = "3.0.0"
 
 
 @event.listens_for(Engine, "connect")
@@ -62,12 +63,19 @@ def _ensure_schema() -> None:
             "forma_giuridica": "ALTER TABLE clients ADD COLUMN forma_giuridica VARCHAR(40)",
             "specializzazioni": "ALTER TABLE clients ADD COLUMN specializzazioni TEXT",
             "attivita_svolte": "ALTER TABLE clients ADD COLUMN attivita_svolte TEXT",
-            "albo_ordine": "ALTER TABLE clients ADD COLUMN albo_ordine VARCHAR(150)",
+            "albo": "ALTER TABLE clients ADD COLUMN albo VARCHAR(150)",
             "albo_numero": "ALTER TABLE clients ADD COLUMN albo_numero VARCHAR(40)",
             "albo_data_iscrizione": "ALTER TABLE clients ADD COLUMN albo_data_iscrizione DATE",
             "inquadramento": "ALTER TABLE clients ADD COLUMN inquadramento VARCHAR(30)",
             "numero_professionisti": "ALTER TABLE clients ADD COLUMN numero_professionisti INTEGER",
             "studio_id": "ALTER TABLE clients ADD COLUMN studio_id INTEGER REFERENCES clients (id)",
+            **{col: f"ALTER TABLE clients ADD COLUMN {col} {tipo}" for col, tipo in {
+                "nome": "VARCHAR(80)", "cognome": "VARCHAR(80)", "data_nascita": "DATE",
+                "luogo_nascita": "VARCHAR(100)", "stato_civile": "VARCHAR(30)", "nucleo_familiare": "TEXT",
+                "interessi": "TEXT", "residenza_indirizzo": "VARCHAR(200)", "residenza_citta": "VARCHAR(100)",
+                "residenza_cap": "VARCHAR(5)", "residenza_provincia": "VARCHAR(2)", "albo": "VARCHAR(150)",
+                "albo_provincia": "VARCHAR(60)", "albo_numero": "VARCHAR(40)", "albo_data_iscrizione": "DATE",
+            }.items()},
         },
         "policies": {
             "provvigione_perc": "ALTER TABLE policies ADD COLUMN provvigione_perc FLOAT",
@@ -77,7 +85,7 @@ def _ensure_schema() -> None:
         },
         "users": {
             "sessione_versione": "ALTER TABLE users ADD COLUMN sessione_versione INTEGER NOT NULL DEFAULT 0",
-            "tema": "ALTER TABLE users ADD COLUMN tema VARCHAR(20) NOT NULL DEFAULT 'blu'",
+            "tema": "ALTER TABLE users ADD COLUMN tema VARCHAR(20) NOT NULL DEFAULT 'agenda'",
             "aspetto": "ALTER TABLE users ADD COLUMN aspetto VARCHAR(10) NOT NULL DEFAULT 'auto'",
         },
         "documents": {
@@ -85,11 +93,12 @@ def _ensure_schema() -> None:
             "claim_id": "ALTER TABLE documents ADD COLUMN claim_id INTEGER",
             "cartella": "ALTER TABLE documents ADD COLUMN cartella VARCHAR(80)",
         },
-        "followups": {
-            "policy_id": "ALTER TABLE followups ADD COLUMN policy_id INTEGER",
-            "auto_generato": "ALTER TABLE followups ADD COLUMN auto_generato BOOLEAN NOT NULL DEFAULT 0",
-        },
         "settings": {
+            "pin_hash": "ALTER TABLE settings ADD COLUMN pin_hash VARCHAR(200)",
+            "pin_recupero_hash": "ALTER TABLE settings ADD COLUMN pin_recupero_hash VARCHAR(200)",
+            "blocco_minuti": "ALTER TABLE settings ADD COLUMN blocco_minuti INTEGER DEFAULT 10",
+            "pin_tentativi": "ALTER TABLE settings ADD COLUMN pin_tentativi INTEGER DEFAULT 0",
+            "pin_attesa_fino": "ALTER TABLE settings ADD COLUMN pin_attesa_fino DATETIME",
             "studio_nome": "ALTER TABLE settings ADD COLUMN studio_nome VARCHAR(200)",
             "studio_rui": "ALTER TABLE settings ADD COLUMN studio_rui VARCHAR(40)",
             "studio_piva": "ALTER TABLE settings ADD COLUMN studio_piva VARCHAR(16)",
@@ -106,6 +115,14 @@ def _ensure_schema() -> None:
         },
     }
 
+    migrazioni["client_persons"] = {
+        "persona_client_id": "ALTER TABLE client_persons ADD COLUMN persona_client_id INTEGER",
+    }
+    migrazioni["followups"] = {
+        "policy_id": "ALTER TABLE followups ADD COLUMN policy_id INTEGER",
+        "auto_generato": "ALTER TABLE followups ADD COLUMN auto_generato BOOLEAN NOT NULL DEFAULT 0",
+    }
+
     cambiato = False
     for tabella, colonne in migrazioni.items():
         if tabella not in tabelle:
@@ -116,6 +133,15 @@ def _ensure_schema() -> None:
                 db.session.execute(text(ddl))
                 cambiato = True
     if cambiato:
+        db.session.commit()
+
+    # Le versioni del Gestionale Assicurativo salvavano l'ordine professionale
+    # in «albo_ordine»; Deal Combined lo tiene in «albo».
+    if "clients" in tabelle and "albo_ordine" in {c["name"] for c in inspect(db.engine).get_columns("clients")}:
+        db.session.execute(text(
+            "UPDATE clients SET albo = albo_ordine WHERE albo_ordine IS NOT NULL AND TRIM(albo_ordine) != '' "
+            "AND (albo IS NULL OR TRIM(albo) = '')"
+        ))
         db.session.commit()
 
     # Indici delle colonne aggiunte con ALTER TABLE e vincolo anti-duplicati
@@ -440,6 +466,15 @@ def create_app(test_config: dict | None = None) -> Flask:
     stato_refresh = {"ultimo": 0.0}
 
     @app.before_request
+    def blocca_richieste_da_altri_siti():
+        """Le modifiche arrivano solo dalle pagine dell'app: un sito esterno
+        aperto nel browser non può inviare moduli verso il gestionale."""
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            provenienza = request.headers.get("Origin") or request.headers.get("Referer")
+            if provenienza and urlparse(provenienza).netloc != request.host:
+                abort(403)
+
+    @app.before_request
     def refresh_notifications():
         if request.endpoint in (None, "static") or g.get("user") is None:
             return
@@ -447,6 +482,8 @@ def create_app(test_config: dict | None = None) -> Flask:
         adesso = time.monotonic()
         if intervallo and adesso - stato_refresh["ultimo"] < intervallo:
             return
+        if app.config.get("DC_IN_PAUSA"):
+            return  # finestra nella barra o archivio aperto sull'altro PC: niente scritture
 
         from .notifications import LOCK, aggiorna_tutto
 

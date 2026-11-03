@@ -1,8 +1,9 @@
 """Avvio da sorgente per lo sviluppo: ``python app.py``.
 
 Per l'uso quotidiano avvia il gestionale con ``python run_desktop.py`` (o con
-l'eseguibile): usa il server waitress, apre il browser, conserva i dati nella
-cartella dell'utente e avvia lo scheduler di email e backup.
+l'eseguibile DealCombined.exe): usa il server waitress, apre la finestra del
+programma, conserva i dati in Documenti\\Deal Combined e avvia lo scheduler di
+email e backup.
 
 Questo file usa invece il server di sviluppo di Flask, adatto solo alle prove
 su questo computer: non usarlo in produzione né in rete. Il debugger
@@ -20,10 +21,7 @@ import os
 from gestionale import create_app
 from gestionale.backup import normalizza_cartelle
 from gestionale.scheduler import start_scheduler
-from run_desktop import registra_tipi_mime
-
-registra_tipi_mime()
-app = create_app()
+app = create_app()  # registra anche i tipi MIME corretti dei file statici
 # UPLOAD_FOLDER/BACKUP_FOLDER relativi: risolti rispetto a instance/, come il database.
 normalizza_cartelle(app)
 

@@ -1,511 +1,142 @@
-"""Avvio «desktop» del Gestionale Assicurativo.
+"""Avvio «desktop» di Deal Combined.
 
-Avvia il motore interno del programma (un server locale raggiungibile solo da
-questo computer, senza internet), lo scheduler delle notifiche e apre il
-gestionale in una **finestra propria**, come un normale programma Windows
-(pywebview, con il motore WebView2 già presente in Windows 10 e 11). Se la
-finestra non è disponibile si apre il browser predefinito; con
-``GESTIONALE_BROWSER=1`` si usa sempre il browser. È l'entry point usato per
-l'eseguibile impacchettato con PyInstaller (vedi ``gestionale.spec``), ma si
-può lanciare anche direttamente con:
+È il punto di ingresso del programma installato (vedi ``gestionale.spec`` e
+``installer/DealCombined.iss``), ma si può lanciare anche con:
 
     python run_desktop.py
 
-Cartella dei dati (database, documenti, backup, chiave di sessione e log),
-scelta in quest'ordine:
+Cosa fa:
+- usa la cartella dati scelta dall'utente (di base Documenti\\Deal Combined) e
+  vi sposta i dati delle versioni precedenti, che stavano accanto
+  all'eseguibile in «dati_gestionale»;
+- fa un backup del database e segna l'archivio come «aperto su questo PC»,
+  così se la cartella è condivisa tra due PC l'altro viene avvisato;
+- apre l'app in una finestra propria (Edge WebView2 tramite pywebview); se non
+  è disponibile, o se all'avvio precedente si era chiusa da sola, la apre in
+  una finestra di Microsoft Edge in modalità applicazione (senza barra degli
+  indirizzi) o, in mancanza, nel browser: il programma si chiude allora dal
+  pulsante «Chiudi Deal Combined»;
+- su Windows mette un'icona vicino all'orologio: chiudendo la finestra il
+  programma resta lì e mostra i promemoria (follow-up di oggi, polizze in
+  scadenza) come notifiche di Windows. Con ``--avvio-silenzioso`` (avvio con
+  Windows) parte direttamente nella barra, senza finestra.
 
-1. la cartella indicata dalla variabile d'ambiente ``GESTIONALE_DATI``;
-2. la cartella ``dati_gestionale`` accanto al programma, se contiene già un
-   database (installazioni precedenti): si continua a usarla;
-3. in modalità portatile (file ``portatile.txt`` accanto al programma oppure
-   ``GESTIONALE_PORTATILE=1``) la cartella ``dati_gestionale`` accanto al
-   programma;
-4. altrimenti la cartella dell'utente: ``%LOCALAPPDATA%\\GestionaleAssicurativo``
-   su Windows, ``~/Library/Application Support/GestionaleAssicurativo`` su
-   macOS, ``~/.local/share/GestionaleAssicurativo`` su Linux.
-
-Se il programma gira da una cartella temporanea (ZIP aperto con doppio clic
-senza estrarlo) i dati non vengono mai salvati lì: quelli eventualmente già
-creati in una cartella temporanea vengono copiati nella cartella dell'utente.
-
-Il programma si avvia una sola volta per cartella dati: un secondo avvio apre
-un'altra finestra sull'istanza già in esecuzione. Gli errori di avvio vengono
-scritti in ``avvio.log`` nella cartella dati e mostrati in un messaggio.
-
-Per recuperare l'accesso se si dimentica la password dell'amministratore:
-
-    GestionaleAssicurativo.exe --reimposta-password NOMEUTENTE
+``DealCombined.exe --reimposta-password NOMEUTENTE`` imposta una nuova password
+per un utente (es. l'unico amministratore che l'ha dimenticata).
 """
 from __future__ import annotations
 
-import logging
-import logging.handlers
-import mimetypes
+import atexit
 import os
-import re
-import shutil
 import socket
-import sqlite3
 import sys
-import tempfile
 import threading
 import time
-import traceback
+import secrets
+import urllib.request
 import webbrowser
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 
-NOME_APP = "GestionaleAssicurativo"
-NOME_CARTELLA_DATI = "dati_gestionale"
-NOME_DB = "gestionale.db"
-FILE_PORTATILE = "portatile.txt"
-FILE_BLOCCO = "gestionale.lock"
-FILE_PORTA = "porta.txt"
-FILE_LOG = "gestionale.log"
-FILE_LOG_AVVIO = "avvio.log"
-ENV_CARTELLA_DATI = "GESTIONALE_DATI"
-ENV_PORTATILE = "GESTIONALE_PORTATILE"
-HOST = "127.0.0.1"
-TITOLO_FINESTRA = "Gestionale Assicurativo"
-ENV_BROWSER = "GESTIONALE_BROWSER"
-PORTA_PREDEFINITA = 5000
-VALORI_VERI = {"1", "true", "yes", "si", "sì", "on"}
 
-# Tipi MIME dei file statici, imposti all'avvio (vedi registra_tipi_mime).
-TIPI_MIME = {
-    ".js": "text/javascript",
-    ".mjs": "text/javascript",
-    ".css": "text/css",
-    ".svg": "image/svg+xml",
-    ".woff2": "font/woff2",
-    ".woff": "font/woff",
-    ".json": "application/json",
-    ".map": "application/json",
-}
-
-DESCRIZIONE_POSIZIONE = {
-    "temporanea": "una cartella temporanea (ad esempio lo ZIP aperto con doppio clic senza estrarlo)",
-    "programmi": "la cartella Programmi",
-    "onedrive": "una cartella sincronizzata con OneDrive",
-}
-
-# Cartelle in cui Esplora risorse, 7-Zip e WinRAR estraggono un file aperto
-# direttamente dall'archivio (tutte sotto %TEMP%, controllate anche per nome).
-_NOMI_TEMPORANEI = (
-    re.compile(r"^temp\d+_.+\.zip$"),
-    re.compile(r"^7zo[0-9a-f]+$"),
-    re.compile(r"^rar\$ex"),
-    re.compile(r"^_mei\d+$"),
-)
-
-
-class ErroreAvvio(Exception):
-    """Errore di avvio con un messaggio comprensibile per l'utente."""
-
-
-# ----------------------------------------------------------------------
-# Tipi MIME
-# ----------------------------------------------------------------------
-def registra_tipi_mime() -> None:
-    """Forza i tipi MIME di script, fogli di stile, icone e font.
-
-    Su Windows ``mimetypes`` legge anche il registro, dove ``.js`` è spesso
-    associato a ``text/plain`` da editor o installer: con l'header ``nosniff``
-    il browser rifiuterebbe di eseguire Bootstrap e ``app.js``. ``add_type``
-    inizializza prima il database dei tipi (registro compreso), quindi i
-    valori impostati qui prevalgono.
-    """
-    for estensione, tipo in TIPI_MIME.items():
-        mimetypes.add_type(tipo, estensione)
-
-
-# ----------------------------------------------------------------------
-# Cartella dei dati
-# ----------------------------------------------------------------------
-def base_dir() -> Path:
-    """Cartella del programma: quella dell'eseguibile (o del sorgente in sviluppo)."""
+def _base_dir() -> Path:
+    """Cartella del programma: accanto all'eseguibile (o al sorgente)."""
     if getattr(sys, "frozen", False):  # eseguibile PyInstaller
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
 
 
-def cartella_utente(sistema: str | None = None, env: Mapping[str, str] | None = None,
-                    home: Path | None = None) -> Path:
-    """Cartella dati dell'utente, fuori dalla cartella del programma."""
-    sistema = sistema or sys.platform
-    env = os.environ if env is None else env
-    home = Path.home() if home is None else Path(home)
-    if sistema.startswith("win"):
-        base = env.get("LOCALAPPDATA") or env.get("APPDATA")
-        radice = Path(base) if base else home / "AppData" / "Local"
-    elif sistema == "darwin":
-        radice = home / "Library" / "Application Support"
-    else:
-        xdg = env.get("XDG_DATA_HOME")
-        radice = Path(xdg) if xdg and os.path.isabs(xdg) else home / ".local" / "share"
-    return radice / NOME_APP
-
-
-def _normalizza(percorso) -> str:
-    return os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(str(percorso)))))
-
-
-def _sotto(percorso, radice) -> bool:
-    """True se ``percorso`` coincide con ``radice`` o si trova al suo interno."""
-    if not radice:
-        return False
-    r = _normalizza(radice)
-    if len(Path(r).parts) < 2:  # mai considerare «sotto» la radice del disco
-        return False
-    p = _normalizza(percorso)
-    return p == r or p.startswith(r.rstrip(os.sep) + os.sep)
-
-
-def posizione_instabile(cartella, env: Mapping[str, str] | None = None,
-                        temp: str | os.PathLike | None = None) -> str | None:
-    """Dove non conviene tenere i dati: «temporanea», «programmi», «onedrive» o None."""
-    env = os.environ if env is None else env
-    temp = tempfile.gettempdir() if temp is None else temp
-    if any(_sotto(cartella, r) for r in (temp, env.get("TEMP"), env.get("TMP"))):
-        return "temporanea"
-    if any(_sotto(cartella, env.get(v)) for v in ("PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432")):
-        return "programmi"
-    if any(_sotto(cartella, env.get(v)) for v in ("ONEDRIVE", "ONEDRIVECOMMERCIAL", "ONEDRIVECONSUMER")):
-        return "onedrive"
-    for parte in Path(cartella).parts:
-        nome = parte.lower()
-        if any(regola.match(nome) for regola in _NOMI_TEMPORANEI):
-            return "temporanea"
-        if nome in ("program files", "program files (x86)"):
-            return "programmi"
-        if nome.startswith("onedrive"):
-            return "onedrive"
-    return None
-
-
-def cartella_scrivibile(cartella: Path) -> bool:
-    """Crea la cartella se serve e verifica che si possa scriverci (database compreso)."""
-    cartella = Path(cartella)
-    try:
-        cartella.mkdir(parents=True, exist_ok=True)
-        fd, prova = tempfile.mkstemp(prefix=".prova_scrittura_", dir=cartella)
-        os.close(fd)
-        os.remove(prova)
-    except OSError:
-        return False
-    database = cartella / NOME_DB
-    return not database.exists() or os.access(database, os.W_OK)
-
-
-@dataclass
-class SceltaDati:
-    """Esito della scelta della cartella dati."""
-
-    cartella: Path
-    motivo: str
-    avvisi: list[str] = field(default_factory=list)
-    migra_da: Path | None = None  # cartella da cui copiare i dati esistenti
-    esplicita: bool = False
-
-
-def scegli_cartella_dati(
-    base: Path,
-    *,
-    env: Mapping[str, str] | None = None,
-    sistema: str | None = None,
-    home: Path | None = None,
-    temp: str | os.PathLike | None = None,
-    scrivibile: Callable[[Path], bool] = cartella_scrivibile,
-) -> SceltaDati:
-    """Sceglie dove salvare i dati (vedi la docstring del modulo per l'ordine)."""
-    env = os.environ if env is None else env
-    base = Path(base)
-    utente = cartella_utente(sistema, env, home)
-
-    esplicita = (env.get(ENV_CARTELLA_DATI) or "").strip()
-    if esplicita:
-        return SceltaDati(Path(esplicita).expanduser(), f"indicata dalla variabile {ENV_CARTELLA_DATI}",
-                          esplicita=True)
-
-    accanto = base / NOME_CARTELLA_DATI
-    instabile = posizione_instabile(base, env, temp)
-    descrizione = DESCRIZIONE_POSIZIONE.get(instabile, "")
-
-    def _verso_utente(problema: str) -> SceltaDati:
-        if (utente / NOME_DB).exists():
-            return SceltaDati(utente, "cartella dati dell'utente",
-                              [f"{problema} Uso i dati già presenti in {utente}."])
-        return SceltaDati(utente, "cartella dati dell'utente",
-                          [f"{problema} I dati vengono copiati in {utente}."], migra_da=accanto)
-
-    # Installazioni precedenti: dati già presenti accanto al programma.
-    if (accanto / NOME_DB).is_file():
-        if instabile == "temporanea":
-            return _verso_utente(f"I dati trovati accanto al programma sono in {descrizione} e andrebbero persi.")
-        if not scrivibile(accanto):
-            return _verso_utente(f"La cartella dati {accanto} non è scrivibile.")
-        avvisi = []
-        if instabile:
-            avvisi.append(
-                f"La cartella dati {accanto} si trova in {descrizione}: per evitare perdite o conflitti "
-                "sposta il programma con la sua cartella dati in una cartella locale non sincronizzata "
-                "(es. C:\\Gestionale)."
-            )
-        return SceltaDati(accanto, "cartella dati esistente accanto al programma", avvisi)
-
-    portatile = (base / FILE_PORTATILE).is_file() or (env.get(ENV_PORTATILE) or "").strip().lower() in VALORI_VERI
-    if portatile:
-        if instabile == "temporanea":
-            avviso = (f"Modalità portatile ignorata: il programma gira da {descrizione}. "
-                      "Estrai lo ZIP (tasto destro → Estrai tutto) in una cartella stabile.")
-        elif not scrivibile(accanto):
-            avviso = f"Modalità portatile ignorata: la cartella {accanto} non è scrivibile."
-        else:
-            avvisi = [f"La cartella dati si trova in {descrizione}."] if instabile else []
-            return SceltaDati(accanto, "modalità portatile", avvisi)
-        return SceltaDati(utente, "cartella dati dell'utente", [avviso])
-
-    avvisi = []
-    if instabile == "temporanea":
-        avvisi.append(
-            f"Il programma gira da {descrizione}: i dati vengono comunque salvati in modo permanente in "
-            f"{utente}. Per comodità estrai lo ZIP (tasto destro → Estrai tutto) in una cartella stabile."
-        )
-    return SceltaDati(utente, "cartella dati dell'utente", avvisi)
-
-
-def migra_dati(sorgente: Path, destinazione: Path) -> None:
-    """Copia i dati in un'altra cartella; il database per ultimo, con l'API di backup.
-
-    Se la copia si interrompe, al riavvio la destinazione non ha ancora il
-    database e la copia viene ripetuta.
-    """
-    sorgente, destinazione = Path(sorgente), Path(destinazione)
-    destinazione.mkdir(parents=True, exist_ok=True)
-    esclusi = {NOME_DB, f"{NOME_DB}-journal", f"{NOME_DB}-wal", f"{NOME_DB}-shm", FILE_BLOCCO, FILE_PORTA}
-    for voce in sorgente.iterdir():
-        if voce.name in esclusi:
-            continue
-        dest = destinazione / voce.name
-        if voce.is_dir():
-            shutil.copytree(voce, dest, dirs_exist_ok=True)
-        elif not dest.exists():
-            shutil.copy2(voce, dest)
-    parziale = destinazione / f".{NOME_DB}.copia"
-    origine = sqlite3.connect(str(sorgente / NOME_DB))
-    try:
-        dest_conn = sqlite3.connect(str(parziale))
+def _find_free_port(preferred: int = 5000) -> int:
+    for port in (preferred, 0):
         try:
-            origine.backup(dest_conn)
-        finally:
-            dest_conn.close()
-    finally:
-        origine.close()
-    os.replace(parziale, destinazione / NOME_DB)
-
-
-def url_sqlite(percorso: Path) -> str:
-    """URL SQLAlchemy di un file SQLite, sicuro con spazi, accenti, «%», «#» e «?» nel percorso."""
-    from sqlalchemy.engine import URL
-
-    return URL.create("sqlite", database=str(percorso)).render_as_string(hide_password=False)
-
-
-def configura_ambiente(cartella: Path, env: dict | None = None) -> None:
-    """Variabili lette da ``create_app``: tutti i dati nella cartella scelta."""
-    env = os.environ if env is None else env
-    cartella = Path(cartella)
-    env.setdefault("DATABASE_URL", url_sqlite(cartella / NOME_DB))
-    env.setdefault("UPLOAD_FOLDER", str(cartella / "uploads"))
-    env.setdefault("BACKUP_FOLDER", str(cartella / "backup"))
-    # Chiave di sessione generata al primo avvio e conservata con i dati.
-    env.setdefault("SECRET_KEY_FILE", str(cartella / "secret_key"))
-
-
-# ----------------------------------------------------------------------
-# Istanza unica e porta
-# ----------------------------------------------------------------------
-class BloccoIstanza:
-    """Blocco esclusivo sulla cartella dati: una sola istanza del programma alla volta.
-
-    Il blocco resta attivo finché il processo è in esecuzione e il sistema lo
-    rilascia da solo alla chiusura (anche se la finestra viene chiusa).
-    """
-
-    def __init__(self, percorso: Path):
-        self.percorso = Path(percorso)
-        self._fd: int | None = None
-
-    def acquisisci(self) -> bool:
-        fd = os.open(self.percorso, os.O_RDWR | os.O_CREAT, 0o600)
-        try:
-            if os.name == "nt":  # pragma: no cover - solo Windows
-                import msvcrt
-
-                os.lseek(fd, 0, os.SEEK_SET)
-                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            os.close(fd)
-            return False
-        self._fd = fd
-        return True
-
-    def rilascia(self) -> None:
-        if self._fd is None:
-            return
-        try:
-            if os.name == "nt":  # pragma: no cover - solo Windows
-                import msvcrt
-
-                os.lseek(self._fd, 0, os.SEEK_SET)
-                msvcrt.locking(self._fd, msvcrt.LK_UNLCK, 1)
-            else:
-                import fcntl
-
-                fcntl.flock(self._fd, fcntl.LOCK_UN)
-        except OSError:  # pragma: no cover
-            pass
-        finally:
-            os.close(self._fd)
-            self._fd = None
-
-
-def porta_preferita(env: Mapping[str, str] | None = None) -> int:
-    env = os.environ if env is None else env
-    try:
-        porta = int(env.get("PORT") or PORTA_PREDEFINITA)
-    except ValueError:
-        return PORTA_PREDEFINITA
-    return porta if 1 <= porta <= 65535 else PORTA_PREDEFINITA
-
-
-def crea_socket_server(preferita: int, host: str = HOST) -> socket.socket:
-    """Socket in ascolto sulla porta preferita, o su una porta libera qualsiasi.
-
-    Il socket viene passato così com'è a waitress: niente controllo «porta
-    libera» seguito da un secondo bind, che lascerebbe spazio a un altro
-    processo. Su Windows SO_EXCLUSIVEADDRUSE impedisce a chiunque altro di
-    agganciarsi alla stessa porta (con SO_REUSEADDR due programmi potrebbero
-    ascoltare insieme sulla 5000).
-    """
-    ultimo_errore: OSError | None = None
-    for porta in dict.fromkeys((preferita, 0)):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):  # pragma: no cover - solo Windows
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
-            else:
-                # POSIX: consente solo il riuso delle connessioni chiuse da poco (TIME_WAIT).
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.bind((host, porta))
-            sock.listen(128)
-            return sock
-        except OSError as exc:
-            sock.close()
-            ultimo_errore = exc
-    raise ErroreAvvio(f"Impossibile aprire una porta di rete locale: {ultimo_errore}")
-
-
-def scrivi_porta(cartella: Path, porta: int) -> None:
-    (Path(cartella) / FILE_PORTA).write_text(str(porta), encoding="ascii")
-
-
-def leggi_porta(cartella: Path) -> int | None:
-    try:
-        porta = int((Path(cartella) / FILE_PORTA).read_text(encoding="ascii").strip())
-    except (OSError, ValueError):
-        return None
-    return porta if 1 <= porta <= 65535 else None
-
-
-def porta_in_ascolto(porta: int, host: str = HOST, timeout: float = 0.5) -> bool:
-    try:
-        with socket.create_connection((host, porta), timeout=timeout):
-            return True
-    except OSError:
-        return False
-
-
-def apri_istanza_esistente(cartella: Path, attesa_s: float = 20.0,
-                           apri: Callable[[str], object] = webbrowser.open,
-                           pausa_s: float = 0.5) -> str | None:
-    """Apre il browser sull'istanza già avviata. Restituisce l'indirizzo, o None.
-
-    L'altra istanza potrebbe essere ancora in fase di avvio: si attende fino a
-    ``attesa_s`` secondi che scriva la porta e inizi ad ascoltare.
-    """
-    scadenza = time.monotonic() + attesa_s
-    while True:
-        porta = leggi_porta(cartella)
-        if porta and porta_in_ascolto(porta):
-            url = f"http://{HOST}:{porta}"
-            apri(url)
-            return url
-        if time.monotonic() >= scadenza:
-            return None
-        time.sleep(pausa_s)
-
-
-# ----------------------------------------------------------------------
-# Log ed errori di avvio
-# ----------------------------------------------------------------------
-_cartella_log: Path | None = None
-_blocco: BloccoIstanza | None = None
-
-
-def configura_log(cartella: Path) -> None:
-    """Log dell'applicazione su console e su file (``gestionale.log``, a rotazione)."""
-    radice = logging.getLogger()
-    if any(getattr(h, "_gestionale", False) for h in radice.handlers):
-        return
-    formato = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-    gestori: list[logging.Handler] = [
-        logging.handlers.RotatingFileHandler(
-            Path(cartella) / FILE_LOG, maxBytes=1_000_000, backupCount=3, encoding="utf-8"
-        )
-    ]
-    if sys.stderr is not None:
-        gestori.append(logging.StreamHandler())
-    for gestore in gestori:
-        gestore.setFormatter(formato)
-        gestore._gestionale = True  # type: ignore[attr-defined]
-        radice.addHandler(gestore)
-    radice.setLevel(logging.INFO)
-
-
-def registra_errore_avvio(testo: str, intestazione: bool = True) -> Path | None:
-    """Scrive il dettaglio dell'errore in ``avvio.log`` (cartella dati, o di ripiego)."""
-    candidati = [_cartella_log, cartella_utente(), Path(tempfile.gettempdir())]
-    for cartella in candidati:
-        if cartella is None:
-            continue
-        try:
-            Path(cartella).mkdir(parents=True, exist_ok=True)
-            percorso = Path(cartella) / FILE_LOG_AVVIO
-            with open(percorso, "a", encoding="utf-8") as fh:
-                if intestazione:
-                    fh.write(f"\n=== {datetime.now():%d/%m/%Y %H:%M:%S} ===\n{testo}\n")
-                else:
-                    fh.write(f"{datetime.now():%d/%m/%Y %H:%M:%S} {testo}\n")
-            return percorso
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind(("127.0.0.1", port))
+                return s.getsockname()[1]
         except OSError:
             continue
-    return None  # pragma: no cover
+    return preferred
 
 
-def attendi_invio(messaggio: str = "Premi Invio per chiudere…") -> None:
-    """Tiene aperta la finestra della console finché l'utente non preme Invio."""
+def _attendi_server(port: int, secondi: float = 15.0) -> None:
+    fine = time.time() + secondi
+    while time.time() < fine:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+                return
+        except OSError:
+            time.sleep(0.1)
+
+
+def _chiudi_splash() -> None:
+    """Toglie la schermata «Avvio in corso…» dell'eseguibile (se presente)."""
+    if "_PYI_SPLASH_IPC" not in os.environ:
+        return  # eseguibile senza schermata di avvio, o avvio da sorgente
     try:
-        if sys.stdin is not None and sys.stdin.isatty():
-            input(messaggio)
-    except (EOFError, OSError, KeyboardInterrupt):
+        import pyi_splash  # disponibile solo nell'eseguibile con la schermata di avvio
+
+        pyi_splash.close()
+    except Exception:  # noqa: BLE001 - sorgente, oppure schermata già chiusa
         pass
+
+
+NOME_MUTEX = "DealCombinedAppMutex"  # lo stesso in installer/DealCombined.iss
+# Segno lasciato mentre la finestra nativa si apre: se il programma si chiude
+# da solo entro questi secondi, al prossimo avvio si usa la finestra di Edge.
+FILE_PROVA_FINESTRA = "finestra_nativa.prova"
+SECONDI_PROVA_FINESTRA = 20
+
+
+def _leggi_testo(percorso: Path) -> str | None:
+    try:
+        return percorso.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None  # lo stesso in installer/DealCombined.iss
+
+
+def _prendi_mutex():
+    """Mutex di Windows con nome: dice all'installatore (e a una seconda
+    copia) che il programma è aperto. Restituisce (handle, già_esistente)."""
+    if sys.platform != "win32":
+        return None, False
+    import ctypes
+
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.CreateMutexW(None, False, NOME_MUTEX)
+    return handle, kernel32.GetLastError() == 183  # ERROR_ALREADY_EXISTS
+
+
+def chiudi_database(app) -> None:
+    """Chiude ogni collegamento al file del database. Su Windows un file
+    aperto non può essere sostituito da OneDrive/Google Drive: con la
+    finestra nella barra la versione arrivata dall'altro PC deve poter
+    entrare. Alla riapertura SQLAlchemy si ricollega da solo."""
+    from gestionale.models import db
+
+    with app.app_context():
+        db.session.remove()
+        db.engine.dispose()
+
+
+def _altra_copia_attiva(file_istanza: Path) -> bool:
+    """Se il programma è già aperto (magari solo nella barra), gli chiede di
+    mostrare la finestra e restituisce True."""
+    try:
+        porta = int(file_istanza.read_text(encoding="utf-8").strip())
+        richiesta = urllib.request.Request(
+            f"http://127.0.0.1:{porta}/impostazioni/mostra", data=b"", method="POST",
+            headers={"X-DC-Azione": "mostra"},
+        )
+        with urllib.request.urlopen(richiesta, timeout=3) as risposta:  # noqa: S310 - solo localhost
+            return risposta.status == 204
+    except (OSError, ValueError):
+        return False
+
+
+def main() -> None:
+    try:
+        _avvia()
+    finally:
+        _chiudi_splash()
 
 
 def apri_console() -> None:
@@ -516,73 +147,249 @@ def apri_console() -> None:
         import ctypes
 
         ctypes.windll.kernel32.AllocConsole()
-        sys.stdin = open("CONIN$", encoding="utf-8")
-        sys.stdout = sys.stderr = open("CONOUT$", "w", encoding="utf-8")
+        sys.stdin = open("CONIN$", encoding="utf-8")  # noqa: SIM115
+        sys.stdout = sys.stderr = open("CONOUT$", "w", encoding="utf-8")  # noqa: SIM115
     except Exception:  # noqa: BLE001
         pass
 
 
-def traccia(passo: str) -> None:
-    """Annota in ``avvio.log`` i passi dell'avvio: se il programma sembra non partire
-    si vede dove si è fermato (l'exe non ha console)."""
-    registra_errore_avvio(f"[avvio] {passo}", intestazione=False)
+def _reimposta_password(username: str, data_dir: Path, chiave: str | None) -> int:
+    """``DealCombined.exe --reimposta-password NOMEUTENTE``: nuova password per
+    un utente (es. l'unico amministratore che l'ha dimenticata)."""
+    from gestionale import desktop
+
+    apri_console()
+    os.environ.setdefault("SECRET_KEY", chiave or secrets.token_hex(32))
+    os.environ.setdefault("DATABASE_URL", "sqlite:///" + str(data_dir / desktop.NOME_DB))
+    os.environ.setdefault("UPLOAD_FOLDER", str(data_dir / desktop.NOME_UPLOADS))
+    os.environ.setdefault("BACKUP_FOLDER", str(data_dir / desktop.NOME_BACKUP))
+    from gestionale import create_app
+    from gestionale.cli import chiedi_e_reimposta
+
+    app = create_app()
+    with app.app_context():
+        esito = chiedi_e_reimposta(username)
+    if sys.platform == "win32":
+        input("Premi Invio per chiudere…")
+    return esito
 
 
-def chiudi_splash(testo: str | None = None) -> None:
-    """Chiude la schermata di caricamento dell'exe (se presente)."""
+def _avvia() -> None:
+    from gestionale import desktop, promemoria
+
+    silenzioso = promemoria.PARAMETRO_SILENZIOSO in sys.argv[1:]
+    file_config = desktop.file_configurazione()
+    config = desktop.leggi_configurazione(file_config)
+    data_dir = desktop.cartella_dati(config)
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    argomenti = sys.argv[1:]
+    if len(argomenti) >= 2 and argomenti[0] == "--reimposta-password":
+        _chiudi_splash()
+        raise SystemExit(_reimposta_password(argomenti[1], data_dir, config.get("secret_key")))
+
+    file_istanza = file_config.parent / "istanza.txt"
+    mutex_app, gia_aperto = _prendi_mutex()  # resta aperto finché il programma è attivo
+    if gia_aperto:
+        # L'altra copia potrebbe essere ancora in avvio: le si dà qualche secondo.
+        for _ in range(20):
+            if _altra_copia_attiva(file_istanza):
+                return
+            time.sleep(1)
+        return
+    if _altra_copia_attiva(file_istanza):  # fuori da Windows: solo il file
+        return
+
+    # Senza console (programma installato) i messaggi vanno in un file di log.
+    if sys.stdout is None or sys.stderr is None:
+        log = open(data_dir / "deal-combined.log", "a", encoding="utf-8", buffering=1)  # noqa: SIM115
+        sys.stdout = sys.stdout or log
+        sys.stderr = sys.stderr or log
+
+    # Chiave segreta propria di questa installazione: firma la sessione (e
+    # quindi lo sblocco con il PIN), non deve essere quella pubblica di prova.
+    if not config.get("secret_key"):
+        config["secret_key"] = secrets.token_hex(32)
+        desktop.salva_configurazione(config, file_config)
+    os.environ.setdefault("SECRET_KEY", config["secret_key"])
+
+    migrati = desktop.migra_vecchia_cartella(_base_dir() / "dati_gestionale", data_dir)
+
+    os.environ.setdefault("DATABASE_URL", "sqlite:///" + str(data_dir / desktop.NOME_DB))
+    os.environ.setdefault("UPLOAD_FOLDER", str(data_dir / desktop.NOME_UPLOADS))
+    # Backup del gestionale (giornalieri, prima di un ripristino o di una
+    # sincronizzazione) nella stessa cartella dei backup di avvio.
+    os.environ.setdefault("BACKUP_FOLDER", str(data_dir / desktop.NOME_BACKUP))
+
+    from gestionale import create_app
+    from gestionale.scheduler import start_scheduler
+
+    app = create_app()
+    app.config.update(DC_DESKTOP=True, DC_CONFIG_FILE=str(file_config), DC_BLOCCO_ALTRUI=None,
+                      DC_HO_BLOCCO=False, DC_IN_PAUSA=True)
+    stato = {"backup_fatto": False}
+    mutex_blocco = threading.Lock()  # entra/esce e battito non si sovrappongono
+
+    def entra() -> None:
+        """La finestra si apre: l'archivio diventa «aperto su questo PC», a
+        meno che non lo sia già su un altro (pagina di avviso)."""
+        with mutex_blocco:
+            altrui = desktop.blocco_altrui(data_dir)
+            app.config["DC_BLOCCO_ALTRUI"] = altrui
+            if not altrui:
+                if not stato["backup_fatto"]:
+                    desktop.esegui_backup(data_dir, motivo="avvio")
+                    stato["backup_fatto"] = True
+                desktop.prendi_blocco(data_dir)
+                app.config["DC_HO_BLOCCO"] = True
+            # Se l'archivio è aperto altrove resta in pausa finché l'utente
+            # non sceglie «Apri comunque».
+            app.config["DC_IN_PAUSA"] = bool(altrui)
+
+    def esce() -> None:
+        """La finestra va nella barra: l'archivio si libera per l'altro PC."""
+        from datetime import datetime
+
+        with mutex_blocco:
+            app.config["DC_IN_PAUSA"] = True
+            app.config["DC_NASCOSTA_ALLE"] = datetime.utcnow().timestamp()  # stesso orologio del PIN
+            if app.config.get("DC_HO_BLOCCO"):
+                desktop.rilascia_blocco(data_dir)
+                app.config["DC_HO_BLOCCO"] = False
+            chiudi_database(app)
+
+    def chiudi() -> None:
+        esce()
+        if app.config.get("DC_FINESTRA"):
+            # Chiusura normale della finestra nativa: funziona, si riusa la prossima volta.
+            try:
+                (data_dir / FILE_PROVA_FINESTRA).unlink(missing_ok=True)
+            except OSError:
+                pass
+        ferma_icona = app.config.get("DC_FERMA_ICONA")
+        if ferma_icona:
+            try:
+                ferma_icona()
+            except Exception:  # noqa: BLE001 - l'icona potrebbe essere già ferma
+                pass
+        try:
+            file_istanza.unlink(missing_ok=True)
+        except OSError:
+            pass
+        os._exit(0)
+
+    app.config["DC_SHUTDOWN"] = chiudi
+    atexit.register(esce)
+
+    def battito() -> None:
+        # Tiene «fresco» il blocco: se il programma si chiude male, dopo
+        # qualche minuto l'altro PC potrà riaprire l'archivio.
+        while True:
+            time.sleep(desktop.BATTITO_OGNI)
+            with mutex_blocco:
+                if app.config.get("DC_HO_BLOCCO") and not app.config.get("DC_BLOCCO_ALTRUI"):
+                    try:
+                        desktop.prendi_blocco(data_dir)
+                    except OSError:
+                        pass
+
+    threading.Thread(target=battito, name="blocco", daemon=True).start()
+
+    port = _find_free_port(int(os.environ.get("PORT", "5000")))
+    url = f"http://127.0.0.1:{port}"
+    os.environ.setdefault("APP_BASE_URL", url)  # link nelle email
+
+    start_scheduler(app)
+
+    if config.get("aggiornamenti_automatici", True):
+        from gestionale.routes.settings import controlla_aggiornamenti
+
+        # Dopo qualche secondo, per non rallentare l'apertura.
+        threading.Timer(8, controlla_aggiornamenti, args=(app,)).start()
+
+    print("=" * 60)
+    print("  Deal Combined è in esecuzione.")
+    print(f"  Indirizzo:        {url}")
+    print(f"  Dati salvati in:  {data_dir}")
+    if migrati:
+        print("  (dati della versione precedente copiati qui)")
+    print("=" * 60)
+
+    def servi() -> None:
+        try:
+            from waitress import serve  # server WSGI di produzione, puro Python
+
+            serve(app, host="127.0.0.1", port=port, threads=8)
+        except ImportError:
+            app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
+
     try:
-        import pyi_splash  # disponibile solo nell'eseguibile con schermata di avvio
+        import webview  # pywebview: finestra nativa con Edge WebView2
+    except ImportError:
+        webview = None
 
-        if testo:
-            pyi_splash.update_text(testo)
-        else:
-            pyi_splash.close()
-    except Exception:  # noqa: BLE001 - nessuna schermata: niente da fare
+    # Se all'avvio precedente la finestra nativa si è chiusa da sola appena
+    # aperta (componente grafico non compatibile), con questa stessa versione
+    # si usa direttamente la finestra di Edge.
+    from gestionale import __version__
+
+    prova = data_dir / FILE_PROVA_FINESTRA
+    nativa_fallita = _leggi_testo(prova) == __version__
+
+    if webview is None or os.environ.get("DC_BROWSER") or nativa_fallita:
+        # Ripiego: finestra di Edge (o browser); si chiude dal pulsante «Chiudi Deal Combined».
+        entra()
+        _chiudi_splash()
+        threading.Timer(1.2, lambda: _apri_finestra_edge(url, data_dir) or webbrowser.open(url)).start()
+        servi()
+        return
+
+    threading.Thread(target=servi, name="server", daemon=True).start()
+    _attendi_server(port)
+    try:
+        file_istanza.write_text(str(port), encoding="utf-8")
+    except OSError:
+        pass
+    app.config["DC_FINESTRA"] = True
+
+    finestra = webview.create_window(
+        "Deal Combined", url, width=1320, height=860, min_size=(360, 560),
+        text_select=True, hidden=silenzioso,
+    )
+    icona = _avvia_barra(app, finestra, entra, esce, chiudi, url)
+    if not silenzioso or icona is None:
+        entra()
+    _chiudi_splash()
+
+    try:
+        prova.write_text(__version__, encoding="utf-8")
+    except OSError:
         pass
 
-
-def mostra_messaggio(testo: str, icona: int = 0x10) -> None:
-    """Messaggio di Windows (0x10 errore, 0x40 informazione), anche senza console; altrove stampa."""
-    if sys.platform == "win32":
+    def finestra_ok() -> None:
         try:
-            import ctypes
-
-            ctypes.windll.user32.MessageBoxW(None, testo, TITOLO_FINESTRA, icona)
-            return
-        except Exception:  # noqa: BLE001 - ripiego sulla console
+            prova.unlink(missing_ok=True)
+        except OSError:
             pass
-    print(testo)
 
-
-def mostra_errore(testo: str) -> None:
-    """Mostra un errore anche senza console (eseguibile a finestra)."""
-    mostra_messaggio(testo, icona=0x10)
-
-
-# ----------------------------------------------------------------------
-# Finestra del programma
-# ----------------------------------------------------------------------
-def modulo_finestra(env: Mapping[str, str] | None = None):
-    """Il modulo pywebview se la finestra propria è utilizzabile, altrimenti None."""
-    env = os.environ if env is None else env
-    if env.get(ENV_BROWSER, "").strip().lower() in ("1", "si", "sì", "true", "yes"):
-        return None
+    threading.Timer(SECONDI_PROVA_FINESTRA, finestra_ok).start()
     try:
-        import webview  # pywebview
-    except Exception:  # noqa: BLE001 - non installato o senza motore grafico
-        return None
-    return webview
+        webview.start()
+    except Exception as exc:  # noqa: BLE001 - nessun motore WebView disponibile
+        print(f"Finestra non disponibile ({exc}): apro la finestra di Edge.")
+        app.config["DC_FINESTRA"] = False
+        entra()
+        if not _apri_finestra_edge(url, data_dir):
+            webbrowser.open(url)
+        threading.Event().wait()  # il server resta attivo; si chiude dall'app
+        return
+    chiudi()  # finestra chiusa davvero (senza icona nella barra): fine
 
 
-FILE_FINESTRA = "finestra.json"
-CARTELLA_PROFILO_FINESTRA = "finestra_edge"
-
-
-def trova_browser_app(env: Mapping[str, str] | None = None, esiste: Callable[[str], bool] = os.path.isfile) -> str | None:
-    """Microsoft Edge (o Chrome) per aprire il gestionale come applicazione, solo su Windows."""
+def trova_browser_app(env=None, esiste=os.path.isfile) -> str | None:
+    """Microsoft Edge (o Chrome) per aprire il programma in una finestra
+    propria, senza barra degli indirizzi né schede (solo Windows)."""
     env = os.environ if env is None else env
-    if env.get(ENV_BROWSER, "").strip().lower() in ("1", "si", "sì", "true", "yes"):
-        return None
     candidati = []
     for base in (env.get("PROGRAMFILES(X86)"), env.get("PROGRAMFILES"), env.get("LOCALAPPDATA")):
         if base:
@@ -592,404 +399,94 @@ def trova_browser_app(env: Mapping[str, str] | None = None, esiste: Callable[[st
 
 
 def comando_finestra_app(browser: str, url: str, cartella: Path) -> list[str]:
-    """Edge/Chrome in modalità applicazione: niente barra degli indirizzi né schede,
-    con un profilo proprio (dimensione e posizione della finestra restano ricordate)."""
+    """Edge/Chrome in modalità applicazione, con un profilo proprio (la
+    finestra ricorda dimensione e posizione)."""
     return [
-        browser, f"--app={url}", f"--user-data-dir={Path(cartella) / CARTELLA_PROFILO_FINESTRA}",
+        browser, f"--app={url}", f"--user-data-dir={Path(cartella) / 'finestra_edge'}",
         "--no-first-run", "--no-default-browser-check", "--disable-sync",
         "--disable-features=Translate,msEdgeStartupBoost,msImplicitSignin",
         "--window-size=1366,860",
     ]
 
 
-ARG_FINESTRA = "--finestra"
-FILE_FINESTRA_PRONTA = "finestra.pronta"
-# Tempo massimo perché la finestra nativa compaia, poi si usa l'altra finestra.
-SECONDI_ATTESA_FINESTRA = 30
-
-
-def finestra_nativa_disponibile() -> bool:
-    """pywebview è presente (senza importarlo: il componente grafico si carica solo nel processo figlio)."""
-    import importlib.util
-
-    if os.environ.get(ENV_BROWSER, "").strip().lower() in ("1", "si", "sì", "true", "yes"):
-        return False
-    try:
-        return importlib.util.find_spec("webview") is not None
-    except (ImportError, ValueError):
-        return False
-
-
-def esegui_finestra_nativa(url: str, cartella: Path) -> int:
-    """Processo figlio: solo la finestra nativa (pywebview). Un eventuale crash del
-    componente grafico non ferma il programma e il suo punto esatto finisce in avvio.log."""
-    import faulthandler
-
-    global _cartella_log
-    _cartella_log = cartella
-    try:
-        registro = open(Path(cartella) / FILE_LOG_AVVIO, "a", encoding="utf-8")
-        faulthandler.enable(registro)
-    except OSError:
-        registro = None
-    traccia("finestra nativa: avvio del componente grafico")
-    webview = modulo_finestra()
-    if webview is None:
-        traccia("finestra nativa: componente grafico non disponibile")
-        return 3
-
-    def mostrata(*_):
-        traccia("finestra nativa mostrata")
-        try:
-            (Path(cartella) / FILE_FINESTRA_PRONTA).write_text("1", encoding="utf-8")
-        except OSError:
-            pass
-
-    if not apri_finestra(url, webview, cartella, alla_comparsa=mostrata):
-        return 4
-    traccia("finestra nativa chiusa")
-    return 0
-
-
-def apri_finestra_nativa(url: str, cartella: Path, avvia=None) -> bool:
-    """Apre la finestra nativa in un processo separato e attende che venga chiusa.
-
-    False se il processo termina con un errore (es. crash di WebView2): si userà
-    un'altra finestra senza perdere il programma, che resta in esecuzione.
-    """
-    import subprocess
-
-    if getattr(sys, "frozen", False):
-        comando = [sys.executable, ARG_FINESTRA, url]
-    else:
-        comando = [sys.executable, os.path.abspath(__file__), ARG_FINESTRA, url]
-    avvia = avvia or subprocess.Popen
-    pronta = Path(cartella) / FILE_FINESTRA_PRONTA
-    try:
-        pronta.unlink()
-    except OSError:
-        pass
-    try:
-        processo = avvia(comando)
-    except OSError:
-        registra_errore_avvio("Finestra nativa non avviata:\n" + traceback.format_exc())
-        return False
-    # Se la finestra non compare entro il tempo massimo (componente bloccato) si chiude
-    # il processo e si passa all'altra finestra: il programma non resta mai «invisibile».
-    scadenza = time.monotonic() + SECONDI_ATTESA_FINESTRA
-    while processo.poll() is None and not pronta.exists() and time.monotonic() < scadenza:
-        time.sleep(0.25)
-    if processo.poll() is None and not pronta.exists():
-        traccia("finestra nativa non comparsa in tempo: la chiudo e uso un'altra finestra")
-        processo.kill()
-        return False
-    codice = processo.wait()
-    if codice != 0:
-        traccia(f"finestra nativa terminata con errore (codice {codice}): uso un'altra finestra")
-        return False
-    return True
-
-
-def edge_in_uso(profilo: Path) -> bool:
-    """Edge tiene bloccato il file «lockfile» del profilo finché la finestra è aperta."""
-    blocco = Path(profilo) / "lockfile"
-    if not blocco.exists():
-        return False
-    try:
-        blocco.unlink()  # riesce solo quando Edge ha chiuso la finestra
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return False
-
-
-def apri_finestra_app(url: str, cartella: Path, browser: str | None = None, avvia=None,
-                      in_uso: Callable[[Path], bool] = edge_in_uso, pausa_s: float = 1.0) -> bool:
-    """Apre il gestionale in una finestra di Edge in modalità applicazione e attende
-    che venga chiusa (anche quando Edge affida la finestra a un suo processo
-    interno: si controlla il blocco del profilo). False se non c'è un browser adatto."""
-    import subprocess
-
-    browser = browser or trova_browser_app()
+def _apri_finestra_edge(url: str, cartella: Path) -> bool:
+    """Ripiego se la finestra nativa non parte: il programma si apre comunque
+    in una finestra a sé (si chiude dal pulsante «Chiudi Deal Combined»)."""
+    browser = trova_browser_app()
     if browser is None:
         return False
-    avvia = avvia or subprocess.Popen
-    profilo = Path(cartella) / CARTELLA_PROFILO_FINESTRA
+    import subprocess
+
     try:
-        processo = avvia(comando_finestra_app(browser, url, cartella))
+        subprocess.Popen(comando_finestra_app(browser, url, cartella), close_fds=True)  # noqa: S603
     except OSError:
-        registra_errore_avvio("Finestra di Edge non avviata:\n" + traceback.format_exc())
         return False
-    # Attesa che la finestra si apra (il profilo viene bloccato), poi che si chiuda.
-    scadenza = time.monotonic() + SECONDI_ATTESA_FINESTRA
-    while not in_uso(profilo) and time.monotonic() < scadenza:
-        time.sleep(pausa_s)
-    if in_uso(profilo):
-        while in_uso(profilo):
-            time.sleep(pausa_s)
-    else:
-        processo.wait()
     return True
 
 
-def leggi_geometria(cartella: Path | None) -> dict:
-    """Dimensione e posizione della finestra all'ultima chiusura (valori plausibili o niente)."""
-    if cartella is None:
-        return {}
+def _avvia_barra(app, finestra, entra, esce, chiudi, url):
+    """Icona nella barra e promemoria (solo Windows). Restituisce l'icona,
+    o None se non disponibile: allora chiudere la finestra chiude tutto."""
+    if sys.platform != "win32":
+        return None
     try:
-        import json
+        from gestionale import promemoria, tray
+    except ImportError:
+        return None
 
-        dati = json.loads((Path(cartella) / FILE_FINESTRA).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    geometria = {}
-    if isinstance(dati, dict):
-        larghezza, altezza = dati.get("width"), dati.get("height")
-        if isinstance(larghezza, int) and isinstance(altezza, int) and 800 <= larghezza <= 8000 and 500 <= altezza <= 5000:
-            geometria.update(width=larghezza, height=altezza)
-        x, y = dati.get("x"), dati.get("y")
-        if isinstance(x, int) and isinstance(y, int) and -100 <= x <= 7000 and -100 <= y <= 4000:
-            geometria.update(x=x, y=y)
-    return geometria
+    stato = {"uscita": False}
 
+    def mostra() -> None:
+        entra()
+        finestra.load_url(url)  # ricarica: dati aggiornati, eventuale avviso «in uso»
+        finestra.show()
+        finestra.restore()
 
-def salva_geometria(cartella: Path | None, finestra) -> None:
-    if cartella is None:
-        return
+    def esci() -> None:
+        stato["uscita"] = True
+        chiudi()  # toglie anche l'icona
+
+    def alla_chiusura():
+        if stato["uscita"]:
+            return True
+        esce()
+        finestra.hide()
+        finestra.load_url("about:blank")  # ferma i timer della pagina (blocco PIN, ricarica)
+        if not stato.get("avvisato"):
+            stato["avvisato"] = True
+            icona.notify("Deal Combined resta attivo qui per i promemoria. Per chiuderlo: tasto destro → Esci.",
+                         "Deal Combined è nella barra")
+        return False  # niente chiusura: la finestra si nasconde
+
     try:
-        import json
+        icona = tray.crea(mostra, esci)
+    except Exception as exc:  # noqa: BLE001 - pystray/Pillow mancanti o barra non disponibile
+        print(f"Icona nella barra non disponibile ({exc}).")
+        return None
 
-        dati = {k: int(getattr(finestra, k)) for k in ("width", "height", "x", "y") if getattr(finestra, k, None) is not None}
-        (Path(cartella) / FILE_FINESTRA).write_text(json.dumps(dati), encoding="utf-8")
-    except Exception:  # noqa: BLE001 - non deve mai impedire la chiusura
-        pass
+    app.config["DC_MOSTRA"] = mostra
+    app.config["DC_FERMA_ICONA"] = icona.stop
+    finestra.events.closing += alla_chiusura
 
-
-def apri_finestra(url: str, webview=None, cartella: Path | None = None, alla_comparsa=None) -> bool:
-    """Apre il gestionale in una finestra propria e attende che venga chiusa.
-
-    La finestra riapre con la dimensione e la posizione dell'ultima volta.
-    Restituisce False se la finestra non si può aprire (si userà il browser).
-    """
-    webview = webview if webview is not None else modulo_finestra()
-    if webview is None:
-        return False
-    try:
-        # Backup, esportazioni CSV e calendario si scaricano anche dalla finestra.
-        # pywebview.settings è un dizionario a chiavi fisse (UserDict, non dict).
-        impostazioni = getattr(webview, "settings", None)
-        for chiave in ("ALLOW_DOWNLOADS", "OPEN_EXTERNAL_LINKS_IN_BROWSER"):
+    def controlla_promemoria() -> None:
+        annunciatore = promemoria.Annunciatore()
+        time.sleep(30)
+        while True:
             try:
-                impostazioni[chiave] = True  # email, PEC e siti si aprono nei programmi predefiniti
-            except (TypeError, KeyError):
-                pass
-        opzioni = {"width": 1366, "height": 860, **leggi_geometria(cartella)}
-        finestra = webview.create_window(
-            TITOLO_FINESTRA, url, min_size=(1024, 640), text_select=True,
-            background_color="#f3f5f9",  # niente lampo bianco all'apertura
-            **opzioni,
-        )
-        eventi = getattr(finestra, "events", None)
-        if eventi is not None and hasattr(eventi, "closing"):
-            eventi.closing += lambda *_: salva_geometria(cartella, finestra)
-        if eventi is not None and alla_comparsa is not None and hasattr(eventi, "shown"):
-            eventi.shown += alla_comparsa
-        icona = Path(getattr(sys, "_MEIPASS", Path(__file__).parent)) / "gestionale" / "static" / "icona.png"
-        avvio = {"private_mode": False}
-        if icona.is_file():
-            avvio["icon"] = str(icona)  # usata su Linux; su Windows vale l'icona dell'exe
-        webview.start(**avvio)
-    except Exception:  # noqa: BLE001 - es. WebView2 mancante: si ripiega sul browser
-        logging.getLogger("gestionale.avvio").exception("Finestra non disponibile, uso il browser")
-        registra_errore_avvio("Finestra non disponibile, uso il browser:\n" + traceback.format_exc())
-        return False
-    return True
+                with app.app_context():
+                    novita = annunciatore.novita(promemoria.elementi_di_oggi())
+                if app.config.get("DC_IN_PAUSA"):
+                    chiudi_database(app)  # lettura lampo: il file non resta aperto
+                if novita:
+                    titolo, testo = novita
+                    icona.notify(testo, titolo)
+            except Exception as exc:  # noqa: BLE001 - archivio in sincronizzazione, ecc.
+                print(f"Promemoria non disponibili ({exc}).")
+            time.sleep(promemoria.CONTROLLO_OGNI)
 
-
-# ----------------------------------------------------------------------
-# Avvio
-# ----------------------------------------------------------------------
-def _main(argv: list[str]) -> int:
-    global _cartella_log, _blocco
-
-    registra_tipi_mime()
-    scelta = scegli_cartella_dati(base_dir())
-    cartella = scelta.cartella
-    if not cartella_scrivibile(cartella):
-        suggerimento = (f"Imposta {ENV_CARTELLA_DATI} su una cartella scrivibile."
-                        if scelta.esplicita else "Controlla i permessi della cartella.")
-        raise ErroreAvvio(f"Impossibile scrivere nella cartella dati {cartella}. {suggerimento}")
-    _cartella_log = cartella
-    traccia(f"avvio del programma, cartella dati {cartella}")
-
-    # Istanza unica: il blocco viene preso prima di scrivere log o copiare dati.
-    reimposta = len(argv) >= 2 and argv[0] == "--reimposta-password"
-    if not reimposta:
-        _blocco = BloccoIstanza(cartella / FILE_BLOCCO)
-        if not _blocco.acquisisci():
-            traccia("il programma risulta già aperto: apro un'altra finestra sull'istanza attiva")
-            chiudi_splash()
-            # Il programma è già aperto: un'altra finestra (o il browser) sulla stessa istanza.
-            url = apri_istanza_esistente(cartella, apri=lambda u: None)
-            if url:
-                browser_app = trova_browser_app() if sys.platform == "win32" else None
-                if sys.platform == "win32" and finestra_nativa_disponibile() and apri_finestra_nativa(url, cartella):
-                    return 0
-                if browser_app:
-                    import subprocess
-
-                    subprocess.Popen(comando_finestra_app(browser_app, url, cartella))
-                elif not apri_finestra(url, cartella=cartella):
-                    webbrowser.open(url)
-                return 0
-            raise ErroreAvvio(
-                "Il Gestionale Assicurativo risulta già in esecuzione con la stessa cartella dati, ma non "
-                "risponde. Chiudi l'altra finestra del programma (o riavvia il computer) e riprova."
-            )
-        try:  # porta dell'avvio precedente: non più valida
-            (cartella / FILE_PORTA).unlink()
-        except FileNotFoundError:
-            pass
-
-    configura_log(cartella)
-    log = logging.getLogger("gestionale.avvio")
-    log.info("Cartella dati: %s (%s)", cartella, scelta.motivo)
-    if scelta.migra_da:
-        migra_dati(scelta.migra_da, cartella)
-        log.warning("Dati copiati da %s a %s", scelta.migra_da, cartella)
-    for avviso in scelta.avvisi:
-        log.warning(avviso)
-
-    configura_ambiente(cartella)
-    from gestionale import create_app
-    from gestionale.backup import normalizza_cartelle
-
-    app = create_app()
-    normalizza_cartelle(app)
-
-    if reimposta:
-        from gestionale.cli import chiedi_e_reimposta
-
-        apri_console()
-
-        with app.app_context():
-            return chiedi_e_reimposta(argv[1])
-
-    sock = crea_socket_server(porta_preferita())
-    porta = sock.getsockname()[1]
-    url = f"http://{HOST}:{porta}"
-    # I link nelle email puntano all'app in esecuzione localmente.
-    os.environ.setdefault("APP_BASE_URL", url)
-    scrivi_porta(cartella, porta)
-
-    from gestionale.scheduler import start_scheduler
-
-    start_scheduler(app)
-    traccia(f"motore avviato su {url}")
-
-    print("=" * 60)
-    print("  Gestionale Assicurativo è in esecuzione.")
-    print(f"  Apri il browser su:  {url}")
-    print(f"  Dati salvati in:     {cartella}")
-    print("  Chiudi questa finestra per fermare il programma.")
-    print("=" * 60)
-
-    try:
-        from waitress import serve  # server WSGI di produzione, puro Python
-    except ImportError:  # pragma: no cover
-        # Fallback: server integrato di Flask (nessuna dipendenza extra).
-        sock.close()
-
-        def avvia_server():
-            app.run(host=HOST, port=porta, debug=False, use_reloader=False)
-    else:
-        def avvia_server():
-            serve(app, sockets=[sock], threads=8)
-
-    if sys.platform == "win32" and finestra_nativa_disponibile():
-        traccia("apro la finestra del programma")
-        chiudi_splash()
-        threading.Thread(target=avvia_server, name="server", daemon=True).start()
-        if apri_finestra_nativa(url, cartella):
-            traccia("finestra chiusa: programma terminato")
-            return 0
-        server_avviato = True
-    else:
-        server_avviato = False
-    browser_app = trova_browser_app() if sys.platform == "win32" else None
-    if browser_app:
-        traccia(f"apro la finestra del programma con {Path(browser_app).name} (modalità applicazione)")
-        chiudi_splash()
-        if not server_avviato:
-            threading.Thread(target=avvia_server, name="server", daemon=True).start()
-            server_avviato = True
-        if apri_finestra_app(url, cartella, browser_app):
-            traccia("finestra chiusa: programma terminato")
-            return 0
-    webview = modulo_finestra()
-    traccia("apro la finestra del programma" if webview is not None else "finestra non disponibile: uso il browser")
-    chiudi_splash()
-    if webview is not None and not browser_app and sys.platform != "win32":
-        # Il motore gira in sottofondo; chiudendo la finestra si chiude il programma.
-        threading.Thread(target=avvia_server, name="server", daemon=True).start()
-        server_avviato = True
-        if apri_finestra(url, webview, cartella):
-            traccia("finestra chiusa: programma terminato")
-            log.info("Finestra chiusa: programma terminato")
-            return 0
-    # Senza finestra propria: browser predefinito, server in primo piano.
-    apertura = threading.Timer(1.0, webbrowser.open, args=(url,))
-    apertura.daemon = True
-    apertura.start()
-    if not server_avviato:
-        avvia_server()
-    elif sys.platform == "win32" and sys.stdout is None:
-        # Exe senza console: un messaggio resta aperto finché il programma è in uso,
-        # così c'è sempre un modo per chiuderlo.
-        mostra_messaggio(
-            "La finestra del programma non è disponibile su questo PC (manca Microsoft Edge WebView2): "
-            "il gestionale si è aperto nel browser.\n\nPremi OK per chiudere il Gestionale Assicurativo.",
-            icona=0x40,
-        )
-    else:  # il server è già partito nel thread: si resta in attesa
-        threading.Event().wait()
-    return 0
-
-
-def main(argv: list[str] | None = None) -> int:
-    """Avvia il programma; qualsiasi errore viene registrato e mostrato senza chiudere la finestra."""
-    argv = sys.argv[1:] if argv is None else argv
-    if len(argv) >= 2 and argv[0] == ARG_FINESTRA:
-        chiudi_splash()
-        cartella = scegli_cartella_dati(base_dir()).cartella
-        return esegui_finestra_nativa(argv[1], cartella)
-    if "--diagnosi" in argv:
-        # Doppio clic con --diagnosi (es. da un collegamento): console con tutti i messaggi.
-        argv = [a for a in argv if a != "--diagnosi"]
-        apri_console()
-    try:
-        return _main(argv)
-    except KeyboardInterrupt:
-        return 0
-    except SystemExit:
-        raise
-    except BaseException as exc:  # noqa: BLE001 - l'utente deve sempre vedere cosa è successo
-        chiudi_splash()
-        percorso = registra_errore_avvio(traceback.format_exc())
-        dettaglio = str(exc) if isinstance(exc, ErroreAvvio) else f"{exc.__class__.__name__}: {exc}"
-        testo = "Il Gestionale Assicurativo si è fermato per un errore.\n\n" + dettaglio
-        if percorso:
-            testo += f"\n\nDettagli tecnici nel file: {percorso}"
-        if sys.stdout is not None:  # avviato da console
-            print("=" * 60)
-            print(testo)
-            print("=" * 60)
-            attendi_invio()
-        else:
-            mostra_errore(testo)
-        return 1
+    threading.Thread(target=controlla_promemoria, name="promemoria", daemon=True).start()
+    return icona
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

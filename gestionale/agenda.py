@@ -177,7 +177,7 @@ def esporta_ics(eventi: list[Evento], base_url: str, nome_calendario: str) -> st
     righe = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//Gestionale Assicurativo//Scadenzario//IT",
+        "PRODID:-//Deal Combined//Scadenzario//IT",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
         f"X-WR-CALNAME:{_ics_testo(nome_calendario)}",

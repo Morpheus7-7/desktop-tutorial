@@ -1,17 +1,28 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}Dashboard — Gestionale Assicurativo{% endblock %}
+{% block title %}Oggi — Deal Combined{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-  <div>
-    <h1 class="page-title">Dashboard</h1>
-    <div class="page-subtitle">Buongiorno{% if utente and utente.nome %} {{ utente.nome.split(' ')[0] }}{% endif %}, ecco la situazione al {{ oggi | data_it }}</div>
+<header class="pagina-giorno">
+  <div class="pagina-giorno-data">
+    <div class="giorno-numero" aria-hidden="true">{{ pagina.numero }}</div>
+    <div>
+      <h1 class="giorno-nome"><span class="visually-hidden">Oggi, </span>{{ pagina.giorno | capitalize }} <span class="visually-hidden">{{ pagina.numero }}</span></h1>
+      <div class="giorno-meta">{{ pagina.mese_anno }} · settimana {{ pagina.settimana }} · giorno {{ pagina.giorno_anno }}, ne mancano {{ pagina.rimanenti }}</div>
+      {% set n_ritardo = agenda | selectattr('gruppo', 'equalto', 'ritardo') | list | length %}
+      {% set n_oggi = agenda | selectattr('gruppo', 'equalto', 'oggi') | list | length %}
+      {% set n_sett = agenda | selectattr('gruppo', 'equalto', 'settimana') | list | length %}
+      <div class="giorno-riepilogo">
+        <span {% if n_ritardo %}class="text-danger"{% endif %}><strong>{{ n_ritardo }}</strong> in ritardo</span>
+        <span><strong>{{ n_oggi }}</strong> per oggi</span>
+        <span><strong>{{ n_sett }}</strong> nei prossimi 7 giorni</span>
+      </div>
+    </div>
   </div>
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.analytics') }}"><i class="bi bi-bar-chart-line"></i> Statistiche</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('followups.list_followups') }}"><i class="bi bi-list-check"></i> Tutti i follow-up</a>
     {% if puo_modificare %}<a class="btn btn-primary" href="{{ url_for('clients.new_client') }}"><i class="bi bi-person-plus"></i> Nuovo cliente</a>{% endif %}
   </div>
-</div>
+</header>
 
 <!-- Portafoglio -->
 <div class="row g-3 mb-3">
@@ -107,7 +118,110 @@
 </div>
 {% endif %}
 
-<div class="row g-4">
+<div class="row g-4 oggi-layout">
+  <div class="col-md-7 col-xl-8">
+    <section class="card" aria-labelledby="titolo-agenda">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0" id="titolo-agenda">Da fare</h2>
+        <a class="small" href="{{ url_for('main.scadenzario') }}">Scadenzario completo</a>
+      </div>
+      <div class="oggi">
+        {% if agenda %}
+          {% for chiave, titolo, voci in agenda_gruppi %}
+          <h3 class="oggi-gruppo">{{ titolo }} <span class="numeri">· {{ voci | length }}</span></h3>
+          {% for v in voci %}
+            {% if prossimo_passo and v is sameas prossimo_passo %}
+            <div class="nastro" role="note"><i class="bi bi-bookmark-fill" aria-hidden="true"></i> Prossimo passo
+              <span class="nastro-dettaglio">· inizia da qui</span></div>
+            {% endif %}
+            <div class="oggi-item">
+              <div class="oggi-quando {% if v.giorni < 0 %}ritardo{% endif %}">
+                {% if v.giorni < 0 %}−{{ -v.giorni }} gg<small>dal {{ v.data.strftime('%d/%m') }}</small>
+                {% elif v.giorni == 0 %}Oggi<small>{{ v.giorno_breve }} {{ v.data.day }}</small>
+                {% else %}{{ v.giorno_breve | capitalize }} {{ v.data.day }}<small>tra {{ v.giorni }} gg</small>{% endif %}
+              </div>
+              <div class="min-w-0">
+                <div class="oggi-titolo">{{ v.titolo }}<span class="oggi-tipo">{{ v.etichetta }}</span></div>
+                <div class="oggi-meta">{% if v.cliente %}<a href="{{ url_for('clients.detail', client_id=v.cliente.id) }}">{{ v.cliente.ragione_sociale }}</a>{% else %}<a href="{{ url_for('note.index') }}">Note</a>{% endif %}</div>
+              </div>
+              <div class="oggi-azione">
+                {% if not puo_modificare %}
+                {% elif v.tipo == 'followup' %}
+                <form method="post" action="{{ url_for('followups.complete', followup_id=v.id) }}">
+                  {{ csrf_field() }}
+                  <input type="hidden" name="next" value="{{ url_for('main.dashboard') }}">
+                  <button class="btn btn-sm btn-outline-success"><i class="bi bi-check-lg"></i> Fatto</button>
+                </form>
+                {% elif v.tipo == 'nota' %}
+                <form method="post" action="{{ url_for('note.done', nota_id=v.id) }}">
+                  {{ csrf_field() }}
+                  <input type="hidden" name="next" value="{{ url_for('main.dashboard') }}">
+                  <button class="btn btn-sm btn-outline-success"><i class="bi bi-check-lg"></i> Fatto</button>
+                </form>
+                {% else %}
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('policies.edit_policy', policy_id=v.id) }}"><i class="bi bi-arrow-repeat"></i> Rinnovo</a>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+          {% endfor %}
+        {% else %}
+          <div class="oggi-vuoto">
+            <i class="bi bi-check2-circle" aria-hidden="true"></i>
+            Nessuna attività aperta e nessuna scadenza nei prossimi 30 giorni.<br>
+            È il momento di lavorare il portafoglio: <a href="{{ url_for('clients.list_clients') }}">scegli un cliente da rivedere</a>.
+          </div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="col-md-5 col-xl-4 colonna-laterale">
+    <section class="card" aria-labelledby="titolo-trattative">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0" id="titolo-trattative">Trattative aperte</h2>
+        <a class="small" href="{{ url_for('opportunities.board') }}">Pipeline</a>
+      </div>
+      <div class="card-body py-2">
+        <ul class="trattative-mini">
+          {% for o in opportunita_recenti %}
+          <li>
+            <div class="min-w-0">
+              <a href="{{ url_for('clients.detail', client_id=o.client_id) }}" class="fw-semibold">{{ o.titolo }}</a>
+              <div class="small text-muted">{{ o.cliente.ragione_sociale }}</div>
+            </div>
+            <div class="text-end">
+              <div class="fase-chip">{{ o.fase_label }}</div>
+              {% if o.premio_stimato %}<div class="small numeri">{{ o.premio_stimato | euro }}</div>{% endif %}
+            </div>
+          </li>
+          {% else %}
+          <li class="text-muted">Nessuna trattativa aperta. <a href="{{ url_for('opportunities.new_opportunity') }}">Aprine una</a>.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="titolo-allenamento">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0" id="titolo-allenamento">Allenamento di oggi</h2>
+        <a class="small" href="{{ url_for('academy.index') }}">Accademia</a>
+      </div>
+      <div class="card-body">
+        <p class="mb-2 fw-semibold">«{{ pillola.obiezione }}»</p>
+        <p class="small text-muted mb-2">Rispondi ad alta voce prima di guardare la soluzione.</p>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('academy.drill', id=pillola.id) }}">Allenati</a>
+      </div>
+    </section>
+
+    {% if ultime_notifiche %}
+    <p class="small text-muted mt-3 mb-0"><i class="bi bi-bell"></i>
+      <a href="{{ url_for('notifications.list_notifications') }}">{{ ultime_notifiche | length }} notifiche da leggere</a></p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4 mt-1">
   <div class="col-xl-6">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
@@ -292,3 +406,4 @@
 
 {{ m.modali_titoli(payment_methods) }}
 {% endblock %}
+

@@ -1,13 +1,24 @@
-# Gestionale Assicurativo
+# Deal Combined
 
-Gestionale web per intermediari assicurativi (agenti e broker) che seguono
+Gestionale per intermediari assicurativi (agenti e broker) che seguono
 **aziende, studi professionali, liberi professionisti, lavoratori dipendenti e
-privati**. Raccoglie in un unico
-posto anagrafiche, polizze, **titoli e incassi**, **sinistri** e documenti;
-**analizza automaticamente i pericoli** a partire dalla descrizione
-dell'attività e non fa perdere **scadenze, rate e follow-up** grazie a
-notifiche generate in automatico. Accesso con **utenti e ruoli**, **registro
-attività** e **backup** integrati.
+privati**, con un'**Accademia commerciale** per la formazione del consulente.
+Raccoglie in un unico posto anagrafiche, persone collegate, polizze, **titoli e
+incassi**, **sinistri**, preventivi, note e documenti; **analizza
+automaticamente i pericoli** a partire dalla descrizione dell'attività e non fa
+perdere **scadenze, rate e follow-up** grazie a notifiche generate in
+automatico. Si usa come un normale **programma Windows**, con accesso tramite
+**utenti e password**, **PIN** con blocco per inattività, **registro attività**
+e **backup** integrati.
+
+> **Versione 3.0** — unisce il *Gestionale Assicurativo* (titoli e incassi,
+> sinistri, utenti e ruoli, tipi di cliente con professioni e obblighi di
+> legge, documenti in cartelle, rate da far pagare, sincronizzazione tra due
+> PC, temi di colore) e *Deal Combined* (Accademia, note e promemoria, persone
+> collegate, preventivi, schede compilate, import da Excel, PIN, Google,
+> icona vicino all'orologio, aggiornamenti). Aprendo la nuova versione i dati
+> già presenti in `Documenti\Deal Combined` vengono aggiornati da soli, dopo un
+> backup automatico: al primo avvio si crea l'utente amministratore.
 
 ## Funzionalità
 
@@ -161,16 +172,94 @@ attività** e **backup** integrati.
   pulsanti con nome leggibile dagli screen reader, contrasto WCAG AA, focus
   visibile da tastiera, nessun doppio invio dei moduli.
 
-## Applicazione desktop (.exe)
+### Dalla versione Deal Combined
 
-Vuoi provarla senza installare Python? È possibile impacchettare il gestionale
-in un **eseguibile unico** (`GestionaleAssicurativo.exe` su Windows) che si apre
-in una **finestra propria**, come un normale programma, con tutti i dati salvati
-sul PC. Il modo più semplice per ottenere il
-`.exe` è fare **doppio clic su `CREA_EXE.bat`** su un PC Windows con Python 3.11 o
-successivo: prepara tutto da solo e apre la cartella con l'eseguibile pronto. In
-alternativa c'è la build automatica su GitHub Actions. Tutti i dettagli in
-**[PACKAGING.md](PACKAGING.md)**.
+- **Persone fisiche con nome e cognome**: nascita, **residenza**, stato civile,
+  nucleo familiare e interessi; per i professionisti anche la **sede
+  dell'ordine** accanto ad albo, numero e data di iscrizione.
+- **Note (diario delle attività)** divise per sezione e collegabili a un
+  cliente, con **promemoria** (email dal proprio Gmail, evento in Google
+  Calendar, notifica di Windows, voce nell'agenda di «Oggi»).
+- **Amministratori e persone collegate**: amministratori, consiglieri, soci
+  (con quota), legali rappresentanti, titolari effettivi, familiari… La
+  ricerca trova un'azienda anche dal nome di un suo amministratore e ogni
+  persona si può **gestire anche come cliente privato**. Il lavoratore
+  dipendente si collega all'azienda cliente per cui lavora.
+- **Preventivi nelle proposte**: compagnia, cosa prevedono, premio, validità,
+  esito e file allegato (salvato anche tra i documenti del cliente).
+- **Schede compilate nel cliente** («Compila scheda»), salvate con data e
+  consulente, modificabili e stampabili.
+- **Import da Excel** di clienti, polizze e amministratori, con anteprima.
+- Pagina **«Oggi»** in stile agenda: cose da fare in ordine di urgenza, il
+  **nastro rosso** sul prossimo passo, trattative aperte e allenamento del
+  giorno, sopra gli indicatori del portafoglio.
+
+## Accademia commerciale
+
+Dal menu **Accademia** si accede a un percorso di **16 settimane** (un modulo a
+settimana) che copre psicologia della decisione, comunicazione e PNL,
+prospezione, marketing, primo contatto, raccolta delle informazioni, arte
+delle domande (SPIN, ascolto attivo), pensiero laterale e storytelling,
+proposta e prezzo, obiezioni, negoziazione (metodo Harvard, Voss), chiusura,
+continuità della trattativa, sviluppo del portafoglio dai clienti acquisiti e
+organizzazione personale.
+
+- **Lezioni** con teoria, punti chiave, esempio di dialogo ed esercizio sul
+  campo; si segnano come completate e l'avanzamento è salvato.
+- **Base scientifica** per ogni modulo: cosa conferma la ricerca, cosa è solo
+  pratica professionale e quali miti evitare (es. movimenti oculari o regola
+  7-38-55), con le fonti.
+- **Quiz** con correzione spiegata e storico dei tentativi (soglia 70%).
+- **Libreria delle obiezioni** con cosa nascondono, tecnica, risposta, rilancio
+  e spunto di pensiero laterale; **allenamento quotidiano** a flashcard.
+- **Role-play**: scenari a tre (consulente, cliente, osservatore) con trappole
+  e domande di debrief.
+- **Cassetta degli attrezzi**: le tecniche documentate con fonte e modulo.
+- **Schede da stampare**: raccolta informazioni (privato e azienda), documenti
+  da dare al cliente, preparazione dell'appuntamento, diario della trattativa,
+  piano di negoziazione, registro obiezioni, griglia di role-play, revisione
+  annuale, mappa delle referenze, piano settimanale e KPI, post-vendita.
+- **Schede compilate nel cliente**: dalla scheda del cliente («Compila scheda»)
+  le schede che riguardano il cliente si compilano direttamente nel gestionale,
+  con anagrafica e polizze in essere già scritte. Restano salvate nella scheda
+  **Schede** del cliente con data e consulente, si possono modificare e
+  stampare compilate. Resta disponibile anche la versione vuota da stampare.
+
+I contenuti sono in `gestionale/academy.py`. I riferimenti normativi (IDD,
+Regolamenti IVASS, privacy) sono indicazioni formative: verifica sempre le
+versioni vigenti e le procedure della tua compagnia o intermediario.
+
+## Grafica, temi e dispositivi
+
+La grafica predefinita segue il mondo dell'**agenda del consulente**, descritto
+in [DESIGN.md](DESIGN.md): barra laterale verde come copertina, pagina «Oggi»
+con la data in grande e un unico **nastro rosso** che segna il prossimo passo.
+
+- **Aspetto** (menu dell'utente in alto a destra): ognuno sceglie il colore
+  (*Agenda verde* predefinito, oppure blu, ottanio, smeraldo, viola, bordeaux,
+  grafite) e la modalità **chiara, scura o come Windows**. Le stampe escono
+  sempre chiare.
+- **Dispositivi**: computer, tablet, telefono e pieghevoli.
+- **Carattere**: Archivo (SIL Open Font License, `gestionale/static/vendor/fonts/Archivo-OFL.txt`),
+  servito in locale per funzionare anche offline.
+- Il contesto di prodotto per chi lavora alla grafica è in [PRODUCT.md](PRODUCT.md);
+  la skill di design [Impeccable](https://github.com/pbakaus/impeccable) è inclusa
+  in `.claude/skills/impeccable/`.
+
+## Programma installato sul PC (Windows)
+
+Deal Combined si installa come un normale programma con
+`Installa-DealCombined.exe`: icona sul desktop e nel menu Start, **finestra
+propria** (non il browser), funziona senza internet. I dati stanno in
+`Documenti\Deal Combined`, con un backup automatico a ogni avvio. Il modo più
+semplice per creare programma e installatore è un **doppio clic su
+`CREA_EXE.bat`** su un PC Windows con Python 3.11–3.14 (per l'installatore
+serve anche Inno Setup 6). In più: **icona vicino all'orologio** con le
+notifiche di Windows, avvio con Windows, **PIN** con blocco per inattività,
+**PDF** delle schede, **Gmail**, **Google Calendar** e **Google Drive**,
+**aggiornamenti automatici** verificati e due modi per lavorare da **due PC**
+(cartella dati condivisa oppure «Sincronizza PC»).
+Tutti i dettagli in **[PACKAGING.md](PACKAGING.md)**.
 
 ## Requisiti
 
@@ -183,7 +272,7 @@ alternativa c'è la build automatica su GitHub Actions. Tutti i dettagli in
 pip install -r requirements.txt
 
 python run_desktop.py
-# si apre il browser su http://127.0.0.1:5000
+# si apre la finestra del programma
 ```
 
 Per provare il gestionale con dati di esempio (clienti, polizze, titoli,
@@ -197,9 +286,9 @@ python app.py
 `run_desktop.py` è il modo consigliato per l'uso quotidiano (è lo stesso avvio
 dell'eseguibile): usa il server [waitress](https://github.com/Pylons/waitress),
 avvia lo **scheduler** (email automatiche e backup giornaliero), apre la
-finestra del programma (o il browser, se la finestra non è disponibile) e salva i dati nella cartella dati dell'utente (vedi
-[PACKAGING.md](PACKAGING.md#cartella-dei-dati); per tenerli altrove imposta
-`GESTIONALE_DATI`).
+finestra del programma (o, se non è disponibile, una finestra di Edge) e salva
+i dati in `Documenti\Deal Combined` (la cartella si cambia da *Impostazioni →
+Dati e backup*; vedi [PACKAGING.md](PACKAGING.md#dove-sono-i-dati)).
 
 Per lo sviluppo c'è anche `python app.py`, che usa il server di sviluppo di
 Flask e salva i dati nella cartella `instance/` (esclusa dal versionamento).
@@ -210,7 +299,7 @@ parte**: niente email automatiche né backup giornaliero.
 Al primo accesso il gestionale chiede di creare l'account **amministratore**;
 gli altri utenti si aggiungono poi dalla pagina **Utenti**. Se l'unico
 amministratore dimentica la password: `flask --app app reimposta-password NOMEUTENTE`
-(con l'eseguibile: `GestionaleAssicurativo.exe --reimposta-password NOMEUTENTE`).
+(con l'eseguibile: `DealCombined.exe --reimposta-password NOMEUTENTE`).
 
 ## Configurazione
 
@@ -224,7 +313,6 @@ Variabili d'ambiente supportate:
 | `UPLOAD_FOLDER`         | `<instance>/uploads`                 | Cartella dei documenti caricati                     |
 | `BACKUP_FOLDER`         | `<instance>/backups`                 | Cartella dei backup automatici                      |
 | `SESSION_COOKIE_SECURE` | `false`                              | `true` se il gestionale è servito in HTTPS          |
-| `GESTIONALE_DATI`       | cartella dati dell'utente            | Solo `run_desktop.py`/eseguibile: cartella di tutti i dati |
 | `PORT`                  | `5000`                               | Solo `run_desktop.py`/eseguibile: porta preferita   |
 
 `<instance>` è la cartella `instance/` del progetto (con `python app.py`); con
