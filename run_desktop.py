@@ -575,6 +575,144 @@ def modulo_finestra(env: Mapping[str, str] | None = None):
 
 
 FILE_FINESTRA = "finestra.json"
+CARTELLA_PROFILO_FINESTRA = "finestra_edge"
+# Se Edge si chiude prima di così, ha passato la finestra a un processo già aperto.
+SECONDI_MINIMI_FINESTRA = 5
+
+
+def trova_browser_app(env: Mapping[str, str] | None = None, esiste: Callable[[str], bool] = os.path.isfile) -> str | None:
+    """Microsoft Edge (o Chrome) per aprire il gestionale come applicazione, solo su Windows."""
+    env = os.environ if env is None else env
+    if env.get(ENV_BROWSER, "").strip().lower() in ("1", "si", "sì", "true", "yes"):
+        return None
+    candidati = []
+    for base in (env.get("PROGRAMFILES(X86)"), env.get("PROGRAMFILES"), env.get("LOCALAPPDATA")):
+        if base:
+            candidati += [os.path.join(base, "Microsoft", "Edge", "Application", "msedge.exe"),
+                          os.path.join(base, "Google", "Chrome", "Application", "chrome.exe")]
+    return next((c for c in candidati if esiste(c)), None)
+
+
+def comando_finestra_app(browser: str, url: str, cartella: Path) -> list[str]:
+    """Edge/Chrome in modalità applicazione: niente barra degli indirizzi né schede,
+    con un profilo proprio (dimensione e posizione della finestra restano ricordate)."""
+    return [
+        browser, f"--app={url}", f"--user-data-dir={Path(cartella) / CARTELLA_PROFILO_FINESTRA}",
+        "--no-first-run", "--no-default-browser-check", "--disable-sync",
+        "--disable-features=Translate,msEdgeStartupBoost,msImplicitSignin",
+        "--window-size=1366,860",
+    ]
+
+
+ARG_FINESTRA = "--finestra"
+FILE_FINESTRA_PRONTA = "finestra.pronta"
+# Tempo massimo perché la finestra nativa compaia, poi si usa l'altra finestra.
+SECONDI_ATTESA_FINESTRA = 30
+
+
+def finestra_nativa_disponibile() -> bool:
+    """pywebview è presente (senza importarlo: il componente grafico si carica solo nel processo figlio)."""
+    import importlib.util
+
+    if os.environ.get(ENV_BROWSER, "").strip().lower() in ("1", "si", "sì", "true", "yes"):
+        return False
+    try:
+        return importlib.util.find_spec("webview") is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def esegui_finestra_nativa(url: str, cartella: Path) -> int:
+    """Processo figlio: solo la finestra nativa (pywebview). Un eventuale crash del
+    componente grafico non ferma il programma e il suo punto esatto finisce in avvio.log."""
+    import faulthandler
+
+    global _cartella_log
+    _cartella_log = cartella
+    try:
+        registro = open(Path(cartella) / FILE_LOG_AVVIO, "a", encoding="utf-8")
+        faulthandler.enable(registro)
+    except OSError:
+        registro = None
+    traccia("finestra nativa: avvio del componente grafico")
+    webview = modulo_finestra()
+    if webview is None:
+        traccia("finestra nativa: componente grafico non disponibile")
+        return 3
+
+    def mostrata(*_):
+        traccia("finestra nativa mostrata")
+        try:
+            (Path(cartella) / FILE_FINESTRA_PRONTA).write_text("1", encoding="utf-8")
+        except OSError:
+            pass
+
+    if not apri_finestra(url, webview, cartella, alla_comparsa=mostrata):
+        return 4
+    traccia("finestra nativa chiusa")
+    return 0
+
+
+def apri_finestra_nativa(url: str, cartella: Path, avvia=None) -> bool:
+    """Apre la finestra nativa in un processo separato e attende che venga chiusa.
+
+    False se il processo termina con un errore (es. crash di WebView2): si userà
+    un'altra finestra senza perdere il programma, che resta in esecuzione.
+    """
+    import subprocess
+
+    if getattr(sys, "frozen", False):
+        comando = [sys.executable, ARG_FINESTRA, url]
+    else:
+        comando = [sys.executable, os.path.abspath(__file__), ARG_FINESTRA, url]
+    avvia = avvia or subprocess.Popen
+    pronta = Path(cartella) / FILE_FINESTRA_PRONTA
+    try:
+        pronta.unlink()
+    except OSError:
+        pass
+    try:
+        processo = avvia(comando)
+    except OSError:
+        registra_errore_avvio("Finestra nativa non avviata:\n" + traceback.format_exc())
+        return False
+    # Se la finestra non compare entro il tempo massimo (componente bloccato) si chiude
+    # il processo e si passa all'altra finestra: il programma non resta mai «invisibile».
+    scadenza = time.monotonic() + SECONDI_ATTESA_FINESTRA
+    while processo.poll() is None and not pronta.exists() and time.monotonic() < scadenza:
+        time.sleep(0.25)
+    if processo.poll() is None and not pronta.exists():
+        traccia("finestra nativa non comparsa in tempo: la chiudo e uso un'altra finestra")
+        processo.kill()
+        return False
+    codice = processo.wait()
+    if codice != 0:
+        traccia(f"finestra nativa terminata con errore (codice {codice}): uso un'altra finestra")
+        return False
+    return True
+
+
+def apri_finestra_app(url: str, cartella: Path, browser: str | None = None, avvia=None) -> bool:
+    """Apre il gestionale in una finestra di Edge in modalità applicazione e attende
+    che venga chiusa. False se non c'è un browser adatto o non parte."""
+    import subprocess
+
+    browser = browser or trova_browser_app()
+    if browser is None:
+        return False
+    avvia = avvia or subprocess.Popen
+    inizio = time.monotonic()
+    try:
+        processo = avvia(comando_finestra_app(browser, url, cartella))
+        processo.wait()
+    except OSError:
+        registra_errore_avvio("Finestra di Edge non avviata:\n" + traceback.format_exc())
+        return False
+    if time.monotonic() - inizio < SECONDI_MINIMI_FINESTRA:
+        # La finestra è stata affidata a un Edge già aperto con lo stesso profilo:
+        # il programma resta attivo finché l'utente non conferma la chiusura.
+        mostra_messaggio("Il Gestionale Assicurativo è aperto.\n\nPremi OK quando vuoi chiuderlo.", icona=0x40)
+    return True
 
 
 def leggi_geometria(cartella: Path | None) -> dict:
@@ -610,7 +748,7 @@ def salva_geometria(cartella: Path | None, finestra) -> None:
         pass
 
 
-def apri_finestra(url: str, webview=None, cartella: Path | None = None) -> bool:
+def apri_finestra(url: str, webview=None, cartella: Path | None = None, alla_comparsa=None) -> bool:
     """Apre il gestionale in una finestra propria e attende che venga chiusa.
 
     La finestra riapre con la dimensione e la posizione dell'ultima volta.
@@ -637,6 +775,8 @@ def apri_finestra(url: str, webview=None, cartella: Path | None = None) -> bool:
         eventi = getattr(finestra, "events", None)
         if eventi is not None and hasattr(eventi, "closing"):
             eventi.closing += lambda *_: salva_geometria(cartella, finestra)
+        if eventi is not None and alla_comparsa is not None and hasattr(eventi, "shown"):
+            eventi.shown += alla_comparsa
         icona = Path(getattr(sys, "_MEIPASS", Path(__file__).parent)) / "gestionale" / "static" / "icona.png"
         avvio = {"private_mode": False}
         if icona.is_file():
@@ -675,7 +815,14 @@ def _main(argv: list[str]) -> int:
             # Il programma è già aperto: un'altra finestra (o il browser) sulla stessa istanza.
             url = apri_istanza_esistente(cartella, apri=lambda u: None)
             if url:
-                if not apri_finestra(url, cartella=cartella):
+                browser_app = trova_browser_app() if sys.platform == "win32" else None
+                if sys.platform == "win32" and finestra_nativa_disponibile() and apri_finestra_nativa(url, cartella):
+                    return 0
+                if browser_app:
+                    import subprocess
+
+                    subprocess.Popen(comando_finestra_app(browser_app, url, cartella))
+                elif not apri_finestra(url, cartella=cartella):
                     webbrowser.open(url)
                 return 0
             raise ErroreAvvio(
@@ -742,12 +889,33 @@ def _main(argv: list[str]) -> int:
         def avvia_server():
             serve(app, sockets=[sock], threads=8)
 
+    if sys.platform == "win32" and finestra_nativa_disponibile():
+        traccia("apro la finestra del programma")
+        chiudi_splash()
+        threading.Thread(target=avvia_server, name="server", daemon=True).start()
+        if apri_finestra_nativa(url, cartella):
+            traccia("finestra chiusa: programma terminato")
+            return 0
+        server_avviato = True
+    else:
+        server_avviato = False
+    browser_app = trova_browser_app() if sys.platform == "win32" else None
+    if browser_app:
+        traccia(f"apro la finestra del programma con {Path(browser_app).name} (modalità applicazione)")
+        chiudi_splash()
+        if not server_avviato:
+            threading.Thread(target=avvia_server, name="server", daemon=True).start()
+            server_avviato = True
+        if apri_finestra_app(url, cartella, browser_app):
+            traccia("finestra chiusa: programma terminato")
+            return 0
     webview = modulo_finestra()
     traccia("apro la finestra del programma" if webview is not None else "finestra non disponibile: uso il browser")
     chiudi_splash()
-    if webview is not None:
+    if webview is not None and not browser_app and sys.platform != "win32":
         # Il motore gira in sottofondo; chiudendo la finestra si chiude il programma.
         threading.Thread(target=avvia_server, name="server", daemon=True).start()
+        server_avviato = True
         if apri_finestra(url, webview, cartella):
             traccia("finestra chiusa: programma terminato")
             log.info("Finestra chiusa: programma terminato")
@@ -756,7 +924,7 @@ def _main(argv: list[str]) -> int:
     apertura = threading.Timer(1.0, webbrowser.open, args=(url,))
     apertura.daemon = True
     apertura.start()
-    if webview is None:
+    if not server_avviato:
         avvia_server()
     elif sys.platform == "win32" and sys.stdout is None:
         # Exe senza console: un messaggio resta aperto finché il programma è in uso,
@@ -774,6 +942,10 @@ def _main(argv: list[str]) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Avvia il programma; qualsiasi errore viene registrato e mostrato senza chiudere la finestra."""
     argv = sys.argv[1:] if argv is None else argv
+    if len(argv) >= 2 and argv[0] == ARG_FINESTRA:
+        chiudi_splash()
+        cartella = scegli_cartella_dati(base_dir()).cartella
+        return esegui_finestra_nativa(argv[1], cartella)
     if "--diagnosi" in argv:
         # Doppio clic con --diagnosi (es. da un collegamento): console con tutti i messaggi.
         argv = [a for a in argv if a != "--diagnosi"]

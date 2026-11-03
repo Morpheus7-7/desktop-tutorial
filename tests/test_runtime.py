@@ -460,3 +460,85 @@ def test_traccia_dell_avvio_in_avvio_log(tmp_path, monkeypatch):
     rd.chiudi_splash()  # senza schermata di avvio non fa nulla
     testo = (tmp_path / "avvio.log").read_text(encoding="utf-8")
     assert "[avvio] motore avviato" in testo and "===" not in testo
+
+
+# ----------------------------------------------------------------------
+# Finestra con Microsoft Edge in modalità applicazione (Windows)
+# ----------------------------------------------------------------------
+def test_trova_edge_poi_chrome():
+    env = {"PROGRAMFILES(X86)": r"C:\Program Files (x86)", "PROGRAMFILES": r"C:\Program Files"}
+    edge = os.path.join(env["PROGRAMFILES(X86)"], "Microsoft", "Edge", "Application", "msedge.exe")
+    chrome = os.path.join(env["PROGRAMFILES"], "Google", "Chrome", "Application", "chrome.exe")
+    assert rd.trova_browser_app(env, esiste=lambda p: p in {edge, chrome}) == edge
+    assert rd.trova_browser_app(env, esiste=lambda p: p == chrome) == chrome
+    assert rd.trova_browser_app(env, esiste=lambda p: False) is None
+    assert rd.trova_browser_app({**env, "GESTIONALE_BROWSER": "1"}, esiste=lambda p: True) is None
+
+
+def test_finestra_edge_in_modalita_applicazione(tmp_path, monkeypatch):
+    lanciati, messaggi = [], []
+    monkeypatch.setattr(rd, "mostra_messaggio", lambda testo, icona=0x10: messaggi.append(testo))
+
+    class _Processo:
+        def __init__(self, comando):
+            lanciati.append(comando)
+
+        def wait(self):
+            return 0
+
+    tempi = iter([100.0, 160.0])  # la finestra è rimasta aperta un minuto
+    monkeypatch.setattr(rd.time, "monotonic", lambda: next(tempi))
+    assert rd.apri_finestra_app("http://127.0.0.1:5000", tmp_path, "msedge.exe", avvia=_Processo)
+    comando = lanciati[0]
+    assert comando[0] == "msedge.exe" and "--app=http://127.0.0.1:5000" in comando
+    assert f"--user-data-dir={tmp_path / rd.CARTELLA_PROFILO_FINESTRA}" in comando and messaggi == []
+    # Edge passa la finestra a un processo già aperto e torna subito: il programma resta attivo.
+    tempi = iter([100.0, 101.0])
+    monkeypatch.setattr(rd.time, "monotonic", lambda: next(tempi))
+    assert rd.apri_finestra_app("http://127.0.0.1:5000", tmp_path, "msedge.exe", avvia=_Processo)
+    assert messaggi and "Premi OK" in messaggi[0]
+    assert rd.apri_finestra_app("http://x", tmp_path, None, avvia=_Processo) in (True, False)
+
+
+def test_finestra_nativa_in_processo_separato(tmp_path, monkeypatch):
+    class _Processo:
+        def __init__(self, comando, codice=0, pronta=True):
+            self.comando, self.codice = comando, codice
+            if pronta:
+                (tmp_path / rd.FILE_FINESTRA_PRONTA).write_text("1")
+
+        def poll(self):
+            return self.codice
+
+        def wait(self):
+            return self.codice
+
+        def kill(self):
+            pass
+
+    lanciati = []
+    assert rd.apri_finestra_nativa("http://127.0.0.1:5000", tmp_path,
+                                   avvia=lambda c: lanciati.append(c) or _Processo(c))
+    assert rd.ARG_FINESTRA in lanciati[0] and "http://127.0.0.1:5000" in lanciati[0]
+    # Crash del componente grafico (es. WebView2): si passa all'altra finestra.
+    assert not rd.apri_finestra_nativa("http://x", tmp_path, avvia=lambda c: _Processo(c, codice=-1073741819))
+    log = (tmp_path / "avvio.log").read_text(encoding="utf-8") if (tmp_path / "avvio.log").exists() else ""
+    assert log == "" or "errore" in log
+
+
+def test_finestra_nativa_bloccata_viene_chiusa(tmp_path, monkeypatch):
+    uccisi = []
+
+    class _Bloccato:
+        def poll(self):
+            return None
+
+        def kill(self):
+            uccisi.append(True)
+
+        def wait(self):
+            return 1
+
+    monkeypatch.setattr(rd, "SECONDI_ATTESA_FINESTRA", 0.3)
+    assert not rd.apri_finestra_nativa("http://x", tmp_path, avvia=lambda c: _Bloccato())
+    assert uccisi == [True]
