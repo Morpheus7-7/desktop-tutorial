@@ -1,37 +1,10 @@
 """Test delle funzionalità aggiunte: dipendente, provvigioni, pipeline,
 spunti di trattativa, ricerca, statistiche e upload multiplo."""
 import io
-import os
-import tempfile
 from datetime import date, timedelta
 
-import pytest
-
-from gestionale import create_app
 from gestionale.models import Client, Document, Opportunity, Policy, db
 from gestionale.risk_engine import analyze_risks
-
-
-@pytest.fixture
-def app():
-    db_fd, db_path = tempfile.mkstemp(suffix=".db")
-    upload_dir = tempfile.mkdtemp()
-    app = create_app(
-        {
-            "TESTING": True,
-            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}",
-            "UPLOAD_FOLDER": upload_dir,
-            "SECRET_KEY": "test",
-        }
-    )
-    yield app
-    os.close(db_fd)
-    os.unlink(db_path)
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
 
 
 def _crea_cliente(client, **extra):
@@ -155,3 +128,48 @@ def test_multi_document_upload(client, app):
         docs = Document.query.filter_by(client_id=cid).all()
         assert len(docs) == 2
         assert all(d.dimensione and d.dimensione > 0 for d in docs)
+
+
+# ---------------------------------------------------------------- Oggi
+def test_oggi_agenda_e_nastro(client, app):
+    with app.app_context():
+        c = Client(tipo="azienda", ragione_sociale="Officina Bianchi")
+        db.session.add(c)
+        db.session.commit()
+        from gestionale.models import FollowUp
+        db.session.add_all([
+            FollowUp(client_id=c.id, titolo="Chiamata in ritardo", tipo="chiamata",
+                     data_scadenza=date.today() - timedelta(days=3)),
+            FollowUp(client_id=c.id, titolo="Incontro di domani", tipo="incontro",
+                     data_scadenza=date.today() + timedelta(days=1)),
+        ])
+        db.session.commit()
+    html = client.get("/").get_data(as_text=True)
+    assert html.count('class="nastro"') == 1
+    # il nastro precede la voce più urgente
+    assert html.index("Prossimo passo") < html.index("Chiamata in ritardo") < html.index("Incontro di domani")
+    assert "In ritardo" in html and "Nei prossimi 7 giorni" in html
+
+
+def test_completa_followup_torna_a_oggi_solo_con_percorso_locale(client, app):
+    with app.app_context():
+        c = Client(tipo="azienda", ragione_sociale="Officina Verdi")
+        db.session.add(c)
+        db.session.commit()
+        from gestionale.models import FollowUp
+        f1 = FollowUp(client_id=c.id, titolo="A", tipo="chiamata", data_scadenza=date.today())
+        f2 = FollowUp(client_id=c.id, titolo="B", tipo="chiamata", data_scadenza=date.today())
+        db.session.add_all([f1, f2])
+        db.session.commit()
+        id1, id2 = f1.id, f2.id
+    r = client.post(f"/follow-up/{id1}/completa", data={"next": "/"})
+    assert r.headers["Location"].endswith("/")
+    for esterno in ("//evil.example", "https://evil.example", "/\\evil.example"):
+        r = client.post(f"/follow-up/{id2}/completa", data={"next": esterno})
+        assert "evil" not in r.headers["Location"]
+
+
+def test_shell_tema_e_marchio(client):
+    html = client.get("/").get_data(as_text=True)
+    assert 'data-tema="agenda"' in html and "aspetto.js" in html  # agenda verde, modalità dall'«Aspetto»
+    assert "Deal Combined" in html

@@ -1,0 +1,92 @@
+{# Campi del modulo polizza, condivisi da «Aggiungi polizza» (scheda cliente) e «Modifica polizza».
+   p = polizza esistente (o None), v = valori inviati da ripresentare dopo un errore (o None). #}
+{% macro campi_polizza(p, v, pre, nuova, compagnie, policy_branches, policy_statuses, payment_frequencies) -%}
+{%- set v = v or {} -%}
+{%- set inviato = v | length > 0 -%}
+{%- macro val(nome, predefinito) -%}{{ v.get(nome, predefinito) if inviato else predefinito }}{%- endmacro -%}
+{%- macro spunta(nome, predefinito) -%}{% set attivo = (nome in v) if inviato else predefinito %}{% if attivo %}checked{% endif %}{%- endmacro -%}
+<div class="col-md-4">
+  <label class="form-label" for="{{ pre }}compagnia">Compagnia *</label>
+  <input class="form-control" id="{{ pre }}compagnia" name="compagnia" required maxlength="120" list="{{ pre }}elenco-compagnie" autocomplete="off"
+         value="{{ val('compagnia', p.compagnia if p else '') }}">
+  <datalist id="{{ pre }}elenco-compagnie">{% for c in compagnie %}<option value="{{ c }}">{% endfor %}</datalist>
+</div>
+<div class="col-md-4">
+  <label class="form-label" for="{{ pre }}numero">Numero polizza *</label>
+  <input class="form-control" id="{{ pre }}numero" name="numero_polizza" required maxlength="60" value="{{ val('numero_polizza', p.numero_polizza if p else '') }}">
+</div>
+{% set ramo_sel = val('ramo', p.ramo if p else '') %}
+<div class="col-md-4">
+  <label class="form-label" for="{{ pre }}ramo">Ramo</label>
+  <select class="form-select" id="{{ pre }}ramo" name="ramo">
+    {% for value, label in policy_branches %}<option value="{{ value }}" {% if ramo_sel == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+</div>
+<div class="col-6 col-md-3">
+  <label class="form-label" for="{{ pre }}premio">Premio annuo (€)</label>
+  <input class="form-control" id="{{ pre }}premio" name="premio_annuo" inputmode="decimal" placeholder="es. 1.250,00"
+         value="{{ val('premio_annuo', (p.premio_annuo | num_input) if p else '') }}">
+</div>
+<div class="col-6 col-md-3">
+  <label class="form-label" for="{{ pre }}provv">Provvigione %</label>
+  <input class="form-control" id="{{ pre }}provv" name="provvigione_perc" inputmode="decimal" placeholder="es. 15"
+         value="{{ val('provvigione_perc', (p.provvigione_perc | num_input) if p else '') }}">
+</div>
+<div class="col-6 col-md-3">
+  <label class="form-label" for="{{ pre }}massimale">Massimale (€)</label>
+  <input class="form-control" id="{{ pre }}massimale" name="massimale" inputmode="decimal" placeholder="es. 1.000.000"
+         value="{{ val('massimale', (p.massimale | num_input) if p else '') }}">
+</div>
+{% set fraz_sel = val('frazionamento', p.frazionamento if p else 'annuale') %}
+<div class="col-6 col-md-3">
+  <label class="form-label" for="{{ pre }}fraz">Frazionamento</label>
+  <select class="form-select" id="{{ pre }}fraz" name="frazionamento">
+    {% for value, label in payment_frequencies %}<option value="{{ value }}" {% if fraz_sel == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+</div>
+{% set stato_sel = val('stato', p.stato if p else 'attiva') %}
+<div class="col-6 col-md-3">
+  <label class="form-label" for="{{ pre }}stato">Stato</label>
+  <select class="form-select" id="{{ pre }}stato" name="stato">
+    {% for value, label in policy_statuses %}<option value="{{ value }}" {% if stato_sel == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+</div>
+<div class="col-6 col-md-3">
+  <label class="form-label" for="{{ pre }}decorrenza">Decorrenza</label>
+  <input type="date" class="form-control" id="{{ pre }}decorrenza" name="data_decorrenza" min="1900-01-01" max="2100-12-31"
+         value="{{ val('data_decorrenza', p.data_decorrenza.isoformat() if p and p.data_decorrenza else '') }}">
+  <div class="form-text">Anche futura: la polizza risulta «non ancora in vigore».</div>
+</div>
+<div class="col-6 col-md-3">
+  <label class="form-label" for="{{ pre }}scadenza">Scadenza</label>
+  <input type="date" class="form-control" id="{{ pre }}scadenza" name="data_scadenza" min="1900-01-01" max="2100-12-31"
+         value="{{ val('data_scadenza', p.data_scadenza.isoformat() if p and p.data_scadenza else '') }}">
+  <div class="form-text">Vuota per le polizze senza scadenza (es. vita).</div>
+</div>
+<div class="col-6 col-md-3">
+  <div class="form-check mt-md-4">
+    <input class="form-check-input" type="checkbox" name="tacito_rinnovo" id="{{ pre }}tacito" {{ spunta('tacito_rinnovo', p.tacito_rinnovo if p else false) }}
+           aria-describedby="{{ pre }}tacito-help">
+    <label class="form-check-label" for="{{ pre }}tacito">Tacito rinnovo</label>
+  </div>
+  <div class="form-text" id="{{ pre }}tacito-help">Non ammesso per l'RC auto.</div>
+</div>
+<div class="col-6 col-md-3">
+  <label class="form-label" for="{{ pre }}preavviso">Preavviso disdetta (giorni)</label>
+  <input type="number" class="form-control" id="{{ pre }}preavviso" name="preavviso_disdetta_giorni" min="0" max="365" step="1" placeholder="30"
+         value="{{ val('preavviso_disdetta_giorni', p.preavviso_disdetta_giorni if p and p.preavviso_disdetta_giorni is not none else '') }}">
+  <div class="form-text">Solo con tacito rinnovo (vuoto = 30).</div>
+</div>
+<div class="col-12">
+  <label class="form-label" for="{{ pre }}note">Note</label>
+  <textarea class="form-control" id="{{ pre }}note" name="note" rows="2">{{ val('note', p.note or '' if p else '') }}</textarea>
+</div>
+{% if nuova %}
+<div class="col-12">
+  <div class="form-check">
+    <input class="form-check-input" type="checkbox" name="genera_titoli" id="{{ pre }}genera" {{ spunta('genera_titoli', true) }}>
+    <label class="form-check-label" for="{{ pre }}genera">Genera i titoli da incassare della prima annualità</label>
+  </div>
+</div>
+{% endif %}
+{%- endmacro %}

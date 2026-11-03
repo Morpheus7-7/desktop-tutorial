@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Note — Deal Combined{% endblock %}
+{% set qui = request.full_path.rstrip('?') %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h1 class="h3 mb-0"><i class="bi bi-journal-text me-2"></i>Note</h1>
+  <a class="btn btn-outline-secondary" href="{{ url_for('note.calendar_ics') }}"
+     title="Scarica tutti i promemoria futuri da importare in Google Calendar"><i class="bi bi-calendar-week"></i> Promemoria in Calendar (.ics)</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <section class="card mb-4" aria-labelledby="t-nuova">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-nuova"><i class="bi bi-plus-lg me-1"></i>Nuova nota</h2></div>
+      <div class="card-body">
+        {% with nota=None, cliente_fisso=None, azione=url_for('note.new'), next=qui, id_prefisso='nuova', annulla=None %}
+        {% include "note/_modulo.html" %}
+        {% endwith %}
+      </div>
+    </section>
+
+    <form class="note-filtri mb-3" method="get" role="search" aria-label="Filtra le note">
+      <div class="row g-2">
+        <div class="col-sm-5"><input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Cerca nelle note" aria-label="Cerca nelle note"></div>
+        <div class="col-6 col-sm-3">
+          <select class="form-select" name="periodo" aria-label="Periodo">
+            {% for v, e in [('7', 'Ultimi 7 giorni'), ('30', 'Ultimi 30 giorni'), ('90', 'Ultimi 3 mesi'), ('365', 'Ultimo anno'), ('tutte', 'Tutte')] %}
+            <option value="{{ v }}" {% if periodo == v %}selected{% endif %}>{{ e }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-sm-4">
+          <select class="form-select" name="cliente" aria-label="Cliente">
+            <option value="">Tutti i clienti</option>
+            {% for c in clienti %}<option value="{{ c.id }}" {% if cliente_id == c.id %}selected{% endif %}>{{ c.ragione_sociale }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="note-sezioni mt-2" role="group" aria-label="Sezione">
+        <button class="btn btn-sm {{ 'btn-primary' if not sezione else 'btn-outline-secondary' }}" name="sezione" value="">Tutte</button>
+        {% for codice, etichetta, icona in sezioni %}
+        <button class="btn btn-sm {{ 'btn-primary' if sezione == codice else 'btn-outline-secondary' }}" name="sezione" value="{{ codice }}"
+                {% if sezione == codice %}aria-pressed="true"{% endif %}><i class="bi {{ icona }}" aria-hidden="true"></i> {{ etichetta }}</button>
+        {% endfor %}
+      </div>
+    </form>
+
+    {% for giorno, note in per_giorno.items() %}
+    <section class="note-giorno" aria-labelledby="g-{{ giorno.isoformat() }}">
+      <h2 class="note-data" id="g-{{ giorno.isoformat() }}">
+        {% if giorno == oggi %}Oggi{% elif (oggi - giorno).days == 1 %}Ieri{% elif (giorno - oggi).days == 1 %}Domani{% else %}{{ giorno | giorno_lungo | capitalize }}{% endif %}
+        <span>{{ giorno | data_it }} · {{ note | length }} {{ 'nota' if note | length == 1 else 'note' }}</span>
+      </h2>
+      {% for n in note %}
+        {% with next=qui, mostra_cliente=True %}{% include "note/_nota.html" %}{% endwith %}
+      {% endfor %}
+    </section>
+    {% else %}
+    <div class="oggi-vuoto">
+      <i class="bi bi-journal" aria-hidden="true"></i>
+      {% if q or sezione or cliente_id %}Nessuna nota con questi filtri.{% else %}Nessuna nota in questo periodo: scrivi qui sopra cosa hai fatto oggi.{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="col-lg-4">
+    <section class="card mb-4" aria-labelledby="t-promemoria">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-promemoria"><i class="bi bi-bell me-1"></i>Promemoria da fare</h2></div>
+      {% if promemoria %}
+      <ul class="list-group list-group-flush">
+        {% for n in promemoria %}
+        <li class="list-group-item">
+          <div class="d-flex justify-content-between gap-2">
+            <a class="fw-semibold text-break" href="{{ url_for('note.edit', nota_id=n.id, next=qui) }}">{{ n.titolo }}</a>
+            <span class="small text-nowrap {{ 'text-danger fw-semibold' if n.promemoria_il <= adesso else 'text-muted' }}">{{ n.promemoria_il.strftime('%d/%m %H:%M') }}</span>
+          </div>
+          {% if n.cliente %}<div class="small text-muted text-truncate">{{ n.cliente.ragione_sociale }}</div>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body small text-muted">Nessun promemoria in sospeso.</div>
+      {% endif %}
+    </section>
+
+    <section class="card" aria-labelledby="t-come">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-come"><i class="bi bi-google me-1"></i>Promemoria con Google</h2></div>
+      <div class="card-body small">
+        <p class="mb-2"><strong>Google Calendar:</strong> il pulsante su ogni nota apre Calendar con l'evento già compilato all'ora del
+          promemoria; premi <em>Salva</em> e Google ti avvisa anche sul telefono, pure a PC spento.</p>
+        <p class="mb-2"><strong>Email:</strong> all'ora scelta Deal Combined ti manda un'email dal tuo Gmail, anche con la finestra
+          chiusa vicino all'orologio. {% if not email_pronta %}<a href="{{ url_for('settings.google') }}">Collega Gmail</a> per attivarle.{% endif %}</p>
+        <p class="mb-0 text-muted">Se il PC è spento all'ora del promemoria l'email non parte: per le cose importanti usa anche Calendar.</p>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

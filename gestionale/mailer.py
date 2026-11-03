@@ -7,20 +7,33 @@ resta leggero.
 La configurazione SMTP arriva dalla tabella ``Settings`` (modificabile dalla
 pagina «Impostazioni»); le variabili d'ambiente omonime, se presenti, hanno la
 precedenza — utile per non salvare la password nel database in produzione.
+
+L'invio del digest è serializzato da ``_invio_lock``: il pulsante «Invia ora»
+e lo scheduler non possono spedire due volte le stesse notifiche.
 """
 from __future__ import annotations
 
 import os
 import smtplib
 import ssl
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from email.message import EmailMessage
 from email.utils import formataddr
 
 from flask import current_app
+from markupsafe import escape
 
 from .models import LIVELLO_ORDINE, Notification, Settings, db
+
+# Un solo invio del digest alla volta (scheduler e richieste web nello stesso processo).
+_invio_lock = threading.Lock()
+ATTESA_INVIO_S = 60  # attesa massima se un altro invio è in corso (timeout SMTP: 20 s)
+
+
+class InvioInCorso(Exception):
+    """Un altro invio del digest è ancora in corso."""
 
 
 @dataclass
@@ -89,7 +102,7 @@ def email_attive(settings: Settings | None = None) -> bool:
 def _build_message(cfg: MailConfig, subject: str, text_body: str, html_body: str) -> EmailMessage:
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = formataddr(("Gestionale Assicurativo", cfg.mittente or cfg.user))
+    msg["From"] = formataddr(("Deal Combined", cfg.mittente or cfg.user))
     msg["To"] = ", ".join(cfg.destinatari)
     msg.set_content(text_body)
     msg.add_alternative(html_body, subtype="html")
@@ -122,20 +135,46 @@ def send_test_email(settings: Settings | None = None) -> tuple[bool, str]:
         return False, "Configurazione incompleta: servono almeno server SMTP e un destinatario."
     ora = datetime.now().strftime("%d/%m/%Y %H:%M")
     text_body = (
-        "Email di prova dal Gestionale Assicurativo.\n\n"
+        "Email di prova da Deal Combined.\n\n"
         f"Se leggi questo messaggio la configurazione SMTP funziona ({ora})."
     )
     html_body = _wrap_html(
         "Email di prova",
         f"<p>Se leggi questo messaggio la configurazione SMTP del "
-        f"<strong>Gestionale Assicurativo</strong> funziona correttamente.</p>"
+        f"<strong>Deal Combined</strong> funziona correttamente.</p>"
         f"<p class='muted'>Inviata il {ora}.</p>",
     )
     try:
-        _send(cfg, _build_message(cfg, "Gestionale Assicurativo — email di prova", text_body, html_body))
+        _send(cfg, _build_message(cfg, "Deal Combined — email di prova", text_body, html_body))
         return True, f"Email di prova inviata a {', '.join(cfg.destinatari)}."
     except Exception as exc:  # noqa: BLE001 — mostriamo l'errore all'utente
         return False, f"Invio non riuscito: {exc}"
+
+
+def invia_al_cliente(destinatario: str, oggetto: str, testo: str,
+                     allegati: list[tuple[str, bytes, str]] | None = None,
+                     settings: Settings | None = None) -> None:
+    """Invia un'email al cliente con gli allegati indicati (nome, dati, mime).
+
+    Usa il server configurato in Impostazioni (per Gmail: smtp.gmail.com con
+    una «password per le app»): l'email compare anche in «Posta inviata».
+    Solleva ValueError se manca la configurazione o l'indirizzo.
+    """
+    cfg = effective_config(settings)
+    if not cfg.host or not (cfg.mittente or cfg.user):
+        raise ValueError("Configura prima l'invio email in Impostazioni → Notifiche email (server e mittente).")
+    destinatario = (destinatario or "").strip()
+    if "@" not in destinatario or any(c in destinatario for c in "\r\n,;<>"):
+        raise ValueError("Indirizzo email del destinatario non valido.")
+    msg = EmailMessage()
+    msg["Subject"] = oggetto.replace("\r", " ").replace("\n", " ").strip()[:200]
+    msg["From"] = cfg.mittente or cfg.user
+    msg["To"] = destinatario
+    msg.set_content(testo)
+    for nome, dati, mime in allegati or []:
+        principale, _, secondario = mime.partition("/")
+        msg.add_attachment(dati, maintype=principale, subtype=secondario, filename=nome)
+    _send(cfg, msg)
 
 
 # ----------------------------------------------------------------------
@@ -159,14 +198,14 @@ def _wrap_html(titolo: str, corpo: str) -> str:
 <body style="margin:0;background:#f4f6fb;font-family:Segoe UI,Arial,sans-serif;color:#1f2933;">
   <div style="max-width:640px;margin:0 auto;padding:24px;">
     <div style="background:#0d6efd;color:#fff;padding:16px 20px;border-radius:10px 10px 0 0;">
-      <div style="font-size:18px;font-weight:700;">🛡️ Gestionale Assicurativo</div>
+      <div style="font-size:18px;font-weight:700;">Deal Combined</div>
       <div style="opacity:.85;font-size:13px;">{titolo}</div>
     </div>
     <div style="background:#fff;padding:20px;border-radius:0 0 10px 10px;border:1px solid #e5e9f2;border-top:none;">
       {corpo}
     </div>
     <p style="color:#9aa5b1;font-size:12px;text-align:center;margin-top:16px;">
-      Messaggio automatico del Gestionale Assicurativo.
+      Messaggio automatico di Deal Combined.
     </p>
   </div>
 </body></html>"""
@@ -178,7 +217,7 @@ def build_digest(notifiche: list[Notification]) -> tuple[str, str, str]:
     n = len(notifiche)
     urgenti = sum(1 for x in notifiche if x.livello == "danger")
 
-    subject = f"Gestionale Assicurativo — {n} notific{'a' if n == 1 else 'he'}"
+    subject = f"Deal Combined — {n} notific{'a' if n == 1 else 'he'}"
     if urgenti:
         subject += f" ({urgenti} urgent{'e' if urgenti == 1 else 'i'})"
 
@@ -188,13 +227,15 @@ def build_digest(notifiche: list[Notification]) -> tuple[str, str, str]:
     )
 
     # --- testo semplice ---
-    righe = ["Riepilogo notifiche dal Gestionale Assicurativo:", ""]
+    righe = ["Riepilogo notifiche da Deal Combined:", ""]
     etichetta = {"danger": "[URGENTE]", "warning": "[ATTENZIONE]", "info": "[INFO]"}
     for x in ordinate:
         righe.append(f"{etichetta.get(x.livello, '[INFO]')} {x.messaggio}")
     text_body = "\n".join(righe)
 
     # --- html ---
+    # I messaggi contengono dati inseriti dagli utenti (ragione sociale, numero
+    # di polizza, titolo del follow-up): vanno sempre convertiti in testo.
     colore = {"danger": "#dc3545", "warning": "#fd7e14", "info": "#0d6efd"}
     items = []
     for x in ordinate:
@@ -203,13 +244,13 @@ def build_digest(notifiche: list[Notification]) -> tuple[str, str, str]:
         if x.link and base:
             link_html = (
                 f"<div style='margin-top:4px;'>"
-                f"<a href='{base}{x.link}' style='color:#0d6efd;font-size:13px;'>Apri la scheda cliente →</a>"
-                f"</div>"
+                f"<a href='{escape(base + x.link)}' style='color:#0d6efd;font-size:13px;'>"
+                f"Apri la scheda cliente →</a></div>"
             )
         items.append(
             f"<li style='list-style:none;margin:0 0 10px;padding:12px 14px;"
             f"border-left:4px solid {col};background:#f8f9fc;border-radius:6px;'>"
-            f"<div style='font-size:14px;'>{x.messaggio}</div>{link_html}</li>"
+            f"<div style='font-size:14px;'>{escape(x.messaggio or '')}</div>{link_html}</li>"
         )
     corpo = (
         f"<p>Hai <strong>{n}</strong> notific{'a' if n == 1 else 'he'} da controllare"
@@ -227,6 +268,12 @@ def send_pending_notifications(settings: Settings | None = None) -> int:
 
     Va chiamata dentro un app context. Ritorna il numero di notifiche incluse
     nell'email inviata (0 se non c'è nulla da inviare o le email sono disattive).
+
+    Lettura, invio e marcatura avvengono nella stessa sezione critica: chi
+    arriva mentre un altro invio è in corso aspetta e poi trova le notifiche
+    già marcate. Se dopo l'invio il salvataggio fallisce si annulla la
+    transazione e si riprova una volta a marcare le notifiche; l'errore
+    finisce comunque nel log.
     """
     settings = settings or Settings.get()
     if not email_attive(settings):
@@ -235,20 +282,49 @@ def send_pending_notifications(settings: Settings | None = None) -> int:
     if not cfg.valida:
         return 0
 
-    pending = _pending_query()
-    if not pending:
-        return 0
+    if not _invio_lock.acquire(timeout=ATTESA_INVIO_S):
+        raise InvioInCorso("è già in corso un altro invio delle notifiche: riprova tra qualche istante.")
+    try:
+        # Letta solo ora: un invio appena concluso potrebbe averle già marcate.
+        pending = _pending_query()
+        if not pending:
+            return 0
 
-    subject, text_body, html_body = build_digest(pending)
-    _send(cfg, _build_message(cfg, subject, text_body, html_body))
+        subject, text_body, html_body = build_digest(pending)
+        _send(cfg, _build_message(cfg, subject, text_body, html_body))
+        _marca_inviate(pending)
+        current_app.logger.info("Inviato digest email con %d notifiche.", len(pending))
+        return len(pending)
+    finally:
+        _invio_lock.release()
 
-    ora = datetime.utcnow()
-    for x in pending:
+
+def _marca_inviate(notifiche: list[Notification]) -> None:
+    """Segna le notifiche come inviate; in caso di errore annulla e riprova una volta."""
+    ora = datetime.now()
+    ids = [x.id for x in notifiche]
+    for x in notifiche:
         x.inviata_email = True
         x.inviata_email_at = ora
-    db.session.commit()
-    current_app.logger.info("Inviato digest email con %d notifiche.", len(pending))
-    return len(pending)
+    try:
+        db.session.commit()
+        return
+    except Exception:  # noqa: BLE001 - l'email è già partita: non va segnalato come invio fallito
+        db.session.rollback()
+        current_app.logger.exception(
+            "Digest inviato ma salvataggio non riuscito: nuovo tentativo di marcare %d notifiche.", len(ids)
+        )
+    try:
+        Notification.query.filter(Notification.id.in_(ids)).update(
+            {Notification.inviata_email: True, Notification.inviata_email_at: ora},
+            synchronize_session=False,
+        )
+        db.session.commit()
+    except Exception:  # noqa: BLE001
+        db.session.rollback()
+        current_app.logger.exception(
+            "Notifiche inviate via email ma non marcate come inviate: potrebbero essere spedite di nuovo."
+        )
 
 
 def contatore_pending() -> int:

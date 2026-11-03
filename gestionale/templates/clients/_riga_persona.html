@@ -1,0 +1,27 @@
+<div class="riga-persona row g-2 align-items-end mb-2">
+  <div class="col-sm-6 col-lg-3">
+    <label class="form-label small mb-1">Ruolo</label>
+    <select class="form-select" name="persona_ruolo" aria-label="Ruolo">
+      {% for valore, etichetta in ruoli %}<option value="{{ valore }}">{{ etichetta }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-sm-6 col-lg-2">
+    <label class="form-label small mb-1">Nome</label>
+    <input type="text" class="form-control" name="persona_nome" maxlength="80" aria-label="Nome">
+  </div>
+  <div class="col-sm-6 col-lg-2">
+    <label class="form-label small mb-1">Cognome</label>
+    <input type="text" class="form-control" name="persona_cognome" maxlength="80" aria-label="Cognome">
+  </div>
+  <div class="col-sm-6 col-lg-2">
+    <label class="form-label small mb-1">Codice fiscale</label>
+    <input type="text" class="form-control" name="persona_cf" maxlength="16" aria-label="Codice fiscale">
+  </div>
+  <div class="col-10 col-lg-2">
+    <label class="form-label small mb-1">Telefono</label>
+    <input type="text" class="form-control" name="persona_telefono" maxlength="30" aria-label="Telefono">
+  </div>
+  <div class="col-2 col-lg-1 text-end">
+    <button type="button" class="btn btn-outline-danger rimuovi-persona" aria-label="Togli questa riga"><i class="bi bi-x-lg"></i></button>
+  </div>
+</div>

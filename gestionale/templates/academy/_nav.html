@@ -1,0 +1,9 @@
+{# Sotto-navigazione dell'Accademia #}
+<ul class="nav nav-pills academy-nav mb-4 no-print flex-wrap">
+  <li class="nav-item"><a class="nav-link {% if request.endpoint in ('academy.index', 'academy.module', 'academy.quiz') %}active{% endif %}" href="{{ url_for('academy.index') }}"><i class="bi bi-signpost-split"></i> Percorso</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'academy.objections' %}active{% endif %}" href="{{ url_for('academy.objections') }}"><i class="bi bi-shield-exclamation"></i> Obiezioni</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'academy.drill' %}active{% endif %}" href="{{ url_for('academy.drill') }}"><i class="bi bi-lightning-charge"></i> Allenamento</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.endpoint in ('academy.scenarios', 'academy.scenario') %}active{% endif %}" href="{{ url_for('academy.scenarios') }}"><i class="bi bi-people"></i> Role-play</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.endpoint == 'academy.techniques' %}active{% endif %}" href="{{ url_for('academy.techniques') }}"><i class="bi bi-tools"></i> Cassetta degli attrezzi</a></li>
+  <li class="nav-item"><a class="nav-link {% if request.endpoint in ('academy.sheets', 'academy.sheet') %}active{% endif %}" href="{{ url_for('academy.sheets') }}"><i class="bi bi-printer"></i> Schede da stampare</a></li>
+</ul>

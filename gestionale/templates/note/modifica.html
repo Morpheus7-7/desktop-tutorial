@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ nota.titolo }} · Note — Deal Combined{% endblock %}
+{% set ritorno = request.args.get('next') or url_for('note.index') %}
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{{ url_for('note.index') }}">Note</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Modifica</li>
+  </ol>
+</nav>
+<h1 class="h3 mb-4"><i class="bi bi-pencil me-2"></i>Modifica la nota</h1>
+<div class="row g-4">
+  <div class="col-lg-8">
+    <section class="card"><div class="card-body">
+      {% with cliente_fisso=None, azione=url_for('note.edit', nota_id=nota.id), next=ritorno if ritorno.startswith('/') and not ritorno.startswith('//') else url_for('note.index'), id_prefisso='mod', annulla=url_for('note.index') %}
+      {% include "note/_modulo.html" %}
+      {% endwith %}
+    </div></section>
+  </div>
+  <div class="col-lg-4">
+    <section class="card"><div class="card-body small">
+      <p class="mb-2"><a class="btn btn-sm btn-outline-secondary" href="{{ link_calendar_nota(nota) }}" target="_blank" rel="noopener"><i class="bi bi-calendar-plus"></i> Aggiungi a Google Calendar</a></p>
+      {% if nota.promemoria_il and nota.promemoria_email %}
+      <p class="mb-0">{% if inviato %}<i class="bi bi-envelope-check text-success"></i> Email del promemoria inviata.{% else %}<i class="bi bi-envelope"></i> L'email partirà il {{ nota.promemoria_il.strftime('%d/%m alle %H:%M') }}.{% endif %}</p>
+      {% endif %}
+      <p class="text-muted mb-0 mt-2">Scritta il {{ nota.created_at | data_it }}{% if nota.cliente %} · cliente <a href="{{ url_for('clients.detail', client_id=nota.cliente.id) }}">{{ nota.cliente.ragione_sociale }}</a>{% endif %}</p>
+    </div></section>
+  </div>
+</div>
+{% endblock %}
