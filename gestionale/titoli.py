@@ -255,3 +255,45 @@ def prossima_scadenza_utile(scadenza: date, oggi: date | None = None) -> date | 
         if candidata > oggi:
             return candidata
     return None
+
+
+def rate_previste(policy: Policy, dal: date, al: date) -> list[dict]:
+    """Rate del frazionamento con effetto in [dal, al] non ancora coperte da titoli.
+
+    Servono a ricordare nello scadenzario le semestralità, quadrimestralità,
+    trimestralità, bimestralità e mensilità da far pagare anche quando i
+    titoli dell'annualità non sono stati generati. Solo per le polizze
+    frazionate (per le annuali la rata coincide con la scadenza/rinnovo) e
+    dentro il contratto in corso: il rinnovo ha la sua scadenza.
+    """
+    if policy.rate_annue <= 1 or not policy.premio_annuo or policy.premio_annuo <= 0 or not policy.attiva:
+        return []
+    previste = []
+    for inizio, fine in periodi_polizza(policy, fino_a=al + timedelta(days=1)):
+        if fine <= dal or inizio > al:
+            continue
+        rate = date_rate(policy, inizio, fine)
+        pesi = [1] * len(rate) if annualita_piena(inizio, fine) else [(f - e).days for e, f in rate]
+        premi = ripartisci(premio_periodo(policy.premio_annuo, inizio, fine), pesi)
+        for numero, ((effetto, fine_rata), premio) in enumerate(zip(rate, premi), start=1):
+            if not (dal <= effetto <= al):
+                continue
+            # Anche una rata stornata conta come gestita: non va ricordata di nuovo.
+            if titoli_coprono(policy, effetto, fine_rata, includi_stornati=True):
+                continue
+            previste.append({
+                "polizza": policy, "data": effetto, "fine": fine_rata, "premio": premio,
+                "numero": numero, "totali": len(rate),
+            })
+    return previste
+
+
+def rate_previste_portafoglio(dal: date, al: date) -> list[dict]:
+    """Rate previste e non ancora emesse di tutte le polizze frazionate attive, per data."""
+    from .models import RATE_PER_FRAZIONAMENTO
+
+    frazionate = [k for k, n in RATE_PER_FRAZIONAMENTO.items() if n > 1]
+    polizze = Policy.query.filter(Policy.stato.in_(("attiva", "in_rinnovo")), Policy.frazionamento.in_(frazionate),
+                                  Policy.premio_annuo > 0).all()
+    previste = [r for p in polizze for r in rate_previste(p, dal, al)]
+    return sorted(previste, key=lambda r: (r["data"], r["polizza"].numero_polizza))

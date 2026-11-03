@@ -57,7 +57,7 @@
     </div>
 
     <div class="card">
-      <div class="card-header d-flex justify-content-between"><span><i class="bi bi-cash-coin me-1"></i> Rate da incassare</span><span class="badge bg-secondary">{{ titoli | length }}</span></div>
+      <div class="card-header d-flex justify-content-between"><span><i class="bi bi-cash-coin me-1"></i> Rate da incassare</span><span class="badge bg-secondary">{{ (titoli | length) + (rate_previste | length) }}</span></div>
       <div class="table-responsive">
         {% if titoli %}
         <table class="table table-hover mb-0 align-middle">
@@ -76,10 +76,35 @@
           {% endfor %}
           </tbody>
         </table>
-        {% else %}
+        {% elif not rate_previste %}
         <p class="ga-muted p-3 mb-0">Nessuna rata da incassare nel periodo selezionato.</p>
         {% endif %}
       </div>
+      {% if rate_previste %}
+      <div class="card-body border-top py-2">
+        <h3 class="h6 mb-1"><i class="bi bi-calendar2-plus me-1" aria-hidden="true"></i> Rate del frazionamento da far pagare</h3>
+        <p class="small ga-muted mb-0">Semestralità, trimestralità, mensilità… previste dal contratto ma con il titolo non ancora emesso: generalo dalla polizza per incassarle.</p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th>Effetto</th><th>Cliente</th><th>Polizza</th><th class="num">Premio</th><th>Stato</th><th></th></tr></thead>
+          <tbody>
+          {% for r in rate_previste %}
+            {% set p = r.polizza %}
+            <tr class="{% if r.data < oggi %}urgenza-critica{% endif %}">
+              <td class="text-nowrap">{{ r.data | data_it }}<div class="small ga-muted">{{ (r.data - oggi).days | giorni }}</div></td>
+              <td><a href="{{ url_for('clients.detail', client_id=p.client_id) }}">{{ p.cliente.ragione_sociale }}</a></td>
+              <td class="small"><a href="{{ url_for('policies.detail', policy_id=p.id) }}">{{ p.numero_polizza }}</a>
+                <div class="ga-muted">{{ p.frazionamento_label }} · rata {{ r.numero }}/{{ r.totali }}</div></td>
+              <td class="num">{{ r.premio | euro }}</td>
+              <td><span class="badge {{ 'bg-warning text-dark' if r.data < oggi else 'bg-info text-dark' }}">{{ 'Da emettere, già scaduta' if r.data < oggi else 'Da emettere' }}</span></td>
+              <td class="text-end"><a class="btn btn-sm btn-outline-primary text-nowrap" href="{{ url_for('policies.detail', policy_id=p.id) }}#titoli"><i class="bi bi-receipt" aria-hidden="true"></i> Genera titolo</a></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
     </div>
   </div>
 

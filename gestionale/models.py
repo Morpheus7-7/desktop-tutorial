@@ -118,6 +118,7 @@ PAYMENT_FREQUENCIES = [
     ("semestrale", "Semestrale"),
     ("quadrimestrale", "Quadrimestrale"),
     ("trimestrale", "Trimestrale"),
+    ("bimestrale", "Bimestrale"),
     ("mensile", "Mensile"),
 ]
 
@@ -240,6 +241,7 @@ RATE_PER_FRAZIONAMENTO = {
     "semestrale": 2,
     "quadrimestrale": 3,
     "trimestrale": 4,
+    "bimestrale": 6,
     "mensile": 12,
 }
 

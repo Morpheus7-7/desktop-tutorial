@@ -23,7 +23,7 @@ from ..models import (
 )
 from ..agenda import eventi_agenda, esporta_ics
 from ..security import audit
-from ..titoli import add_months
+from ..titoli import add_months, rate_previste_portafoglio
 from ..utils import parse_int, plurale
 
 bp = Blueprint("main", __name__)
@@ -220,6 +220,8 @@ def dashboard():
 
 
 PERIODI_SCADENZARIO = (7, 30, 60, 90, 180, 365)
+# Rate non emesse con effetto già passato da non più di tanti giorni: restano in evidenza.
+GIORNI_RATE_PASSATE = 60
 
 
 def _orizzonte() -> tuple[date, int]:
@@ -258,9 +260,12 @@ def scadenzario():
     agenda = eventi_agenda(
         today, limite, {"decorrenza", "disdetta", "sospensione", "denuncia", "documento", "adeguatezza"}
     )
+    # Semestralità, trimestralità… da far pagare anche se i titoli non sono
+    # ancora stati generati (comprese quelle appena passate).
+    rate_previste = rate_previste_portafoglio(today - timedelta(days=GIORNI_RATE_PASSATE), limite)
     return render_template(
         "scadenzario.html", polizze=polizze, titoli=titoli, followups=followups, giorni=giorni,
-        agenda=agenda, periodi=PERIODI_SCADENZARIO, limite=limite,
+        agenda=agenda, periodi=PERIODI_SCADENZARIO, limite=limite, rate_previste=rate_previste,
     )
 
 

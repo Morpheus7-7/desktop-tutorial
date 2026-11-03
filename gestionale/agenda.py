@@ -110,6 +110,17 @@ def eventi_agenda(dal: date, al: date, tipi: set[str] | None = None) -> list[Eve
                      f"{nome}: rata del {t.data_effetto:%d/%m/%Y} (art. 1901 c.c.)",
                      link, f"titolo-{t.id}-sospensione-{t.data_effetto:%Y%m%d}")
 
+    if "rata" in tipi:
+        from .titoli import rate_previste_portafoglio
+
+        for r in rate_previste_portafoglio(dal, al):
+            p = r["polizza"]
+            aggiungi(r["data"], "rata", f"Rata {p.numero_polizza} da far pagare",
+                     f"{p.cliente.ragione_sociale} · {p.compagnia}: rata {r['numero']}/{r['totali']} "
+                     f"({p.frazionamento_label.lower()}) di {formatta_euro(r['premio'])}, titolo da emettere",
+                     url_for("policies.detail", policy_id=p.id) + "#titoli",
+                     f"polizza-{p.id}-rata-{r['data']:%Y%m%d}")
+
     for f in FollowUp.query.filter(FollowUp.stato == "aperto").all():
         aggiungi(f.data_scadenza, "followup", f.titolo, f"{f.cliente.ragione_sociale} · {f.tipo_label}",
                  url_for("clients.detail", client_id=f.client_id) + "#followup",
