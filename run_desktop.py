@@ -576,8 +576,6 @@ def modulo_finestra(env: Mapping[str, str] | None = None):
 
 FILE_FINESTRA = "finestra.json"
 CARTELLA_PROFILO_FINESTRA = "finestra_edge"
-# Se Edge si chiude prima di così, ha passato la finestra a un processo già aperto.
-SECONDI_MINIMI_FINESTRA = 5
 
 
 def trova_browser_app(env: Mapping[str, str] | None = None, esiste: Callable[[str], bool] = os.path.isfile) -> str | None:
@@ -692,26 +690,46 @@ def apri_finestra_nativa(url: str, cartella: Path, avvia=None) -> bool:
     return True
 
 
-def apri_finestra_app(url: str, cartella: Path, browser: str | None = None, avvia=None) -> bool:
+def edge_in_uso(profilo: Path) -> bool:
+    """Edge tiene bloccato il file «lockfile» del profilo finché la finestra è aperta."""
+    blocco = Path(profilo) / "lockfile"
+    if not blocco.exists():
+        return False
+    try:
+        blocco.unlink()  # riesce solo quando Edge ha chiuso la finestra
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return False
+
+
+def apri_finestra_app(url: str, cartella: Path, browser: str | None = None, avvia=None,
+                      in_uso: Callable[[Path], bool] = edge_in_uso, pausa_s: float = 1.0) -> bool:
     """Apre il gestionale in una finestra di Edge in modalità applicazione e attende
-    che venga chiusa. False se non c'è un browser adatto o non parte."""
+    che venga chiusa (anche quando Edge affida la finestra a un suo processo
+    interno: si controlla il blocco del profilo). False se non c'è un browser adatto."""
     import subprocess
 
     browser = browser or trova_browser_app()
     if browser is None:
         return False
     avvia = avvia or subprocess.Popen
-    inizio = time.monotonic()
+    profilo = Path(cartella) / CARTELLA_PROFILO_FINESTRA
     try:
         processo = avvia(comando_finestra_app(browser, url, cartella))
-        processo.wait()
     except OSError:
         registra_errore_avvio("Finestra di Edge non avviata:\n" + traceback.format_exc())
         return False
-    if time.monotonic() - inizio < SECONDI_MINIMI_FINESTRA:
-        # La finestra è stata affidata a un Edge già aperto con lo stesso profilo:
-        # il programma resta attivo finché l'utente non conferma la chiusura.
-        mostra_messaggio("Il Gestionale Assicurativo è aperto.\n\nPremi OK quando vuoi chiuderlo.", icona=0x40)
+    # Attesa che la finestra si apra (il profilo viene bloccato), poi che si chiuda.
+    scadenza = time.monotonic() + SECONDI_ATTESA_FINESTRA
+    while not in_uso(profilo) and time.monotonic() < scadenza:
+        time.sleep(pausa_s)
+    if in_uso(profilo):
+        while in_uso(profilo):
+            time.sleep(pausa_s)
+    else:
+        processo.wait()
     return True
 
 

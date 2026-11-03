@@ -483,21 +483,28 @@ def test_finestra_edge_in_modalita_applicazione(tmp_path, monkeypatch):
         def __init__(self, comando):
             lanciati.append(comando)
 
+        def poll(self):
+            return 0  # Edge passa subito la finestra a un suo processo interno
+
         def wait(self):
             return 0
 
-    tempi = iter([100.0, 160.0])  # la finestra è rimasta aperta un minuto
-    monkeypatch.setattr(rd.time, "monotonic", lambda: next(tempi))
-    assert rd.apri_finestra_app("http://127.0.0.1:5000", tmp_path, "msedge.exe", avvia=_Processo)
+    # Il profilo resta bloccato per tre controlli (finestra aperta), poi si libera.
+    stati = iter([True, True, True, False, False])
+    assert rd.apri_finestra_app("http://127.0.0.1:5000", tmp_path, "msedge.exe", avvia=_Processo,
+                                in_uso=lambda p: next(stati), pausa_s=0)
     comando = lanciati[0]
     assert comando[0] == "msedge.exe" and "--app=http://127.0.0.1:5000" in comando
-    assert f"--user-data-dir={tmp_path / rd.CARTELLA_PROFILO_FINESTRA}" in comando and messaggi == []
-    # Edge passa la finestra a un processo già aperto e torna subito: il programma resta attivo.
-    tempi = iter([100.0, 101.0])
-    monkeypatch.setattr(rd.time, "monotonic", lambda: next(tempi))
-    assert rd.apri_finestra_app("http://127.0.0.1:5000", tmp_path, "msedge.exe", avvia=_Processo)
-    assert messaggi and "Premi OK" in messaggi[0]
-    assert rd.apri_finestra_app("http://x", tmp_path, None, avvia=_Processo) in (True, False)
+    assert f"--user-data-dir={tmp_path / rd.CARTELLA_PROFILO_FINESTRA}" in comando
+    assert messaggi == []  # nessun messaggio «premi OK per chiudere»
+
+
+def test_blocco_del_profilo_edge(tmp_path):
+    profilo = tmp_path / "profilo"
+    profilo.mkdir()
+    assert not rd.edge_in_uso(profilo)
+    (profilo / "lockfile").write_text("")
+    assert not rd.edge_in_uso(profilo) and not (profilo / "lockfile").exists()  # file libero: Edge chiuso
 
 
 def test_finestra_nativa_in_processo_separato(tmp_path, monkeypatch):
