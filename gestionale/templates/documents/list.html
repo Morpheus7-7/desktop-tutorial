@@ -14,11 +14,26 @@
     <input class="form-control form-control-sm" name="q" value="{{ q }}" placeholder="Nome file o cliente…" aria-label="Cerca">
     <button class="btn btn-sm btn-primary" aria-label="Cerca" title="Cerca"><i class="bi bi-search" aria-hidden="true"></i></button>
   </div>
-  <div class="col-md-4">
-    <select class="form-select form-select-sm" name="categoria" data-autosubmit aria-label="Categoria">
-      <option value="">Tutte le categorie</option>
-      {% for value, label in document_categories %}
-      <option value="{{ value }}" {% if categoria == value %}selected{% endif %}>{{ label }}</option>
+  <div class="col-md-3">
+    <select class="form-select form-select-sm" name="cartella" data-autosubmit aria-label="Cartella">
+      <option value="">Tutte le cartelle</option>
+      {% for chiave, nome, icona, per_tipi, tipi in cartelle_documenti %}
+      <option value="{{ chiave }}" {% if cartella == chiave %}selected{% endif %}>{{ nome }}</option>
+      {% endfor %}
+      {% if cartelle_personali %}
+      <optgroup label="Cartelle create da voi">
+        {% for nome in cartelle_personali %}<option value="personale:{{ nome }}" {% if cartella == 'personale:' ~ nome %}selected{% endif %}>{{ nome }}</option>{% endfor %}
+      </optgroup>
+      {% endif %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <select class="form-select form-select-sm" name="categoria" data-autosubmit aria-label="Tipo di documento">
+      <option value="">Tutti i tipi</option>
+      {% for chiave, nome, icona, per_tipi, tipi in cartelle_documenti %}
+      <optgroup label="{{ nome }}">
+        {% for tipo, etichetta in tipi %}<option value="{{ tipo }}" {% if categoria == tipo %}selected{% endif %}>{{ etichetta }}</option>{% endfor %}
+      </optgroup>
       {% endfor %}
     </select>
   </div>
@@ -29,7 +44,7 @@
     {% if documenti %}
     <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
-      <thead><tr><th>Documento</th><th>Cliente</th><th>Categoria</th><th>Collegato a</th><th>Dim.</th><th>Caricato il</th><th></th></tr></thead>
+      <thead><tr><th>Documento</th><th>Cliente</th><th>Cartella e tipo</th><th>Collegato a</th><th>Dim.</th><th>Caricato il</th><th></th></tr></thead>
       <tbody>
       {% for d in documenti %}
         <tr>
@@ -37,7 +52,7 @@
             {% if d.note %}<br><span class="small text-muted">{{ d.note }}</span>{% endif %}
           </td>
           <td><a href="{{ url_for('clients.detail', client_id=d.client_id) }}">{{ d.cliente.ragione_sociale }}</a></td>
-          <td><span class="badge bg-light text-dark">{{ d.categoria_label }}</span></td>
+          <td class="small"><i class="bi bi-folder2 me-1" aria-hidden="true"></i>{{ d.cartella_nome }}<br><span class="badge badge-soft">{{ d.categoria_label }}</span></td>
           <td class="small">
             {% if d.polizza %}<a href="{{ url_for('policies.detail', policy_id=d.policy_id) }}">{{ d.polizza.numero_polizza }}</a>{% endif %}
             {% if d.sinistro %}<div><a href="{{ url_for('claims.detail', claim_id=d.claim_id) }}">{{ d.sinistro.numero }}</a></div>{% endif %}

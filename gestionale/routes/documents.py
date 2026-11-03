@@ -16,7 +16,7 @@ from werkzeug.security import safe_join
 from werkzeug.utils import secure_filename
 
 from ..backup import cartella_documenti
-from ..models import DOCUMENT_CATEGORIES, Client, Document, db
+from ..models import CARTELLE_DOCUMENTI, CARTELLA_DEL_TIPO, DOCUMENT_CATEGORIES, Client, Document, db
 from ..security import audit, safe_next
 from ..utils import paginate, parse_int
 
@@ -32,6 +32,15 @@ ALLOWED_EXTENSIONS = {
 # il limite di 260 caratteri dei percorsi di Windows.
 LUNGHEZZA_MAX_NOME_FILE = 100
 LUNGHEZZA_MAX_NOME_ORIGINALE = Document.__table__.c.original_name.type.length or 300
+
+
+LUNGHEZZA_MAX_CARTELLA = 80
+
+
+def nome_cartella(valore) -> str | None:
+    """Nome di una cartella creata dall'utente, ripulito (None = cartella del tipo di documento)."""
+    nome = " ".join((valore or "").replace("/", " ").replace("\\", " ").split())[:LUNGHEZZA_MAX_CARTELLA]
+    return nome or None
 
 
 def _allowed(filename: str) -> bool:
@@ -57,10 +66,16 @@ def nome_su_disco(originale: str) -> str:
 @bp.route("/")
 def list_documents():
     categoria = request.args.get("categoria", "")
+    cartella = request.args.get("cartella", "")
     q = (request.args.get("q") or "").strip()
     query = Document.query.join(Client, Document.client_id == Client.id)
     if categoria:
         query = query.filter(Document.categoria == categoria)
+    if cartella.startswith("personale:"):
+        query = query.filter(Document.cartella == cartella.split(":", 1)[1])
+    elif cartella:
+        tipi = [t for t, c in CARTELLA_DEL_TIPO.items() if c == cartella]
+        query = query.filter(Document.cartella.is_(None), Document.categoria.in_(tipi or [""]))
     if q:
         like = f"%{q}%"
         query = query.filter(db.or_(Document.original_name.ilike(like), Client.ragione_sociale.ilike(like)))
@@ -70,8 +85,11 @@ def list_documents():
         pagination=pagination,
         documenti=pagination.items,
         categoria=categoria,
+        cartella=cartella,
         q=q,
-        document_categories=DOCUMENT_CATEGORIES,
+        cartelle_documenti=CARTELLE_DOCUMENTI,
+        cartelle_personali=[r[0] for r in db.session.query(Document.cartella).filter(Document.cartella.isnot(None))
+                            .distinct().order_by(Document.cartella)],
     )
 
 
@@ -105,6 +123,7 @@ def upload(client_id):
 
     policy_id = _resolve_policy_id(client, request.form.get("policy_id"))
     categoria = request.form.get("categoria", "altro")
+    cartella = nome_cartella(request.form.get("cartella"))
     note = request.form.get("note", "").strip() or None
     upload_folder = cartella_documenti()
     os.makedirs(upload_folder, exist_ok=True)
@@ -141,6 +160,7 @@ def upload(client_id):
                 original_name=tronca_nome(original, LUNGHEZZA_MAX_NOME_ORIGINALE),
                 dimensione=dimensione,
                 note=note,
+                cartella=cartella,
             )
         )
         caricati += 1
@@ -170,6 +190,22 @@ def download(document_id):
         as_attachment=True,
         download_name=doc.original_name,
     )
+
+
+@bp.route("/<int:document_id>/sposta", methods=["POST"])
+def move(document_id):
+    """Cambia tipo di documento e/o cartella."""
+    doc = db.get_or_404(Document, document_id)
+    categoria = request.form.get("categoria")
+    if categoria in dict(DOCUMENT_CATEGORIES):
+        doc.categoria = categoria
+    doc.cartella = nome_cartella(request.form.get("cartella"))
+    audit("modifica", "documento", doc.id, f"Spostato il documento «{doc.original_name}» in «{doc.cartella_nome}»")
+    db.session.commit()
+    flash(f"Documento spostato in «{doc.cartella_nome}».", "success")
+    if request.form.get("da_archivio"):
+        return redirect(url_for("documents.list_documents"))
+    return redirect(_destinazione(doc.client_id))
 
 
 @bp.route("/<int:document_id>/elimina", methods=["POST"])

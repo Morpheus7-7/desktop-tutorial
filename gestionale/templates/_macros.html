@@ -138,3 +138,17 @@
   </div>
 </div>
 {%- endmacro %}
+
+
+{# Tipo di documento, raggruppato per cartella. #}
+{% macro select_tipo_documento(id, classe='form-select', selezionato=none, preferita=none, etichetta='Tipo di documento', campo=none) -%}
+<select id="{{ id }}" class="{{ classe }}" name="categoria" aria-label="{{ etichetta }}"{% if campo %} data-field="{{ campo }}"{% endif %}>
+  {% for chiave, nome, icona, per_tipi, tipi in cartelle_documenti %}
+  <optgroup label="{{ nome }}">
+    {% for tipo, etichetta_tipo in tipi %}
+    <option value="{{ tipo }}" {% if selezionato == tipo or (selezionato is none and preferita == chiave and loop.first) %}selected{% endif %}>{{ etichetta_tipo }}</option>
+    {% endfor %}
+  </optgroup>
+  {% endfor %}
+</select>
+{%- endmacro %}

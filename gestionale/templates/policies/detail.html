@@ -261,7 +261,7 @@
       <input type="hidden" name="policy_id" value="{{ policy.id }}">
       <input type="hidden" name="next" value="{{ url_for('policies.detail', policy_id=policy.id) }}#documenti">
       <div class="col-md-5"><input type="file" class="form-control form-control-sm" name="file" multiple required aria-label="File da caricare"></div>
-      <div class="col-md-4"><select class="form-select form-select-sm" name="categoria" aria-label="Categoria del documento">{% for v, l in document_categories %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+      <div class="col-md-4">{{ m.select_tipo_documento('polizza-doc-tipo', 'form-select form-select-sm', selezionato='polizza') }}</div>
       <div class="col-md-3"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-upload"></i> Carica</button></div>
     </form>
     {% endif %}

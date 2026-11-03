@@ -156,6 +156,20 @@
       aggiornaTipo();
     }
 
+    // --- Archivio documenti: «Carica in questa cartella» prepara il modulo di caricamento.
+    document.querySelectorAll('.carica-in-cartella').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const tipo = document.getElementById('clients-detail-categoria');
+        const cartella = document.getElementById('clients-detail-cartella');
+        if (tipo && btn.dataset.tipo) tipo.value = btn.dataset.tipo;
+        if (cartella) cartella.value = btn.dataset.cartella || '';
+        const modulo = document.getElementById('form-upload');
+        if (modulo) modulo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const zona = modulo && modulo.querySelector('.dropzone');
+        if (zona) zona.focus({ preventScroll: true });
+      });
+    });
+
     // --- Menu a tendina dipendenti (es. polizze filtrate per cliente).
     document.querySelectorAll('select[data-filter-target]').forEach(function (sorgente) {
       const target = document.querySelector(sorgente.dataset.filterTarget);

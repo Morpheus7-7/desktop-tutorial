@@ -289,6 +289,16 @@ archivi conservati) e **ripristinare** un archivio.
 Conserva periodicamente una copia dei backup su un disco esterno o in cloud.
 
 
+### Documenti in cartelle
+
+Nella scheda del cliente i documenti sono divisi in **cartelle**: documenti
+personali (carta d'identità, codice fiscale, patente…), documenti azienda
+(visura camerale, statuto, bilancio, DURC…), documenti professionali, polizze e
+contratti, sinistri, veicoli, privacy e adeguatezza. Il tipo di documento
+scelto al caricamento decide la cartella; si possono anche creare **cartelle
+proprie** (es. «Pratica mutuo 2025») e **spostare** i file. L'archivio generale
+filtra per cartella e per tipo.
+
 ### Aspetto
 
 Dal menu utente → **Aspetto** ognuno sceglie il proprio **tema di colore** (blu,

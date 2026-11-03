@@ -341,45 +341,81 @@
 
   <!-- ============ DOCUMENTI ============ -->
   <div class="tab-pane fade" id="tab-documenti">
-    {% if client.documenti %}
-    <div class="table-responsive">
-    <table class="table table-hover align-middle">
-      <thead><tr><th>Documento</th><th>Categoria</th><th>Collegato a</th><th>Dim.</th><th>Caricato il</th><th></th></tr></thead>
-      <tbody>
-      {% for d in client.documenti %}
-        <tr>
-          <td><i class="bi {{ d.icona }} me-1"></i>{{ d.original_name }}
-            {% if d.note %}<br><span class="small ga-muted">{{ d.note }}</span>{% endif %}
-          </td>
-          <td><span class="badge badge-soft">{{ d.categoria_label }}</span></td>
-          <td class="small">
-            {% if d.polizza %}<a href="{{ url_for('policies.detail', policy_id=d.policy_id) }}">Polizza {{ d.polizza.numero_polizza }}</a>{% endif %}
-            {% if d.sinistro %}<div><a href="{{ url_for('claims.detail', claim_id=d.claim_id) }}">Sinistro {{ d.sinistro.numero }}</a></div>{% endif %}
-            {% if not d.polizza and not d.sinistro %}—{% endif %}
-          </td>
-          <td class="small text-nowrap">{{ d.dimensione_leggibile if d.dimensione else '—' }}</td>
-          <td class="small">{{ d.uploaded_at | dataora_it }}</td>
-          <td class="text-end text-nowrap">
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}" title="Scarica" aria-label="Scarica {{ d.original_name }}"><i class="bi bi-download" aria-hidden="true"></i></a>
-            {% if puo_modificare %}
-            <form class="d-inline" method="post" action="{{ url_for('documents.delete', document_id=d.id) }}"
-                  data-confirm="Eliminare il documento {{ d.original_name }}?">
-              {{ csrf_field() }}
-              <button class="btn btn-sm btn-outline-danger" title="Elimina" aria-label="Elimina"><i class="bi bi-trash" aria-hidden="true"></i></button>
-            </form>
-            {% endif %}
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+    {% set cartelle = client.cartelle_documenti %}
+    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+      <h2 class="section-title mb-0">Archivio del cliente</h2>
+      <span class="small ga-muted">{{ client.documenti | length }} documenti in {{ cartelle | selectattr('documenti') | list | length }} cartelle</span>
     </div>
-    {% else %}
-    <p class="ga-muted">Nessun documento caricato per questo cliente.</p>
-    {% endif %}
+    <div class="accordion mb-3" id="cartelle-documenti">
+      {% for c in cartelle %}
+      {% set id_c = 'cartella-' ~ loop.index %}
+      <div class="accordion-item">
+        <h3 class="accordion-header">
+          <button class="accordion-button {% if not c.documenti %}collapsed{% endif %}" type="button" data-bs-toggle="collapse"
+                  data-bs-target="#{{ id_c }}" aria-expanded="{{ 'true' if c.documenti else 'false' }}" aria-controls="{{ id_c }}">
+            <i class="bi {{ c.icona }} me-2 {{ '' if c.documenti else 'ga-muted' }}" aria-hidden="true"></i>
+            <span class="{{ '' if c.documenti else 'ga-muted' }}">{{ c.nome }}</span>
+            <span class="badge {{ 'bg-primary' if c.documenti else 'badge-soft' }} ms-2">{{ c.documenti | length }}</span>
+          </button>
+        </h3>
+        <div id="{{ id_c }}" class="accordion-collapse collapse {% if c.documenti %}show{% endif %}">
+          <div class="accordion-body p-0">
+            {% if c.documenti %}
+            <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead><tr><th>Documento</th><th>Tipo</th><th>Collegato a</th><th>Dim.</th><th>Caricato il</th><th></th></tr></thead>
+              <tbody>
+              {% for d in c.documenti %}
+                <tr>
+                  <td><i class="bi {{ d.icona }} me-1" aria-hidden="true"></i>{{ d.original_name }}
+                    {% if d.note %}<br><span class="small ga-muted">{{ d.note }}</span>{% endif %}
+                  </td>
+                  <td><span class="badge badge-soft">{{ d.categoria_label }}</span></td>
+                  <td class="small">
+                    {% if d.polizza %}<a href="{{ url_for('policies.detail', policy_id=d.policy_id) }}">Polizza {{ d.polizza.numero_polizza }}</a>{% endif %}
+                    {% if d.sinistro %}<div><a href="{{ url_for('claims.detail', claim_id=d.claim_id) }}">Sinistro {{ d.sinistro.numero }}</a></div>{% endif %}
+                    {% if not d.polizza and not d.sinistro %}—{% endif %}
+                  </td>
+                  <td class="small text-nowrap">{{ d.dimensione_leggibile if d.dimensione else '—' }}</td>
+                  <td class="small">{{ d.uploaded_at | dataora_it }}</td>
+                  <td class="text-end text-nowrap">
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download', document_id=d.id) }}" title="Scarica" aria-label="Scarica {{ d.original_name }}"><i class="bi bi-download" aria-hidden="true"></i></a>
+                    {% if puo_modificare %}
+                    <button type="button" class="btn btn-sm btn-outline-secondary" title="Sposta" aria-label="Sposta {{ d.original_name }}"
+                            data-bs-toggle="modal" data-bs-target="#modal-sposta-documento"
+                            data-action="{{ url_for('documents.move', document_id=d.id) }}"
+                            data-fill-nome="{{ d.original_name }}" data-fill-categoria="{{ d.categoria }}" data-fill-cartella="{{ d.cartella or '' }}">
+                      <i class="bi bi-folder-symlink" aria-hidden="true"></i></button>
+                    <form class="d-inline" method="post" action="{{ url_for('documents.delete', document_id=d.id) }}"
+                          data-confirm="Eliminare il documento {{ d.original_name }}?">
+                      {{ csrf_field() }}
+                      <button class="btn btn-sm btn-outline-danger" title="Elimina" aria-label="Elimina {{ d.original_name }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                    </form>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+            </div>
+            {% else %}
+            <p class="small ga-muted px-3 py-2 mb-0">Cartella vuota{% if c.tipi %}: {{ c.tipi | map('last') | join(', ') }}{% endif %}.</p>
+            {% endif %}
+            {% if puo_modificare %}
+            <div class="px-3 py-2 border-top">
+              <button type="button" class="btn btn-sm btn-link px-0 carica-in-cartella"
+                      data-tipo="{{ c.tipi[0][0] if c.tipi else 'altro' }}" data-cartella="{{ c.nome if c.personale else '' }}">
+                <i class="bi bi-cloud-arrow-up" aria-hidden="true"></i> Carica in «{{ c.nome }}»
+              </button>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
 
     {% if puo_modificare %}
-    <hr>
     <h2 class="section-title">Carica documenti</h2>
     <form method="post" action="{{ url_for('documents.upload', client_id=client.id) }}"
           enctype="multipart/form-data" class="row g-3" id="form-upload">
@@ -393,34 +429,62 @@
         </div>
         <div id="file-list" class="mt-2"></div>
       </div>
-      <div class="col-md-3">
-        <label class="form-label" for="clients-detail-categoria">Categoria</label>
-        <select id="clients-detail-categoria" class="form-select" name="categoria">
-          {% for value, label in document_categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
-        </select>
+      <div class="col-md-4">
+        <label class="form-label" for="clients-detail-categoria">Tipo di documento</label>
+        {{ m.select_tipo_documento('clients-detail-categoria', preferita=('azienda' if client.tipo in ('azienda', 'studio') else 'personali')) }}
+        <div class="form-text">Decide la cartella in cui finisce il file.</div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-4">
+        <label class="form-label" for="clients-detail-cartella">Oppure in una cartella tua</label>
+        <input id="clients-detail-cartella" class="form-control" name="cartella" list="cartelle-personali" maxlength="80"
+               placeholder="es. Contratti 2025, Pratica mutuo">
+        <datalist id="cartelle-personali">{% for nome in client.nomi_cartelle_personali %}<option value="{{ nome }}">{% endfor %}</datalist>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="clients-detail-note">Note (a tutti i file)</label>
+        <input id="clients-detail-note" class="form-control" name="note">
+      </div>
+      <div class="col-md-6">
         <label class="form-label" for="clients-detail-policy-id">Polizza collegata</label>
         <select id="clients-detail-policy-id" class="form-select" name="policy_id">
           <option value="">Nessuna</option>
           {% for p in client.polizze %}<option value="{{ p.id }}">{{ p.numero_polizza }} — {{ p.ramo_label }}</option>{% endfor %}
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-6">
         <label class="form-label" for="clients-detail-claim-id">Sinistro collegato</label>
         <select id="clients-detail-claim-id" class="form-select" name="claim_id">
           <option value="">Nessuno</option>
           {% for s in client.sinistri %}<option value="{{ s.id }}">{{ s.numero }} — {{ s.data_evento | data_it }}</option>{% endfor %}
         </select>
       </div>
-      <div class="col-md-3">
-        <label class="form-label" for="clients-detail-note">Note (a tutti i file)</label>
-        <input id="clients-detail-note" class="form-control" name="note">
-      </div>
       <div class="col-12">
-        <button class="btn btn-primary"><i class="bi bi-upload"></i> Carica</button>
+        <button class="btn btn-primary"><i class="bi bi-upload" aria-hidden="true"></i> Carica</button>
       </div>
     </form>
+
+    <div class="modal fade" id="modal-sposta-documento" tabindex="-1" aria-labelledby="titolo-sposta-documento" aria-hidden="true" data-dynamic>
+      <div class="modal-dialog">
+        <form class="modal-content" method="post">
+          {{ csrf_field() }}
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="titolo-sposta-documento">Sposta documento</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+          </div>
+          <div class="modal-body">
+            <p class="small ga-muted mb-3" data-field="nome"></p>
+            <label class="form-label" for="sposta-categoria">Tipo di documento</label>
+            {{ m.select_tipo_documento('sposta-categoria', campo='categoria') }}
+            <label class="form-label mt-3" for="sposta-cartella">Cartella tua (lascia vuoto per usare quella del tipo)</label>
+            <input id="sposta-cartella" class="form-control" name="cartella" list="cartelle-personali" maxlength="80" data-field="cartella">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
+            <button class="btn btn-primary">Sposta</button>
+          </div>
+        </form>
+      </div>
+    </div>
     {% endif %}
   </div>
 

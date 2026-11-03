@@ -398,3 +398,9 @@ body { background: var(--ga-bg); color: var(--ga-text); }
 @media print {
   [data-bs-theme="dark"] body, [data-bs-theme="dark"] .card { background: #fff !important; color: #000 !important; }
 }
+
+/* Cartelle dell'archivio documenti (accordion) nel colore del tema. */
+.accordion { --bs-accordion-active-bg: var(--ga-soft); --bs-accordion-active-color: var(--ga-primary);
+  --bs-accordion-btn-focus-box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--ga-primary-2) 25%, transparent);
+  --bs-accordion-bg: var(--ga-surface); --bs-accordion-border-color: var(--ga-border); }
+[data-bs-theme="dark"] .accordion { --bs-accordion-active-color: var(--ga-text); }

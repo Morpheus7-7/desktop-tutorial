@@ -83,6 +83,7 @@ def _ensure_schema() -> None:
         "documents": {
             "dimensione": "ALTER TABLE documents ADD COLUMN dimensione INTEGER",
             "claim_id": "ALTER TABLE documents ADD COLUMN claim_id INTEGER",
+            "cartella": "ALTER TABLE documents ADD COLUMN cartella VARCHAR(80)",
         },
         "followups": {
             "policy_id": "ALTER TABLE followups ADD COLUMN policy_id INTEGER",
@@ -415,6 +416,9 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.jinja_env.globals["filtri_url"] = filtri_url
     app.jinja_env.globals["versione"] = __version__
     app.jinja_env.globals["payment_methods"] = PAYMENT_METHODS
+    from .models import CARTELLE_DOCUMENTI
+
+    app.jinja_env.globals["cartelle_documenti"] = CARTELLE_DOCUMENTI
 
     @app.context_processor
     def inject_globals():

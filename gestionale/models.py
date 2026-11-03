@@ -139,17 +139,68 @@ FOLLOWUP_PRIORITIES = [
     ("bassa", "Bassa"),
 ]
 
-DOCUMENT_CATEGORIES = [
-    ("polizza", "Polizza / Contratto"),
-    ("preventivo", "Preventivo"),
-    ("identita", "Documento d'identità"),
-    ("visura", "Visura camerale"),
-    ("bilancio", "Bilancio / Dichiarazione"),
-    ("sinistro", "Documentazione sinistro"),
-    ("adeguatezza", "Questionario di adeguatezza"),
-    ("privacy", "Privacy / GDPR"),
-    ("altro", "Altro"),
+# Archivio documenti organizzato in cartelle: ogni cartella raccoglie i suoi
+# tipi di documento (le chiavi già usate dalle versioni precedenti restano).
+# (chiave, nome, icona, tipi di cliente per cui è proposta, [(tipo, etichetta)])
+CARTELLE_DOCUMENTI = [
+    ("personali", "Documenti personali", "bi-person-vcard", None, [
+        ("carta_identita", "Carta d'identità"),
+        ("codice_fiscale", "Codice fiscale / tessera sanitaria"),
+        ("patente", "Patente di guida"),
+        ("passaporto", "Passaporto"),
+        ("permesso_soggiorno", "Permesso di soggiorno"),
+        ("identita", "Altro documento d'identità"),
+    ]),
+    ("azienda", "Documenti azienda", "bi-building", {"azienda", "studio"}, [
+        ("visura", "Visura camerale"),
+        ("statuto", "Atto costitutivo / statuto"),
+        ("attribuzione_piva", "Attribuzione partita IVA"),
+        ("bilancio", "Bilancio / dichiarazione dei redditi"),
+        ("durc", "DURC"),
+        ("documenti_societari", "Altri documenti societari"),
+    ]),
+    ("professionali", "Documenti professionali", "bi-mortarboard", {"professionista", "studio"}, [
+        ("iscrizione_albo", "Iscrizione all'albo"),
+        ("titoli_studio", "Titoli e attestati"),
+        ("incarichi", "Incarichi e nomine"),
+    ]),
+    ("polizze", "Polizze e contratti", "bi-file-earmark-text", None, [
+        ("polizza", "Polizza / contratto"),
+        ("preventivo", "Preventivo"),
+        ("appendice", "Appendice"),
+        ("quietanza", "Quietanza / ricevuta di pagamento"),
+        ("disdetta_doc", "Disdetta"),
+    ]),
+    ("sinistri", "Sinistri", "bi-exclamation-octagon", None, [
+        ("sinistro", "Documentazione sinistro"),
+        ("denuncia", "Denuncia / modulo CAI"),
+        ("perizia", "Perizia"),
+        ("foto", "Foto"),
+    ]),
+    ("veicoli", "Veicoli", "bi-car-front", None, [
+        ("libretto", "Libretto di circolazione"),
+        ("attestato_rischio", "Attestato di rischio"),
+    ]),
+    ("compliance", "Privacy e adeguatezza", "bi-shield-lock", None, [
+        ("privacy", "Privacy / GDPR"),
+        ("adeguatezza", "Questionario di adeguatezza"),
+        ("informativa", "Informativa precontrattuale (allegati IVASS)"),
+        ("incarico_broker", "Incarico / mandato all'intermediario"),
+    ]),
+    ("altro", "Altri documenti", "bi-folder", None, [
+        ("altro", "Altro"),
+    ]),
 ]
+DOCUMENT_CATEGORIES = [(tipo, etichetta) for _, _, _, _, tipi in CARTELLE_DOCUMENTI for tipo, etichetta in tipi]
+CARTELLA_DEL_TIPO = {tipo: chiave for chiave, _, _, _, tipi in CARTELLE_DOCUMENTI for tipo, _ in tipi}
+CARTELLE_DOCUMENTI_INFO = {chiave: (nome, icona) for chiave, nome, icona, _, _ in CARTELLE_DOCUMENTI}
+
+
+def cartelle_per_tipo_cliente(tipo_cliente: str) -> list[tuple]:
+    """Cartelle proposte per un tipo di cliente (es. «Documenti azienda» solo per aziende e studi)."""
+    return [c for c in CARTELLE_DOCUMENTI if c[3] is None or tipo_cliente in c[3]]
+
+
 DOCUMENT_CATEGORY_LABELS = dict(DOCUMENT_CATEGORIES)
 
 # Fasi della pipeline commerciale (opportunità di vendita), stile CRM.
@@ -559,6 +610,28 @@ class Client(db.Model):
         return [t for t in self.titoli if t.stato == "da_incassare"]
 
     @property
+    def cartelle_documenti(self):
+        """Archivio del cliente in cartelle: quelle proposte per il suo tipo, quelle
+        con documenti e quelle create dall'utente, ciascuna con i suoi file."""
+        per_cartella: dict[str, list] = {}
+        for d in sorted(self.documenti, key=lambda d: d.uploaded_at or now(), reverse=True):
+            per_cartella.setdefault(d.cartella_chiave, []).append(d)
+        proposte = {c[0] for c in cartelle_per_tipo_cliente(self.tipo)}
+        cartelle = []
+        for chiave, nome, icona, _, tipi in CARTELLE_DOCUMENTI:
+            if chiave in proposte or chiave in per_cartella:
+                cartelle.append({"chiave": chiave, "nome": nome, "icona": icona, "tipi": tipi,
+                                 "documenti": per_cartella.get(chiave, []), "personale": False})
+        for chiave in sorted(k for k in per_cartella if k.startswith("personale:")):
+            cartelle.append({"chiave": chiave, "nome": chiave.split(":", 1)[1], "icona": "bi-folder-fill",
+                             "tipi": [], "documenti": per_cartella[chiave], "personale": True})
+        return cartelle
+
+    @property
+    def nomi_cartelle_personali(self):
+        return sorted({d.cartella for d in self.documenti if d.cartella})
+
+    @property
     def tipo_badge(self):
         return CLIENT_TYPE_BADGES.get(self.tipo, "bg-secondary")
 
@@ -775,11 +848,24 @@ class Document(db.Model):
     original_name = db.Column(db.String(300), nullable=False)
     dimensione = db.Column(db.Integer)  # dimensione in byte
     note = db.Column(db.Text)
+    # Cartella scelta dall'utente (es. «Contratti 2024»): se vuota, quella del tipo di documento.
+    cartella = db.Column(db.String(80))
     uploaded_at = db.Column(db.DateTime, default=now)
 
     @property
     def categoria_label(self):
         return DOCUMENT_CATEGORY_LABELS.get(self.categoria, self.categoria)
+
+    @property
+    def cartella_chiave(self):
+        """Chiave della cartella: «personale:<nome>» per le cartelle create dall'utente."""
+        if self.cartella:
+            return "personale:" + self.cartella
+        return CARTELLA_DEL_TIPO.get(self.categoria, "altro")
+
+    @property
+    def cartella_nome(self):
+        return self.cartella or CARTELLE_DOCUMENTI_INFO[CARTELLA_DEL_TIPO.get(self.categoria, "altro")][0]
 
     @property
     def estensione(self):
