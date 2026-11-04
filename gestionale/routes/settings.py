@@ -175,6 +175,7 @@ def save_studio():
     s.studio_piva = clean(request.form, "studio_piva")
     s.studio_indirizzo = clean(request.form, "studio_indirizzo")
     s.studio_contatti = clean(request.form, "studio_contatti")
+    s.studio_pagamenti = (request.form.get("studio_pagamenti") or "").strip()[:1000] or None
     audit("modifica", "impostazioni", None, "Aggiornati i dati dello studio")
     db.session.commit()
     flash("Dati dello studio salvati.", "success")

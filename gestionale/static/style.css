@@ -960,3 +960,16 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 .auth-marchio { font-size: 2rem; font-stretch: 82%; letter-spacing: -.01em; color: var(--dc-ink); line-height: 1; }
 .auth-marchio .dc-brand-deal { font-weight: 750; }
 .auth-marchio .dc-brand-combined { font-weight: 400; }
+
+/* Avviso di pagamento: lettera sempre chiara, pronta da stampare. */
+.lettera { max-width: 48rem; }
+.lettera .card-body { padding: 2rem 2.25rem; }
+.lettera-intestazione { border-bottom: 2px solid var(--dc-cover); padding-bottom: .6rem; margin-bottom: 1.5rem; font-size: .9rem; line-height: 1.45; }
+.lettera-destinatario { margin: 0 0 1.25rem auto; width: max-content; max-width: 100%; line-height: 1.45; }
+.lettera-data { text-align: right; color: var(--dc-muted); }
+.lettera-testo { white-space: pre-line; line-height: 1.6; max-width: 70ch; }
+@media print {
+  .lettera { border: 0 !important; box-shadow: none !important; max-width: none; }
+  .lettera .card-body { padding: 0; }
+}
+.oggi-azione { display: flex; gap: .35rem; align-items: center; }

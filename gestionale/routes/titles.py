@@ -3,7 +3,7 @@ estratto conto per compagnia (rimesse) e previsione degli incassi futuri."""
 from collections import OrderedDict
 from datetime import date, timedelta
 
-from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 from sqlalchemy.exc import IntegrityError
 
 from ..export import csv_response
@@ -701,3 +701,93 @@ def forecast_csv():
         ["Mese", "Rate emesse", "Rate stimate", "Totale atteso", "Provvigioni attese", "Netto compagnie"],
         [(v["label"], v["emessi"], v["stimati"], v["totale"], v["provvigioni"], v["netto"]) for v in dati["colonne"]],
     )
+
+
+# ----------------------------------------------------------------------
+# Avviso di pagamento della rata al cliente (stampa o email)
+# ----------------------------------------------------------------------
+def _avviso(policy: Policy, scadenza: date, fine, importo: float, rata: str) -> dict:
+    """Dati dell'avviso: chi paga, cosa, quanto, entro quando e come."""
+    from ..models import Settings
+
+    s = Settings.get()
+    cliente = policy.cliente
+    destinatario = cliente.referente if cliente.tipo in ("azienda", "studio") and cliente.referente else cliente.nome_completo
+    periodo = f"dal {scadenza:%d/%m/%Y}" + (f" al {fine:%d/%m/%Y}" if fine else "")
+    righe = [
+        f"Gentile {destinatario},",
+        "",
+        f"le ricordiamo che il {scadenza:%d/%m/%Y} scade il pagamento della {rata} della polizza "
+        f"n. {policy.numero_polizza} ({policy.compagnia}, {policy.ramo_label}), "
+        f"che copre il periodo {periodo}.",
+        "",
+        f"Importo da pagare: {formatta_euro(importo)}",
+    ]
+    if s.studio_pagamenti:
+        righe += ["", "Come pagare:", s.studio_pagamenti.strip()]
+    righe += [
+        "",
+        "Se il premio non viene pagato, la copertura resta sospesa dalle ore 24 del quindicesimo giorno "
+        "dopo la scadenza e riprende dalle ore 24 del giorno del pagamento (art. 1901 del Codice civile).",
+        "Se ha già provveduto, non tenga conto di questo avviso.",
+        "",
+        "Cordiali saluti",
+        s.studio_nome or (g.user.nome_visualizzato if g.get("user") else ""),
+    ]
+    return {
+        "polizza": policy, "cliente": cliente, "destinatario": destinatario, "scadenza": scadenza, "fine": fine,
+        "importo": importo, "rata": rata, "periodo": periodo, "studio": s,
+        "oggetto": f"Promemoria pagamento polizza {policy.numero_polizza} — scadenza {scadenza:%d/%m/%Y}",
+        "testo": "\n".join(righe).strip(),
+    }
+
+
+def _mostra_avviso(dati: dict, ritorno: str):
+    """Pagina dell'avviso: lettera da stampare e modulo per l'email (invio con POST)."""
+    from .. import mailer
+
+    cliente = dati["cliente"]
+    email = request.form.get("destinatario", cliente.email or "")
+    oggetto = request.form.get("oggetto") or dati["oggetto"]
+    testo = request.form.get("testo") or dati["testo"]
+    if request.method == "POST":
+        try:
+            mailer.invia_al_cliente(email, oggetto, testo)
+        except ValueError as exc:
+            flash(str(exc), "danger")
+        except Exception as exc:  # noqa: BLE001 - errore del server di posta, da mostrare
+            flash(f"Invio non riuscito: {exc}", "danger")
+        else:
+            audit("email", "polizza", dati["polizza"].id,
+                  f"Avviso di pagamento ({dati['rata']}, scadenza {dati['scadenza']:%d/%m/%Y}) inviato a {email}",
+                  commit=True)
+            flash(f"Avviso di pagamento inviato a {email}.", "success")
+            return redirect(ritorno)
+    return render_template("titles/avviso.html", a=dati, email=email, oggetto=oggetto, testo=testo, ritorno=ritorno)
+
+
+@bp.route("/<int:title_id>/avviso", methods=["GET", "POST"])
+def payment_notice(title_id):
+    t = db.get_or_404(Title, title_id)
+    p = t.polizza
+    rata = (f"rata {t.rata_label}" if t.rata_label else "quietanza") + (f" ({t.tipo_label.lower()})" if t.tipo == "appendice" else "")
+    dati = _avviso(p, t.data_effetto, t.data_fine_copertura, t.premio_lordo, rata)
+    return _mostra_avviso(dati, url_for("policies.detail", policy_id=p.id) + "#titoli")
+
+
+@bp.route("/avviso-rata/<int:policy_id>/<data>", methods=["GET", "POST"])
+def expected_payment_notice(policy_id, data):
+    """Avviso per una rata del frazionamento non ancora emessa come titolo."""
+    from ..titoli import rate_previste
+
+    p = db.get_or_404(Policy, policy_id)
+    try:
+        giorno = date.fromisoformat(data)
+    except ValueError:
+        abort(404)
+    r = next((r for r in rate_previste(p, giorno, giorno) if r["data"] == giorno), None)
+    if r is None:
+        flash("Questa rata non è più da far pagare (è stata emessa o incassata).", "info")
+        return redirect(url_for("policies.detail", policy_id=p.id))
+    dati = _avviso(p, r["data"], r["fine"], r["premio"], f"rata {r['numero']}/{r['totali']}")
+    return _mostra_avviso(dati, url_for("policies.detail", policy_id=p.id) + "#titoli")

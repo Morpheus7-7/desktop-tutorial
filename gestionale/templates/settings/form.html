@@ -50,6 +50,12 @@
       <label class="form-label" for="settings-form-studio-contatti">Contatti (telefono, email, PEC)</label>
       <input id="settings-form-studio-contatti" class="form-control" name="studio_contatti" value="{{ s.studio_contatti or '' }}">
     </div>
+    <div class="col-12">
+      <label class="form-label" for="settings-form-studio-pagamenti">Come pagare le rate</label>
+      <textarea id="settings-form-studio-pagamenti" class="form-control" name="studio_pagamenti" rows="3" aria-describedby="aiuto-pagamenti"
+                placeholder="es. Bonifico sull'IBAN IT00 X000 0000 0000 0000 0000 000 intestato a Studio Rossi, causale: numero di polizza. Oppure in agenzia, lun–ven 9–13.">{{ s.studio_pagamenti or '' }}</textarea>
+      <div class="form-text" id="aiuto-pagamenti">Compare negli avvisi di pagamento delle rate che stampi o invii ai clienti.</div>
+    </div>
     <div class="col-12"><button class="btn btn-primary"><i class="bi bi-save"></i> Salva dati studio</button></div>
   </form>
 </div>

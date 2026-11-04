@@ -98,7 +98,10 @@
                 <div class="ga-muted">{{ p.frazionamento_label }} · rata {{ r.numero }}/{{ r.totali }}</div></td>
               <td class="num">{{ r.premio | euro }}</td>
               <td><span class="badge {{ 'bg-warning text-dark' if r.data < oggi else 'bg-info text-dark' }}">{{ 'Da emettere, già scaduta' if r.data < oggi else 'Da emettere' }}</span></td>
-              <td class="text-end"><a class="btn btn-sm btn-outline-primary text-nowrap" href="{{ url_for('policies.detail', policy_id=p.id) }}#titoli"><i class="bi bi-receipt" aria-hidden="true"></i> Genera titolo</a></td>
+              <td class="text-end text-nowrap">
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('titles.expected_payment_notice', policy_id=p.id, data=r.data.isoformat()) }}"
+                   title="Avviso di pagamento al cliente" aria-label="Avviso di pagamento al cliente"><i class="bi bi-envelope-paper" aria-hidden="true"></i></a>
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('policies.detail', policy_id=p.id) }}#titoli"><i class="bi bi-receipt" aria-hidden="true"></i> Genera titolo</a></td>
             </tr>
           {% endfor %}
           </tbody>

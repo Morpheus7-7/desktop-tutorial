@@ -104,6 +104,7 @@ def _ensure_schema() -> None:
             "studio_piva": "ALTER TABLE settings ADD COLUMN studio_piva VARCHAR(16)",
             "studio_indirizzo": "ALTER TABLE settings ADD COLUMN studio_indirizzo VARCHAR(250)",
             "studio_contatti": "ALTER TABLE settings ADD COLUMN studio_contatti VARCHAR(250)",
+            "studio_pagamenti": "ALTER TABLE settings ADD COLUMN studio_pagamenti TEXT",
             "backup_automatico": "ALTER TABLE settings ADD COLUMN backup_automatico BOOLEAN NOT NULL DEFAULT 1",
             "backup_conservati": "ALTER TABLE settings ADD COLUMN backup_conservati INTEGER DEFAULT 14",
             "ultimo_backup_at": "ALTER TABLE settings ADD COLUMN ultimo_backup_at DATETIME",

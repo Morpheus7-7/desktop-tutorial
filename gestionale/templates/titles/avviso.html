@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Avviso di pagamento — {{ a.cliente.ragione_sociale }} — Deal Combined{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb" class="no-print"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=a.cliente.id) }}">{{ a.cliente.ragione_sociale }}</a></li>
+  <li class="breadcrumb-item"><a href="{{ ritorno }}">Polizza {{ a.polizza.numero_polizza }}</a></li>
+  <li class="breadcrumb-item active">Avviso di pagamento</li>
+</ol></nav>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3 no-print">
+  <div>
+    <h1 class="page-title"><i class="bi bi-envelope-paper me-2" aria-hidden="true"></i>Avviso di pagamento</h1>
+    <div class="page-subtitle">{{ a.rata | capitalize }} · {{ a.importo | euro }} · scadenza {{ a.scadenza | data_it }}</div>
+  </div>
+  <button type="button" class="btn btn-outline-secondary" data-print><i class="bi bi-printer" aria-hidden="true"></i> Stampa la lettera</button>
+</div>
+
+{% if not a.studio.studio_pagamenti %}
+<div class="alert alert-info small no-print"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  Aggiungi le istruzioni per pagare (IBAN, pagamento in agenzia…) in
+  {% if is_admin %}<a href="{{ url_for('settings.edit') }}">Impostazioni → Dati dello studio</a>{% else %}Impostazioni (chiedi all'amministratore){% endif %}: compariranno in ogni avviso.</div>
+{% endif %}
+
+<div class="row g-4">
+  <div class="col-xl-7">
+    <article class="lettera card" data-bs-theme="light" aria-label="Lettera per il cliente">
+      <div class="card-body">
+        <header class="lettera-intestazione">
+          <div class="fw-bold">{{ a.studio.studio_nome or 'Deal Combined' }}</div>
+          {% if a.studio.studio_rui %}<div>Iscrizione RUI {{ a.studio.studio_rui }}</div>{% endif %}
+          {% if a.studio.studio_indirizzo %}<div>{{ a.studio.studio_indirizzo }}</div>{% endif %}
+          {% if a.studio.studio_contatti %}<div>{{ a.studio.studio_contatti }}</div>{% endif %}
+        </header>
+        <div class="lettera-destinatario">
+          <div class="fw-semibold">{{ a.cliente.ragione_sociale }}</div>
+          {% if a.cliente.tipo in ('azienda', 'studio') and a.cliente.referente %}<div>alla c.a. di {{ a.cliente.referente }}</div>{% endif %}
+          {% if a.cliente.indirizzo %}<div>{{ a.cliente.indirizzo }}</div>{% endif %}
+          {% if a.cliente.cap or a.cliente.citta %}<div>{{ a.cliente.cap or '' }} {{ a.cliente.citta or '' }}{% if a.cliente.provincia %} ({{ a.cliente.provincia }}){% endif %}</div>{% endif %}
+        </div>
+        <p class="lettera-data">{{ oggi | data_it }}</p>
+        <p class="fw-semibold">Oggetto: {{ oggetto }}</p>
+        <div class="lettera-testo">{{ testo }}</div>
+      </div>
+    </article>
+  </div>
+  <div class="col-xl-5 no-print">
+    <section class="card" aria-labelledby="t-email">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-email"><i class="bi bi-envelope me-1" aria-hidden="true"></i> Invia per email</h2></div>
+      <div class="card-body">
+        {% if puo_modificare %}
+        <form method="post">
+          {{ csrf_field() }}
+          <div class="mb-2"><label class="form-label" for="destinatario">Email del cliente</label>
+            <input class="form-control" type="email" id="destinatario" name="destinatario" required value="{{ email }}"></div>
+          <div class="mb-2"><label class="form-label" for="oggetto">Oggetto</label>
+            <input class="form-control" id="oggetto" name="oggetto" maxlength="200" value="{{ oggetto }}"></div>
+          <div class="mb-3"><label class="form-label" for="testo">Testo</label>
+            <textarea class="form-control" id="testo" name="testo" rows="14">{{ testo }}</textarea>
+            <div class="form-text">Puoi modificarlo prima di inviare. L'email parte dal server impostato in Impostazioni (es. Gmail) e resta nella tua posta inviata.</div></div>
+          <button class="btn btn-primary"><i class="bi bi-send" aria-hidden="true"></i> Invia l'avviso</button>
+        </form>
+        {% else %}
+        <p class="small ga-muted mb-0">Il tuo profilo è in sola consultazione: puoi stampare la lettera ma non inviare email.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

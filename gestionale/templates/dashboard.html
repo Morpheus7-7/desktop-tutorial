@@ -159,8 +159,10 @@
                   <button class="btn btn-sm btn-outline-success"><i class="bi bi-check-lg"></i> Fatto</button>
                 </form>
                 {% elif v.tipo == 'rata' %}
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('titles.payment_notice', title_id=v.id) }}" title="Avviso di pagamento al cliente" aria-label="Avviso di pagamento al cliente"><i class="bi bi-envelope-paper" aria-hidden="true"></i></a>
                 <a class="btn btn-sm btn-outline-success" href="{{ url_for('policies.detail', policy_id=v.policy_id) }}#titoli"><i class="bi bi-cash-coin" aria-hidden="true"></i> Incassa</a>
                 {% elif v.tipo == 'rata_prevista' %}
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('titles.expected_payment_notice', policy_id=v.policy_id, data=v.data.isoformat()) }}" title="Avviso di pagamento al cliente" aria-label="Avviso di pagamento al cliente"><i class="bi bi-envelope-paper" aria-hidden="true"></i></a>
                 <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('policies.detail', policy_id=v.policy_id) }}#titoli"><i class="bi bi-receipt" aria-hidden="true"></i> Apri</a>
                 {% else %}
                 <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('policies.edit_policy', policy_id=v.id) }}"><i class="bi bi-arrow-repeat"></i> Rinnovo</a>

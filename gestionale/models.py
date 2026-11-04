@@ -1281,6 +1281,8 @@ class Settings(db.Model):
     studio_piva = db.Column(db.String(16))
     studio_indirizzo = db.Column(db.String(250))
     studio_contatti = db.Column(db.String(250))
+    # Come pagare le rate (IBAN, intestatario, pagamento in agenzia…): va negli avvisi ai clienti.
+    studio_pagamenti = db.Column(db.Text)
     # Backup automatico giornaliero del database e dei documenti.
     backup_automatico = db.Column(db.Boolean, default=True, nullable=False)
     backup_conservati = db.Column(db.Integer, default=14)

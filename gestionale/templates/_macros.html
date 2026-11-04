@@ -52,6 +52,10 @@
 {%- endmacro %}
 
 {% macro azioni_titolo(t, next_url) -%}
+{% if t.stato == 'da_incassare' and t.premio_lordo and t.premio_lordo > 0 %}
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('titles.payment_notice', title_id=t.id) }}"
+     title="Avviso di pagamento al cliente" aria-label="Avviso di pagamento al cliente"><i class="bi bi-envelope-paper" aria-hidden="true"></i></a>
+{% endif %}
 {% if puo_modificare %}
   {% if t.stato == 'da_incassare' %}
   <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalIncasso"
