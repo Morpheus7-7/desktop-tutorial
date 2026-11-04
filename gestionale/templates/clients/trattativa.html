@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Trattativa — {{ client.ragione_sociale }} — Deal Combined{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb" class="no-print"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('clients.list_clients') }}">Clienti</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('clients.detail', client_id=client.id) }}">{{ client.ragione_sociale }}</a></li>
+  <li class="breadcrumb-item active">Come impostare la trattativa</li>
+</ol></nav>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="page-title"><i class="bi bi-compass me-2" aria-hidden="true"></i>Come impostare la trattativa</h1>
+    <div class="page-subtitle">{{ client.ragione_sociale }} · {{ client.tipo_label }}{% if gd.professione %} · {{ gd.professione.nome }}{% elif client.professione %} · {{ client.professione }}{% endif %}{% if client.attivita_sintesi %} · {{ client.attivita_sintesi }}{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2 no-print">
+    <button type="button" class="btn btn-outline-secondary" data-print><i class="bi bi-printer" aria-hidden="true"></i> Stampa</button>
+    {% if puo_modificare %}<a class="btn btn-primary" href="{{ url_for('client_sheets.new_sheet', client_id=client.id, scheda_id=gd.scheda_raccolta) }}"><i class="bi bi-clipboard-plus" aria-hidden="true"></i> Compila la raccolta informazioni</a>{% endif %}
+  </div>
+</div>
+
+{% if gd.prossimo_followup %}
+{% set f = gd.prossimo_followup %}
+<div class="nastro mb-3" role="note"><i class="bi bi-bookmark-fill" aria-hidden="true"></i> Prossimo passo
+  <span class="nastro-dettaglio">· {{ f.titolo }} · {{ f.data_scadenza | data_it }}</span></div>
+{% endif %}
+
+<div class="row g-4">
+  <div class="col-xl-7">
+    <section class="card mb-4" aria-labelledby="t-domande">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-domande"><i class="bi bi-question-circle me-1" aria-hidden="true"></i> Le domande da fare (metodo SPIN)</h2></div>
+      <div class="card-body">
+        {% for fase, titolo, aiuto in [('situazione', 'Situazione', 'per capire come lavora e vive'), ('problema', 'Problema', 'per far emergere difficoltà e timori'), ('implicazione', 'Implicazione', 'per far pesare le conseguenze'), ('bisogno', 'Bisogno', 'perché sia lui a dire cosa gli serve')] %}
+        <h3 class="section-title mt-2">{{ titolo }} <span class="text-lowercase fw-normal">· {{ aiuto }}</span></h3>
+        <ul class="mb-3">
+          {% for d in gd.domande[fase] %}<li>{{ d }}</li>{% endfor %}
+        </ul>
+        {% endfor %}
+        <p class="small ga-muted mb-0">Annota le sue parole: serviranno per il questionario di adeguatezza e per la proposta (IDD: proponi solo ciò che è coerente con le sue esigenze).</p>
+      </div>
+    </section>
+
+    <section class="card mb-4" aria-labelledby="t-obiezioni">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0" id="t-obiezioni"><i class="bi bi-shield-exclamation me-1" aria-hidden="true"></i> Obiezioni che potresti sentire</h2>
+        <a class="small no-print" href="{{ url_for('academy.objections') }}">Tutte le obiezioni</a>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for o in gd.obiezioni %}
+        <div class="list-group-item">
+          <div class="d-flex justify-content-between gap-2"><strong>«{{ o.obiezione }}»</strong><span class="badge badge-soft">{{ categorie.get(o.categoria, o.categoria) }}</span></div>
+          <div class="small ga-muted mt-1">Cosa nasconde: {{ o.cosa_nasconde }}</div>
+          <div class="small mt-1"><span class="fw-semibold">Risposta</span> ({{ o.tecnica }}): {{ o.risposta }}</div>
+          <div class="small mt-1"><span class="fw-semibold">Rilancio:</span> {{ o.rilancio }}</div>
+          <div class="small no-print mt-1"><a href="{{ url_for('academy.drill', id=o.id) }}"><i class="bi bi-lightning-charge" aria-hidden="true"></i> Allenati su questa</a></div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <div class="col-xl-5">
+    {% if gd.obblighi %}
+    <section class="card mb-4" aria-labelledby="t-obblighi">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-obblighi"><i class="bi bi-bank me-1" aria-hidden="true"></i> Obblighi di legge</h2></div>
+      <ul class="list-group list-group-flush small">
+        {% for o in gd.obblighi %}
+        <li class="list-group-item">
+          <div class="d-flex justify-content-between gap-2"><span class="fw-semibold">{{ o.copertura }}</span>
+            {% if o.coperto %}<span class="text-success text-nowrap"><i class="bi bi-check-circle" aria-hidden="true"></i> in portafoglio</span>
+            {% else %}<span class="text-danger text-nowrap"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> da proporre</span>{% endif %}</div>
+          <div class="ga-muted">{{ o.norma }}</div>
+          {% if o.massimale_insufficiente %}<div class="text-danger">Massimale sotto il minimo di legge: da adeguare.</div>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% if gd.avvertenze %}<div class="card-body small border-top">{% for a in gd.avvertenze %}<p class="mb-1">{{ a }}</p>{% endfor %}</div>{% endif %}
+    </section>
+    {% endif %}
+
+    <section class="card mb-4" aria-labelledby="t-scoperte">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0" id="t-scoperte"><i class="bi bi-search me-1" aria-hidden="true"></i> Coperture scoperte</h2>
+        {% if gd.analisi %}<span class="small ga-muted">analisi del {{ gd.analisi.created_at | data_it }}</span>{% endif %}
+      </div>
+      {% if gd.scoperte %}
+      <ul class="list-group list-group-flush small">
+        {% for c in gd.scoperte %}
+        <li class="list-group-item">
+          <div class="fw-semibold">{{ c.nome_ramo }}</div>
+          <div class="ga-muted">{{ c.rischi | join(', ') }}</div>
+          {% if c.trattativa and c.trattativa.leva %}<div class="mt-1"><span class="fw-semibold">Leva:</span> {{ c.trattativa.leva }}</div>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body small">
+        {% if gd.analisi %}L'ultima analisi non ha trovato coperture scoperte.
+        {% else %}Non c'è ancora un'analisi dei rischi.{% if client.descrizione_attivita and puo_modificare %}
+        <form method="post" action="{{ url_for('clients.run_analysis', client_id=client.id) }}" class="d-inline no-print">{{ csrf_field() }}<button class="btn btn-sm btn-outline-primary ms-1">Esegui l'analisi</button></form>
+        {% elif not client.descrizione_attivita %} Aggiungi la descrizione dell'attività nell'anagrafica per poterla eseguire.{% endif %}{% endif %}
+      </div>
+      {% endif %}
+    </section>
+
+    {% if gd.trattative %}
+    <section class="card mb-4" aria-labelledby="t-trattative">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-trattative"><i class="bi bi-kanban me-1" aria-hidden="true"></i> Trattative aperte</h2></div>
+      <ul class="list-group list-group-flush small">
+        {% for o in gd.trattative %}<li class="list-group-item d-flex justify-content-between"><span>{{ o.titolo }}</span><span class="ga-muted">{{ o.fase_label }}{% if o.premio_stimato %} · {{ o.premio_stimato | euro }}{% endif %}</span></li>{% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    <section class="card no-print" aria-labelledby="t-allenamento">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-allenamento"><i class="bi bi-mortarboard me-1" aria-hidden="true"></i> Prima dell'appuntamento</h2></div>
+      <div class="card-body small">
+        {% if gd.scenari %}
+        <p class="fw-semibold mb-1">Prova il role-play con un collega</p>
+        <ul class="mb-3">{% for sc in gd.scenari %}<li><a href="{{ url_for('academy.scenario', scenario_id=sc.id) }}">{{ sc.titolo }}</a> <span class="ga-muted">· {{ sc.livello }}</span></li>{% endfor %}</ul>
+        {% endif %}
+        <p class="fw-semibold mb-1">Ripassa</p>
+        <ul class="mb-3">{% for m, lez in gd.lezioni %}<li><a href="{{ url_for('academy.module', modulo_id=m.id) }}#{{ lez.id }}">{{ lez.titolo }}</a> <span class="ga-muted">· settimana {{ m.numero }}</span></li>{% endfor %}</ul>
+        <p class="fw-semibold mb-1">Porta con te</p>
+        <ul class="mb-0">
+          <li><a href="{{ url_for('academy.sheet', scheda_id='preparazione-appuntamento', cliente=client.id) }}">Preparazione dell'appuntamento</a> (da stampare)</li>
+          <li><a href="{{ url_for('academy.sheet', scheda_id='informazioni-da-dare', cliente=client.id) }}">Check-list dei documenti da consegnare</a></li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

@@ -476,6 +476,22 @@ def new_client():
     return _form(client, nuovo=True)
 
 
+@bp.route("/<int:client_id>/trattativa")
+def negotiation_guide(client_id):
+    """«Come impostare la trattativa»: profilo, obblighi, scoperture, domande, obiezioni e allenamento."""
+    from .. import trattativa
+
+    client = db.get_or_404(Client, client_id)
+    return render_template("clients/trattativa.html", client=client, gd=trattativa.guida(client),
+                           categorie=academy_categorie())
+
+
+def academy_categorie():
+    from .. import academy as ac
+
+    return ac.CATEGORIE_OBIEZIONI_LABELS
+
+
 @bp.route("/<int:client_id>")
 def detail(client_id):
     return render_detail(db.get_or_404(Client, client_id))
