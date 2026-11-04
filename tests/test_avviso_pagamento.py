@@ -59,3 +59,17 @@ def test_avviso_nella_lista_oggi(client, app):
     _polizza(app)
     pagina = client.get("/").get_data(as_text=True)
     assert "/titoli/avviso-rata/" in pagina
+
+
+def test_rata_scaduta_sollecito_con_copertura_sospesa(client, app):
+    pid, _ = _polizza(app)
+    with app.app_context():
+        p = db.session.get(Policy, pid)
+        t = Title(policy_id=pid, client_id=p.client_id, data_effetto=OGGI - timedelta(days=20), premio_lordo=600.0,
+                  data_fine_copertura=OGGI + timedelta(days=160), stato="da_incassare")
+        db.session.add(t)
+        db.session.commit()
+        tid = t.id
+    pagina = client.get(f"/titoli/{tid}/avviso").get_data(as_text=True)
+    assert "Sollecito pagamento" in pagina and "risulta ancora da effettuare" in pagina
+    assert "la copertura è sospesa dalle ore 24 del" in pagina and "scade il pagamento" not in pagina

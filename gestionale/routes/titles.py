@@ -714,21 +714,34 @@ def _avviso(policy: Policy, scadenza: date, fine, importo: float, rata: str) -> 
     cliente = policy.cliente
     destinatario = cliente.referente if cliente.tipo in ("azienda", "studio") and cliente.referente else cliente.nome_completo
     periodo = f"dal {scadenza:%d/%m/%Y}" + (f" al {fine:%d/%m/%Y}" if fine else "")
+    oggi = date.today()
+    polizza = f"della polizza n. {policy.numero_polizza} di {policy.compagnia}, ramo {policy.ramo_label}"
+    if scadenza >= oggi:
+        apertura = (f"le ricordiamo che il {scadenza:%d/%m/%Y} scade il pagamento della {rata} {polizza}, "
+                    f"che copre il periodo {periodo}.")
+    else:
+        apertura = (f"dai nostri archivi il pagamento della {rata} {polizza}, scaduto il {scadenza:%d/%m/%Y} "
+                    f"(periodo {periodo}), risulta ancora da effettuare.")
     righe = [
         f"Gentile {destinatario},",
         "",
-        f"le ricordiamo che il {scadenza:%d/%m/%Y} scade il pagamento della {rata} della polizza "
-        f"n. {policy.numero_polizza} ({policy.compagnia}, {policy.ramo_label}), "
-        f"che copre il periodo {periodo}.",
+        apertura,
         "",
         f"Importo da pagare: {formatta_euro(importo)}",
     ]
     if s.studio_pagamenti:
         righe += ["", "Come pagare:", s.studio_pagamenti.strip()]
+    sospensione = scadenza + timedelta(days=15)
+    if oggi > sospensione:
+        avviso_1901 = (f"Trascorsi quindici giorni dalla scadenza, la copertura è sospesa dalle ore 24 del "
+                       f"{sospensione:%d/%m/%Y} e riprenderà dalle ore 24 del giorno del pagamento "
+                       "(art. 1901 del Codice civile): le consigliamo di provvedere al più presto.")
+    else:
+        avviso_1901 = ("Se il premio non viene pagato, la copertura resta sospesa dalle ore 24 del quindicesimo giorno "
+                       "dopo la scadenza e riprende dalle ore 24 del giorno del pagamento (art. 1901 del Codice civile).")
     righe += [
         "",
-        "Se il premio non viene pagato, la copertura resta sospesa dalle ore 24 del quindicesimo giorno "
-        "dopo la scadenza e riprende dalle ore 24 del giorno del pagamento (art. 1901 del Codice civile).",
+        avviso_1901,
         "Se ha già provveduto, non tenga conto di questo avviso.",
         "",
         "Cordiali saluti",
@@ -737,7 +750,9 @@ def _avviso(policy: Policy, scadenza: date, fine, importo: float, rata: str) -> 
     return {
         "polizza": policy, "cliente": cliente, "destinatario": destinatario, "scadenza": scadenza, "fine": fine,
         "importo": importo, "rata": rata, "periodo": periodo, "studio": s,
-        "oggetto": f"Promemoria pagamento polizza {policy.numero_polizza} — scadenza {scadenza:%d/%m/%Y}",
+        "oggetto": (f"Promemoria pagamento polizza {policy.numero_polizza} — scadenza {scadenza:%d/%m/%Y}"
+                    if scadenza >= oggi else
+                    f"Sollecito pagamento polizza {policy.numero_polizza} — scaduta il {scadenza:%d/%m/%Y}"),
         "testo": "\n".join(righe).strip(),
     }
 

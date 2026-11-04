@@ -172,6 +172,25 @@ e **backup** integrati.
   pulsanti con nome leggibile dagli screen reader, contrasto WCAG AA, focus
   visibile da tastiera, nessun doppio invio dei moduli.
 
+### Novità della 3.0
+
+- **Rate da far pagare** (semestrali, trimestrali, mensili e quietanze
+  annuali) nella lista «Da fare» di «Oggi», nelle notifiche e nel riepilogo
+  email, anche quando il titolo non è ancora stato emesso. Giorni di
+  preavviso di scadenze e rate scelti in *Impostazioni → Automatismi*.
+- **Google Calendar collegato**: scadenze, disdette, rate, follow-up e
+  promemoria scritti e aggiornati da soli in un calendario «Deal Combined»
+  (vedi [PACKAGING.md](PACKAGING.md#google-gmail-drive-e-calendar)).
+- **Avviso di pagamento** al cliente: lettera da stampare o email pronta, con
+  importo, periodo, come pagare e art. 1901 c.c.; per le rate scadute diventa
+  un sollecito che indica da quando la copertura è sospesa.
+- **«Come impostare la trattativa»** dalla scheda del cliente: domande SPIN
+  per il suo profilo, obblighi di legge, coperture scoperte con la leva di
+  trattativa, obiezioni probabili, role-play e lezioni da ripassare.
+- **Accademia per utente**: ognuno ha i suoi progressi; il titolare vede in
+  «La squadra» a che punto è ogni consulente. Nuovo modulo «Correttezza e
+  normativa in pratica», 10 obiezioni e 4 role-play per settore in più.
+
 ### Dalla versione Deal Combined
 
 - **Persone fisiche con nome e cognome**: nascita, **residenza**, stato civile,

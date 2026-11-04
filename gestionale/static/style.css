@@ -973,3 +973,7 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
   .lettera .card-body { padding: 0; }
 }
 .oggi-azione { display: flex; gap: .35rem; align-items: center; }
+
+/* Guida alla trattativa: sottotitoli delle fasi SPIN e misura delle risposte. */
+.section-title .text-lowercase { letter-spacing: normal; text-transform: none; }
+.guida-obiezioni .list-group-item > div { max-width: 75ch; }

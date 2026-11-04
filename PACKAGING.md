@@ -95,7 +95,9 @@ stessa pagina mostra lo stato.
 
 ## Google: Gmail, Drive e Calendar
 
-Da *Impostazioni → Google*, senza registrare app su Google Cloud:
+Da *Impostazioni → Google*. Gmail e Drive non richiedono di registrare app su
+Google Cloud; il collegamento diretto a Calendar sì (una volta sola, guida
+passo passo nella pagina).
 
 - **Gmail:** le schede compilate si inviano al cliente come PDF allegato
   (pulsante *Invia per email* nella scheda), con una *password per le app*
@@ -103,8 +105,30 @@ Da *Impostazioni → Google*, senza registrare app su Google Cloud:
 - **Google Drive:** con *Google Drive per desktop* installato, i PDF si
   salvano in `Il mio Drive\Deal Combined\Clienti\<cliente>` e Drive li carica.
   La cartella si imposta per ogni PC.
-- **Google Calendar:** ogni follow-up aperto ha un pulsante che apre Calendar
-  con l'evento già compilato; *Esporta in Calendar (.ics)* li importa tutti.
+- **Google Calendar collegato:** Deal Combined scrive da solo, in un
+  calendario «Deal Combined» del tuo account, scadenze delle polizze, ultimi
+  giorni per la disdetta, rate da far pagare (annuali e frazionate), follow-up
+  e promemoria delle note. Li aggiorna quando cambiano e li toglie quando sono
+  fatti o incassati, a ogni controllo automatico (ogni 30 minuti di base) o
+  con *Aggiorna adesso*. I promemoria di Calendar arrivano ai giorni di
+  preavviso scelti in *Impostazioni → Automatismi* (Google ne accetta fino a 4
+  settimane prima). Configurazione, una volta sola:
+  1. su **console.cloud.google.com** crea un progetto e abilita la
+     **Google Calendar API**;
+  2. nella **schermata di consenso OAuth** scegli *Esterno*, poi
+     **pubblica l'app** («In produzione»): se resta «In prova» Google
+     interrompe il collegamento ogni 7 giorni;
+  3. in **Credenziali** crea un **ID client OAuth** di tipo **App desktop** e
+     copia ID e secret in Deal Combined;
+  4. premi **Collega Google Calendar**: si apre il browser, accedi e consenti
+     (Google avvisa che l'app non è verificata: è la tua, *Avanzate → Vai a
+     Deal Combined*).
+  Il programma chiede solo il permesso sui **calendari che crea lui**: gli
+  altri tuoi calendari restano invisibili. Due PC con lo stesso archivio non
+  creano doppioni.
+- **Senza collegamento:** ogni follow-up aperto ha un pulsante che apre
+  Calendar con l'evento già compilato; *Scarica il calendario (.ics)* li
+  importa tutti.
 
 ## Note e promemoria
 
