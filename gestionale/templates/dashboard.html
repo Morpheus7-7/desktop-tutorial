@@ -158,6 +158,10 @@
                   <input type="hidden" name="next" value="{{ url_for('main.dashboard') }}">
                   <button class="btn btn-sm btn-outline-success"><i class="bi bi-check-lg"></i> Fatto</button>
                 </form>
+                {% elif v.tipo == 'rata' %}
+                <a class="btn btn-sm btn-outline-success" href="{{ url_for('policies.detail', policy_id=v.policy_id) }}#titoli"><i class="bi bi-cash-coin" aria-hidden="true"></i> Incassa</a>
+                {% elif v.tipo == 'rata_prevista' %}
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('policies.detail', policy_id=v.policy_id) }}#titoli"><i class="bi bi-receipt" aria-hidden="true"></i> Apri</a>
                 {% else %}
                 <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('policies.edit_policy', policy_id=v.id) }}"><i class="bi bi-arrow-repeat"></i> Rinnovo</a>
                 {% endif %}

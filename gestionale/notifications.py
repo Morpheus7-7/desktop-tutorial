@@ -205,6 +205,7 @@ def generate_notifications(oggi: date | None = None) -> int:
     created += _notifiche_decorrenze(today)
     created += _notifiche_followup(today)
     created += _notifiche_titoli(today)
+    created += _notifiche_rate_previste(today)
     created += _notifiche_sinistri(today)
     created += _notifiche_clienti(today)
     if created:
@@ -212,12 +213,32 @@ def generate_notifications(oggi: date | None = None) -> int:
     return created
 
 
+def _preavvisi_scadenze() -> list[int]:
+    """Fasce di preavviso delle scadenze annuali scelte in Impostazioni (dalla più lunga)."""
+    from .models import Settings
+
+    try:
+        return Settings.get().giorni_preavviso_scadenze
+    except Exception:  # noqa: BLE001 - database non ancora pronto
+        return list(POLICY_REMINDER_BUCKETS)
+
+
+def _preavviso_rate() -> int:
+    from .models import Settings
+
+    try:
+        return Settings.get().giorni_preavviso_rate
+    except Exception:  # noqa: BLE001
+        return TITLE_REMINDER_DAYS
+
+
 def _notifiche_polizze(today: date) -> int:
     created = 0
+    fasce = _preavvisi_scadenze()
     policies = Policy.query.filter(
         Policy.data_scadenza.isnot(None),
         Policy.stato.in_(STATI_ATTIVI),
-        Policy.data_scadenza <= today + timedelta(days=max(POLICY_REMINDER_BUCKETS)),
+        Policy.data_scadenza <= today + timedelta(days=max(fasce)),
     ).all()
     for policy in policies:
         giorni = (policy.data_scadenza - today).days
@@ -243,9 +264,10 @@ def _notifiche_polizze(today: date) -> int:
             continue
         if tacito:
             continue  # per il tacito rinnovo conta il termine di disdetta (vedi sotto)
-        for bucket in sorted(POLICY_REMINDER_BUCKETS):
+        for indice, bucket in enumerate(sorted(fasce)):
             if giorni <= bucket:
-                livello = "danger" if bucket == 7 else "warning" if bucket == 30 else "info"
+                # La fascia più vicina è urgente, la seconda un avviso, le altre informative.
+                livello = "danger" if indice == 0 else "warning" if indice == 1 else "info"
                 created += _add(
                     "scadenza_polizza", livello,
                     f"{descr} scade {_testo_giorni(giorni)} ({policy.data_scadenza:%d/%m/%Y}).",
@@ -350,7 +372,7 @@ def _notifiche_titoli(today: date) -> int:
     titoli = Title.query.filter(
         Title.stato == "da_incassare",
         Title.premio_lordo > 0,
-        Title.data_effetto <= today + timedelta(days=TITLE_REMINDER_DAYS),
+        Title.data_effetto <= today + timedelta(days=_preavviso_rate()),
     ).all()
     for t in titoli:
         policy = t.polizza
@@ -406,6 +428,25 @@ def _notifiche_titoli(today: date) -> int:
                 f"Rata in scadenza {_testo_giorni(giorni)} ({t.data_effetto:%d/%m/%Y}, {importo}) della {descr}.",
                 link, f"{chiave}:prossimo",
             )
+    return created
+
+
+def _notifiche_rate_previste(today: date) -> int:
+    """Rate del frazionamento (semestrali, trimestrali, mensili…) da far pagare
+    per cui non è ancora stato emesso il titolo: il promemoria arriva lo stesso."""
+    from .titoli import rate_previste_portafoglio
+
+    created = 0
+    for r in rate_previste_portafoglio(today, today + timedelta(days=_preavviso_rate())):
+        policy = r["polizza"]
+        giorni = (r["data"] - today).days
+        created += _add(
+            "titolo", "info",
+            f"Rata {r['numero']}/{r['totali']} da far pagare {_testo_giorni(giorni)} "
+            f"({r['data']:%d/%m/%Y}, {formatta_euro(r['premio'])}) della polizza {policy.numero_polizza} "
+            f"di {policy.cliente.ragione_sociale}.",
+            f"/polizze/{policy.id}", f"rata_prevista:{policy.id}:{r['data'].isoformat()}",
+        )
     return created
 
 

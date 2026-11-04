@@ -23,11 +23,11 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
-from .. import archivio, backup, desktop
+from .. import archivio, backup, desktop, google_calendar
 from ..archivio import percorso_db
 from ..desktop import NOME_DB
 from ..mailer import contatore_pending, effective_config, send_pending_notifications, send_test_email
-from ..models import AuditLog, Settings, db, now
+from ..models import AuditLog, CalendarioEvento, Settings, db, leggi_preavvisi, now
 from ..security import audit, require_admin
 from ..utils import clean, parse_int
 
@@ -45,7 +45,8 @@ def aggiorna_schema() -> None:
 bp = Blueprint("settings", __name__, url_prefix="/impostazioni")
 # Comandi della finestra del programma e avviso «archivio aperto sull'altro
 # PC»: devono funzionare anche prima dell'accesso (vedi security.PUBLIC_ENDPOINTS).
-ENDPOINT_SENZA_ADMIN = {"settings.shutdown", "settings.show_window", "settings.in_use", "settings.open_anyway"}
+ENDPOINT_SENZA_ADMIN = {"settings.shutdown", "settings.show_window", "settings.in_use", "settings.open_anyway",
+                        "settings.calendar_return"}
 
 
 @bp.before_request
@@ -67,6 +68,7 @@ CAMPI_INTERI = {
     "backup_conservati": ("Backup da conservare", 1, 365, 14),
     "anticipo_quietanze_giorni": ("Anticipo emissione quietanze (giorni)", 0, 120, 30),
     "tolleranza_scadenza_giorni": ("Tolleranza prima di segnare la polizza scaduta (giorni)", 0, 180, 30),
+    "preavviso_rate_giorni": ("Preavviso delle rate da far pagare (giorni)", 1, 90, 15),
 }
 
 # Automatismi sulle date (vedi gestionale/automatismi.py).
@@ -76,6 +78,8 @@ CAMPI_AUTOMATISMI = {
     "anticipo_quietanze_giorni": "Anticipo emissione quietanze",
     "scadenza_automatica": "Scadenza automatica delle polizze non rinnovate",
     "tolleranza_scadenza_giorni": "Tolleranza dopo la scadenza",
+    "preavvisi_scadenze": "Preavvisi delle scadenze annuali",
+    "preavviso_rate_giorni": "Preavviso delle rate",
 }
 
 
@@ -229,7 +233,15 @@ def save_automatismi():
         "anticipo_quietanze_giorni": _leggi_intero("anticipo_quietanze_giorni", errori),
         "scadenza_automatica": request.form.get("scadenza_automatica") == "on",
         "tolleranza_scadenza_giorni": _leggi_intero("tolleranza_scadenza_giorni", errori),
+        "preavviso_rate_giorni": _leggi_intero("preavviso_rate_giorni", errori),
     }
+    testo_preavvisi = (request.form.get("preavvisi_scadenze") or "").strip()
+    preavvisi = leggi_preavvisi(testo_preavvisi)
+    if testo_preavvisi and not preavvisi:
+        errori.append("Preavvisi delle scadenze: indica da 1 a 5 numeri di giorni tra 1 e 365, separati da virgola (es. 60, 30, 7).")
+    nuovi["preavvisi_scadenze"] = ", ".join(str(g) for g in preavvisi) if preavvisi else "60, 30, 7"
+    if leggi_preavvisi(s.preavvisi_scadenze) == leggi_preavvisi(nuovi["preavvisi_scadenze"]):
+        nuovi["preavvisi_scadenze"] = s.preavvisi_scadenze  # stessi giorni: nessuna modifica
     if errori:
         _mostra_errori(errori)
         return redirect(url_for("settings.edit") + "#automatismi")
@@ -565,7 +577,91 @@ def google():
         candidati=g.candidati_drive(),
         s=s,
         gmail_attivo=(s.smtp_host or "").lower() == g.GMAIL_SMTP["smtp_host"],
+        gcal_configurato=google_calendar.configurato(s),
+        gcal_collegato=google_calendar.collegato(s),
+        gcal_ritorno=_ritorno_calendar(),
+        gcal_eventi=CalendarioEvento.query.count(),
     )
+
+
+# ----------------------------------------------------------------------
+# Google Calendar collegato direttamente (vedi gestionale/google_calendar.py)
+# ----------------------------------------------------------------------
+def _ritorno_calendar() -> str:
+    """Indirizzo a cui Google rimanda dopo il consenso (questo PC, porta attuale)."""
+    return request.host_url.rstrip("/") + url_for("settings.calendar_return")
+
+
+@bp.route("/google/calendar", methods=["POST"])
+def calendar_settings():
+    s = Settings.get()
+    azione = request.form.get("azione")
+    if azione == "credenziali":
+        client_id = (request.form.get("client_id") or "").strip()
+        segreto = (request.form.get("client_secret") or "").strip()
+        if not client_id.endswith(".apps.googleusercontent.com"):
+            flash("L'ID client non sembra giusto: finisce con «.apps.googleusercontent.com». "
+                  "Copialo da Google Cloud → Credenziali.", "danger")
+            return redirect(url_for("settings.google") + "#calendar")
+        if client_id != s.gcal_client_id:
+            s.gcal_refresh_token = None  # nuove credenziali: va rifatto il collegamento
+        s.gcal_client_id = client_id[:200]
+        if segreto:
+            s.gcal_client_secret = segreto[:200]
+        audit("modifica", "impostazioni", None, "Credenziali di Google Calendar aggiornate")
+        db.session.commit()
+        flash("Credenziali salvate. Ora premi «Collega Google Calendar».", "success")
+    elif azione == "collega":
+        try:
+            indirizzo = google_calendar.url_autorizzazione(s, _ritorno_calendar())
+        except google_calendar.CalendarError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("settings.google") + "#calendar")
+        if current_app.config.get("DC_FINESTRA"):
+            # Google non accetta l'accesso dentro le finestre dei programmi:
+            # si apre il browser e il ritorno arriva comunque qui.
+            import webbrowser
+
+            webbrowser.open(indirizzo)
+            flash("Si è aperto il browser: accedi con il tuo account Google e consenti l'accesso. "
+                  "Poi torna qui e aggiorna la pagina.", "info")
+            return redirect(url_for("settings.google") + "#calendar")
+        return redirect(indirizzo)
+    elif azione == "sincronizza":
+        try:
+            esito = google_calendar.sincronizza(base_url=request.host_url)
+        except google_calendar.CalendarError as exc:
+            flash(f"Sincronizzazione non riuscita: {exc}", "danger")
+        else:
+            flash(f"Google Calendar aggiornato: {esito['creati']} eventi nuovi, {esito['aggiornati']} aggiornati, "
+                  f"{esito['eliminati']} tolti.", "success")
+    elif azione == "scollega":
+        google_calendar.scollega(s)
+        audit("modifica", "impostazioni", None, "Google Calendar scollegato")
+        db.session.commit()
+        flash("Google Calendar scollegato. Gli eventi già scritti restano nel calendario «Deal Combined»: "
+              "se non ti servono, elimina quel calendario da Google Calendar.", "info")
+    return redirect(url_for("settings.google") + "#calendar")
+
+
+@bp.route("/google/calendar/ritorno")
+def calendar_return():
+    """Google rimanda qui dopo il consenso (anche nel browser esterno, senza
+    sessione del programma): la richiesta è riconosciuta dal codice «state»."""
+    s = Settings.get()
+    errore = request.args.get("error")
+    try:
+        if errore:
+            raise google_calendar.CalendarError("Accesso non concesso su Google." if errore == "access_denied"
+                                                else f"Google ha risposto: {errore}.")
+        google_calendar.completa_autorizzazione(s, request.args.get("state"), request.args.get("code"))
+        esito = google_calendar.sincronizza(base_url=request.host_url)
+        messaggio = (f"Google Calendar collegato. Nel calendario «{google_calendar.NOME_CALENDARIO}» ci sono ora "
+                     f"{esito['creati'] + esito['aggiornati']} eventi: scadenze, rate, follow-up e promemoria.")
+        ok = True
+    except google_calendar.CalendarError as exc:
+        messaggio, ok = str(exc), False
+    return render_template("settings/calendar_ritorno.html", messaggio=messaggio, ok=ok)
 
 
 # ----------------------------------------------------------------------

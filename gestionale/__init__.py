@@ -112,6 +112,14 @@ def _ensure_schema() -> None:
             "anticipo_quietanze_giorni": "ALTER TABLE settings ADD COLUMN anticipo_quietanze_giorni INTEGER DEFAULT 30",
             "scadenza_automatica": "ALTER TABLE settings ADD COLUMN scadenza_automatica BOOLEAN NOT NULL DEFAULT 1",
             "tolleranza_scadenza_giorni": "ALTER TABLE settings ADD COLUMN tolleranza_scadenza_giorni INTEGER DEFAULT 30",
+            "preavvisi_scadenze": "ALTER TABLE settings ADD COLUMN preavvisi_scadenze VARCHAR(40) DEFAULT '60,30,7'",
+            "preavviso_rate_giorni": "ALTER TABLE settings ADD COLUMN preavviso_rate_giorni INTEGER DEFAULT 15",
+            "gcal_client_id": "ALTER TABLE settings ADD COLUMN gcal_client_id VARCHAR(200)",
+            "gcal_client_secret": "ALTER TABLE settings ADD COLUMN gcal_client_secret VARCHAR(200)",
+            "gcal_refresh_token": "ALTER TABLE settings ADD COLUMN gcal_refresh_token VARCHAR(500)",
+            "gcal_calendar_id": "ALTER TABLE settings ADD COLUMN gcal_calendar_id VARCHAR(300)",
+            "gcal_ultima_sync": "ALTER TABLE settings ADD COLUMN gcal_ultima_sync DATETIME",
+            "gcal_errore": "ALTER TABLE settings ADD COLUMN gcal_errore VARCHAR(300)",
         },
     }
 

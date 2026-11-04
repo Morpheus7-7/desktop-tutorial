@@ -47,6 +47,9 @@ PUBLIC_ENDPOINTS = {
     # Finestra del programma: chiusura, riapertura dalla barra e avviso
     # «archivio aperto sull'altro PC» (che compare prima dell'accesso).
     "settings.shutdown", "settings.show_window", "settings.in_use", "settings.open_anyway",
+    # Ritorno da Google dopo il consenso a Calendar: arriva nel browser esterno,
+    # senza la sessione del programma; vale solo con il codice «state» atteso.
+    "settings.calendar_return",
 }
 # Comandi inviati dal programma stesso con l'intestazione X-DC-Azione: un altro
 # sito non può aggiungerla (servirebbe un permesso CORS che l'app non concede).

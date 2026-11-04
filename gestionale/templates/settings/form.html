@@ -252,6 +252,28 @@
       </div>
     </div>
 
+    <div class="card mb-3">
+      <div class="card-body">
+        <h2 class="h6 mb-1"><i class="bi bi-bell me-1" aria-hidden="true"></i> Promemoria delle scadenze</h2>
+        <p class="form-text mt-0">Valgono per le notifiche del programma, l'email di riepilogo, la lista «Da fare» di «Oggi» e le notifiche di Windows vicino all'orologio.</p>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label small" for="preavvisi_scadenze">Scadenze annuali: avvisami (giorni prima)</label>
+            <input class="form-control" type="text" id="preavvisi_scadenze" name="preavvisi_scadenze" inputmode="numeric"
+                   aria-describedby="aiuto-preavvisi" value="{{ s.giorni_preavviso_scadenze | join(', ') }}">
+            <div class="form-text" id="aiuto-preavvisi">Fino a 5 numeri separati da virgola, es. <strong>60, 30, 7</strong>: un avviso a ogni soglia.</div>
+          </div>
+          <div class="col-md-6">
+            {% set c = campi_interi['preavviso_rate_giorni'] %}
+            <label class="form-label small" for="preavviso_rate_giorni">Rate da far pagare (annuali e frazionate): avvisami (giorni prima)</label>
+            <input class="form-control" type="number" id="preavviso_rate_giorni" name="preavviso_rate_giorni" aria-describedby="aiuto-rate"
+                   min="{{ c[1] }}" max="{{ c[2] }}" value="{{ s.giorni_preavviso_rate }}">
+            <div class="form-text" id="aiuto-rate">Semestrali, quadrimestrali, trimestrali, bimestrali, mensili e quietanze annuali. Le rate arretrate restano in evidenza finché non le incassi.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <button class="btn btn-primary"><i class="bi bi-save"></i> Salva automatismi</button>
   </form>
 </div>

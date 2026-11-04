@@ -1245,6 +1245,15 @@ class Notification(db.Model):
 LIVELLO_ORDINE = {"danger": 0, "warning": 1, "info": 2}
 
 
+def leggi_preavvisi(testo: str | None) -> list[int]:
+    """«60, 30,7» → [60, 30, 7]: giorni tra 1 e 365, senza doppioni, al massimo 5."""
+    giorni = set()
+    for parte in (testo or "").replace(";", ",").replace(" ", ",").split(","):
+        if parte.strip().isdigit() and 1 <= int(parte) <= 365:
+            giorni.add(int(parte))
+    return sorted(giorni, reverse=True)[:5]
+
+
 class Settings(db.Model):
     """Configurazione applicativa (riga singola, id=1).
 
@@ -1281,6 +1290,16 @@ class Settings(db.Model):
     anticipo_quietanze_giorni = db.Column(db.Integer, default=30)
     scadenza_automatica = db.Column(db.Boolean, default=True, nullable=False)
     tolleranza_scadenza_giorni = db.Column(db.Integer, default=30)
+    # Promemoria: giorni di preavviso delle scadenze annuali (es. «60,30,7») e delle rate.
+    preavvisi_scadenze = db.Column(db.String(40), default="60,30,7")
+    preavviso_rate_giorni = db.Column(db.Integer, default=15)
+    # Google Calendar: credenziali dell'app desktop (Google Cloud), accesso e stato.
+    gcal_client_id = db.Column(db.String(200))
+    gcal_client_secret = db.Column(db.String(200))
+    gcal_refresh_token = db.Column(db.String(500))
+    gcal_calendar_id = db.Column(db.String(300))
+    gcal_ultima_sync = db.Column(db.DateTime)
+    gcal_errore = db.Column(db.String(300))
     ultimo_backup_at = db.Column(db.DateTime)
     # Privacy: PIN all'apertura (hash scrypt), codice di recupero, blocco per inattività
     pin_hash = db.Column(db.String(200))
@@ -1299,6 +1318,15 @@ class Settings(db.Model):
             db.session.add(row)
             db.session.commit()
         return row
+
+    @property
+    def giorni_preavviso_scadenze(self) -> list[int]:
+        """Preavvisi delle scadenze annuali, dal più lungo (default 60, 30, 7 giorni)."""
+        return leggi_preavvisi(self.preavvisi_scadenze) or [60, 30, 7]
+
+    @property
+    def giorni_preavviso_rate(self) -> int:
+        return self.preavviso_rate_giorni if self.preavviso_rate_giorni else 15
 
     @property
     def destinatari(self) -> list[str]:
@@ -1703,6 +1731,18 @@ class AuditLog(db.Model):
     entita_id = db.Column(db.Integer)
     descrizione = db.Column(db.String(500))
     ip = db.Column(db.String(45))
+
+
+class CalendarioEvento(db.Model):
+    """Evento scritto nel calendario Google «Deal Combined» (per aggiornarlo o toglierlo)."""
+
+    __tablename__ = "calendar_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    chiave = db.Column(db.String(120), unique=True, nullable=False)  # es. «titolo:12:2026-11-28»
+    event_id = db.Column(db.String(64), nullable=False)
+    impronta = db.Column(db.String(40), nullable=False)  # cambia quando cambia l'evento
+    aggiornato_at = db.Column(db.DateTime, default=now)
 
 
 class AcademyProgress(db.Model):

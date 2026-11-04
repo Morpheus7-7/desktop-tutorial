@@ -955,3 +955,8 @@ blockquote.box-esempio:not(:has(.bi)) { padding-left: 0; }
 .riquadro-stato { background: var(--dc-surface-2); border-radius: var(--dc-radius); overflow: hidden; }
 .riquadro-stato .list-group-item { background: transparent; }
 .riquadro-avviso { background: color-mix(in srgb, var(--dc-warning-soft) 60%, var(--dc-surface)); }
+
+/* Pagine di accesso: il marchio scritto come nella barra laterale. */
+.auth-marchio { font-size: 2rem; font-stretch: 82%; letter-spacing: -.01em; color: var(--dc-ink); line-height: 1; }
+.auth-marchio .dc-brand-deal { font-weight: 750; }
+.auth-marchio .dc-brand-combined { font-weight: 400; }

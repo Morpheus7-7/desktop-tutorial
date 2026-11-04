@@ -1,0 +1,13 @@
+{% extends "layout_auth.html" %}
+{% block title %}Google Calendar — Deal Combined{% endblock %}
+{% block content %}
+<div class="text-center">
+  {% if ok %}
+  <p class="h5 mb-2"><i class="bi bi-calendar-check text-success me-1" aria-hidden="true"></i> Fatto</p>
+  {% else %}
+  <p class="h5 mb-2"><i class="bi bi-exclamation-triangle text-warning me-1" aria-hidden="true"></i> Collegamento non riuscito</p>
+  {% endif %}
+  <p class="mb-3">{{ messaggio }}</p>
+  <p class="small ga-muted mb-0">Puoi chiudere questa scheda e tornare a Deal Combined{% if ok %}: in <strong>Impostazioni → Google</strong> vedi lo stato del calendario{% else %} e riprovare da <strong>Impostazioni → Google</strong>{% endif %}.</p>
+</div>
+{% endblock %}

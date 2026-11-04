@@ -1,7 +1,8 @@
 """Promemoria di Windows: cosa annunciare e avvio automatico con Windows.
 
 L'icona vicino all'orologio (``run_desktop.py``) chiede qui, ogni tanto, i
-follow-up da fare oggi o in ritardo e le polizze in scadenza, e mostra una
+follow-up da fare oggi o in ritardo, le polizze in scadenza e le rate da far
+pagare (annuali e frazionate, anche arretrate), e mostra una
 notifica di Windows solo quando compare qualcosa di nuovo. Le letture non
 modificano il database: con il programma chiuso nella barra l'archivio può
 essere aperto sull'altro PC.
@@ -22,7 +23,8 @@ def elementi_di_oggi(oggi: date | None = None, adesso: datetime | None = None) -
     """Promemoria delle note arrivati all'ora, follow-up aperti con scadenza
     fino a oggi e polizze attive in scadenza nei prossimi giorni. Da
     chiamare dentro un app context."""
-    from .models import FollowUp, Nota, Policy
+    from .models import FollowUp, Nota, Policy, Settings, Title
+    from .titoli import rate_previste_portafoglio
 
     oggi = oggi or date.today()
     adesso = adesso or datetime.now()
@@ -44,6 +46,26 @@ def elementi_di_oggi(oggi: date | None = None, adesso: datetime | None = None) -
         elementi.append({"chiave": f"p{p.id}", "tipo": "polizza", "ritardo": False,
                          "testo": f"{p.cliente.ragione_sociale}: {p.compagnia} n. {p.numero_polizza} "
                                   f"scade il {p.data_scadenza:%d/%m}"})
+    # Rate da far pagare: quietanze emesse non incassate (anche arretrate) e
+    # rate del frazionamento non ancora emesse, entro i giorni di preavviso.
+    try:
+        preavviso = Settings.get().giorni_preavviso_rate
+    except Exception:  # noqa: BLE001 - database non ancora aggiornato
+        preavviso = GIORNI_SCADENZA
+    limite = oggi + timedelta(days=preavviso)
+    for t in (Title.query.filter(Title.stato == "da_incassare", Title.premio_lordo > 0, Title.data_effetto <= limite)
+              .order_by(Title.data_effetto).all()):
+        p = t.polizza
+        if p is None or not p.attiva:
+            continue
+        elementi.append({"chiave": f"t{t.id}", "tipo": "rata", "ritardo": t.data_effetto < oggi,
+                         "testo": f"{p.cliente.ragione_sociale}: rata {p.numero_polizza} "
+                                  f"del {t.data_effetto:%d/%m} da incassare"})
+    for r in rate_previste_portafoglio(oggi, limite):
+        p = r["polizza"]
+        elementi.append({"chiave": f"r{p.id}-{r['data']:%Y%m%d}", "tipo": "rata", "ritardo": False,
+                         "testo": f"{p.cliente.ragione_sociale}: rata {r['numero']}/{r['totali']} "
+                                  f"{p.numero_polizza} del {r['data']:%d/%m} da far pagare"})
     return elementi
 
 
@@ -65,6 +87,11 @@ def messaggio(elementi: list[dict], nuove: set | None = None) -> tuple[str, str]
         parti.append(f"{len(followup)} follow-up da fare" + (f" ({ritardo} in ritardo)" if ritardo else ""))
     if polizze:
         parti.append(f"{len(polizze)} polizz{'a' if len(polizze) == 1 else 'e'} in scadenza")
+    rate = [e for e in elementi if e["tipo"] == "rata"]
+    if rate:
+        arretrate = sum(e["ritardo"] for e in rate)
+        parti.append(f"{len(rate)} rat{'a' if len(rate) == 1 else 'e'} da incassare"
+                     + (f" ({arretrate} arretrat{'a' if arretrate == 1 else 'e'})" if arretrate else ""))
     righe = [e["testo"] for e in elementi[:3]]
     if len(elementi) > 3:
         righe.append(f"… e altri {len(elementi) - 3}")

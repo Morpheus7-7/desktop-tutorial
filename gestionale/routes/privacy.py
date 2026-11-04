@@ -13,7 +13,7 @@ bp = Blueprint("privacy", __name__)
 
 LIBERI = {"privacy.unlock", "privacy.recover", "static", "settings.shutdown",
           "settings.in_use", "settings.open_anyway", "settings.show_window",
-          "auth.login", "auth.logout", "auth.setup"}
+          "auth.login", "auth.logout", "auth.setup", "settings.calendar_return"}
 
 
 def _pin_attivo() -> bool:

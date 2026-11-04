@@ -53,13 +53,72 @@
     </section>
   </div>
   <div class="col-lg-5">
-    <section class="card" aria-labelledby="t-cal">
-      <div class="card-header"><h2 class="h6 mb-0" id="t-cal"><i class="bi bi-calendar3 me-1"></i> Google Calendar</h2></div>
+    <section class="card" id="calendar" aria-labelledby="t-cal">
+      <div class="card-header"><h2 class="h6 mb-0" id="t-cal"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i> Google Calendar collegato</h2></div>
       <div class="card-body small">
-        <p>Accanto a ogni follow-up trovi <i class="bi bi-calendar-plus"></i> <strong>Aggiungi a Google Calendar</strong>: si apre Calendar con l'evento già scritto, premi Salva.</p>
-        <p class="mb-2">Per portare tutti i follow-up aperti in una volta:</p>
-        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('followups.calendar_ics') }}"><i class="bi bi-download"></i> Scarica il calendario (.ics)</a>
-        <p class="text-muted mt-2 mb-0">In Google Calendar: Impostazioni → Importa ed esporta → Importa.</p>
+        {% if gcal_collegato %}
+          {% if s.gcal_errore %}
+          <div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i> {{ s.gcal_errore }}</div>
+          {% else %}
+          <p class="text-success fw-semibold mb-1"><i class="bi bi-check-circle" aria-hidden="true"></i> Collegato al calendario «Deal Combined».</p>
+          {% endif %}
+          <p class="mb-3">{{ gcal_eventi }} eventi in calendario · ultimo aggiornamento {{ s.gcal_ultima_sync | dataora_it }}.
+            Si aggiorna da solo a ogni controllo automatico (ogni {{ s.intervallo_minuti or 30 }} minuti) con
+            scadenze delle polizze, ultimi giorni per la disdetta, rate da far pagare, follow-up e promemoria delle note.</p>
+          <div class="d-flex flex-wrap gap-2">
+            <form method="post" action="{{ url_for('settings.calendar_settings') }}">
+              {{ csrf_field() }}<input type="hidden" name="azione" value="sincronizza">
+              <button class="btn btn-sm btn-primary"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Aggiorna adesso</button>
+            </form>
+            <form method="post" action="{{ url_for('settings.calendar_settings') }}"
+                  data-confirm="Scollegare Google Calendar? Gli eventi già scritti restano nel calendario «Deal Combined».">
+              {{ csrf_field() }}<input type="hidden" name="azione" value="scollega">
+              <button class="btn btn-sm btn-outline-danger">Scollega</button>
+            </form>
+          </div>
+          <p class="ga-muted mt-3 mb-0">I promemoria di Calendar arrivano ai giorni di preavviso scelti in
+            <a href="{{ url_for('settings.edit') }}#automatismi">Automatismi</a> (Google ne accetta fino a 4 settimane prima).</p>
+        {% else %}
+          <p>Deal Combined scrive da solo in un calendario <strong>«Deal Combined»</strong> del tuo Google Calendar:
+            scadenze delle polizze, rate da far pagare (annuali e frazionate), follow-up e promemoria delle note.
+            Li aggiorna quando cambiano e li toglie quando sono fatti. Vedrai tutto sul telefono, con gli avvisi di Calendar.</p>
+          <details class="mb-3" {% if not gcal_configurato %}open{% endif %}>
+            <summary class="fw-semibold">Configurazione (una volta sola, circa 10 minuti)</summary>
+            <ol class="ps-3 mt-2 mb-0">
+              <li>Apri <strong>console.cloud.google.com</strong> con il tuo account Google e crea un progetto (es. «Deal Combined»).</li>
+              <li><strong>API e servizi → Libreria</strong>: cerca <strong>Google Calendar API</strong> e premi <strong>Abilita</strong>.</li>
+              <li><strong>API e servizi → Schermata consenso OAuth</strong> (o «Google Auth Platform»): tipo <strong>Esterno</strong>,
+                nome dell'app e la tua email. Poi in <strong>Pubblico</strong> premi <strong>Pubblica app</strong>
+                («In produzione»): se resta «In prova», Google interrompe il collegamento ogni 7 giorni.</li>
+              <li><strong>Credenziali → Crea credenziali → ID client OAuth</strong>, tipo di applicazione <strong>App desktop</strong>.
+                Copia <strong>ID client</strong> e <strong>Client secret</strong> qui sotto.</li>
+              <li>Premi <strong>Collega Google Calendar</strong>: accedi, Google avvisa che l'app non è verificata
+                (è la tua) → <strong>Avanzate → Vai a Deal Combined</strong> → <strong>Consenti</strong>.</li>
+            </ol>
+          </details>
+          <form method="post" action="{{ url_for('settings.calendar_settings') }}" class="row g-2" autocomplete="off">
+            {{ csrf_field() }}<input type="hidden" name="azione" value="credenziali">
+            <div class="col-12"><label class="form-label" for="client_id">ID client</label>
+              <input class="form-control" id="client_id" name="client_id" value="{{ s.gcal_client_id or '' }}" placeholder="123456-abc.apps.googleusercontent.com"></div>
+            <div class="col-12"><label class="form-label" for="client_secret">Client secret</label>
+              <input class="form-control" type="password" id="client_secret" name="client_secret"
+                     placeholder="{% if s.gcal_client_secret %}già salvato: lascia vuoto{% else %}GOCSPX-…{% endif %}"></div>
+            <div class="col-12"><button class="btn btn-sm btn-outline-primary">Salva credenziali</button></div>
+          </form>
+          {% if gcal_configurato %}
+          <form method="post" action="{{ url_for('settings.calendar_settings') }}" class="mt-3">
+            {{ csrf_field() }}<input type="hidden" name="azione" value="collega">
+            <button class="btn btn-primary"><i class="bi bi-google" aria-hidden="true"></i> Collega Google Calendar</button>
+          </form>
+          {% if s.gcal_errore %}<div class="alert alert-warning py-2 mt-3 mb-0">{{ s.gcal_errore }}</div>{% endif %}
+          {% endif %}
+          <p class="ga-muted mt-3 mb-0">Deal Combined chiede solo il permesso di gestire <strong>i calendari che crea lui</strong>:
+            gli altri tuoi calendari restano invisibili al programma.</p>
+        {% endif %}
+        <hr>
+        <p class="mb-2">In alternativa, senza collegamento: accanto a ogni follow-up c'è <i class="bi bi-calendar-plus" aria-hidden="true"></i>
+          <strong>Aggiungi a Google Calendar</strong>, oppure scarica tutti i follow-up aperti in un file da importare.</p>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('followups.calendar_ics') }}"><i class="bi bi-download" aria-hidden="true"></i> Scarica il calendario (.ics)</a>
       </div>
     </section>
   </div>

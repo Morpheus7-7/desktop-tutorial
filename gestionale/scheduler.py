@@ -22,7 +22,7 @@ _MIN_INTERVALLO_S = 60  # limite di sicurezza: non più spesso di una volta al m
 
 
 def _tick(app: Flask) -> None:
-    """Un ciclo di controllo: automatismi, notifiche, digest email e backup giornaliero."""
+    """Un ciclo di controllo: automatismi, notifiche, digest email, Google Calendar e backup giornaliero."""
     from .backup import backup_automatico
     from .mailer import send_pending_notifications
     from .models import Settings, db
@@ -42,6 +42,7 @@ def _tick(app: Flask) -> None:
         except Exception:  # noqa: BLE001
             db.session.rollback()
             app.logger.exception("Scheduler: invio delle notifiche via email non riuscito.")
+        _sincronizza_calendar(app)
         try:
             percorso = backup_automatico()
             if percorso:
@@ -51,6 +52,26 @@ def _tick(app: Flask) -> None:
             app.logger.exception("Scheduler: backup automatico non riuscito.")
         finally:
             db.session.remove()
+
+
+def _sincronizza_calendar(app: Flask) -> None:
+    """Google Calendar collegato: allinea scadenze, rate, follow-up e promemoria."""
+    import os
+
+    from . import google_calendar
+    from .models import Settings, db
+
+    try:
+        if not google_calendar.collegato(Settings.get()):
+            return
+        esito = google_calendar.sincronizza(base_url=os.environ.get("APP_BASE_URL", ""))
+        if any(esito.values()):
+            app.logger.info("Scheduler: Google Calendar aggiornato (%s).", esito)
+    except google_calendar.CalendarError as exc:
+        app.logger.warning("Scheduler: Google Calendar non aggiornato: %s", exc)
+    except Exception:  # noqa: BLE001 — il calendario non deve fermare gli altri controlli
+        db.session.rollback()
+        app.logger.exception("Scheduler: errore nell'aggiornamento di Google Calendar.")
 
 
 def _intervallo_secondi(app: Flask) -> int:

@@ -27,7 +27,7 @@ from ..models import (
 from ..agenda import eventi_agenda, esporta_ics
 from ..security import audit
 from ..titoli import add_months, rate_previste_portafoglio
-from ..utils import parse_int, plurale
+from ..utils import formatta_euro, parse_int, plurale
 
 from .clients import _persona_cercata
 
@@ -55,8 +55,12 @@ def _pagina_del_giorno(oggi: date) -> dict:
 
 
 def _agenda_oggi(oggi: date) -> list[dict]:
-    """Elenco unico delle cose da fare: follow-up aperti (fino a 7 giorni) e
-    scadenze polizze (fino a 30 giorni), dal più urgente."""
+    """Elenco unico delle cose da fare, dal più urgente: follow-up aperti (fino
+    a 7 giorni), scadenze delle polizze (fino a 30 giorni), rate da far pagare
+    (arretrate e nei giorni di preavviso scelti) e promemoria delle note."""
+    from ..models import Settings
+
+    preavviso_rate = Settings.get().giorni_preavviso_rate
     voci = []
     for f in FollowUp.query.filter(
         FollowUp.stato == "aperto", FollowUp.data_scadenza <= oggi + timedelta(days=7)
@@ -75,6 +79,30 @@ def _agenda_oggi(oggi: date) -> list[dict]:
             "tipo": "scadenza", "id": p.id, "data": p.data_scadenza,
             "titolo": f"Rinnovo {p.ramo_label}", "etichetta": f"Polizza {p.numero_polizza}",
             "cliente": p.cliente, "priorita": "alta",
+        })
+    # Rate già emesse (quietanze) non ancora incassate: anche quelle arretrate.
+    for t in Title.query.filter(
+        Title.stato == "da_incassare", Title.premio_lordo > 0,
+        Title.data_effetto <= oggi + timedelta(days=preavviso_rate),
+    ):
+        p = t.polizza
+        if p is None or not p.attiva:
+            continue
+        rata = f"Rata {t.rata_label}" if t.rata_label else ("Quietanza" if p.rate_annue <= 1 else "Rata")
+        voci.append({
+            "tipo": "rata", "id": t.id, "policy_id": p.id, "data": t.data_effetto,
+            "titolo": f"{rata} da incassare · {formatta_euro(t.premio_lordo)}",
+            "etichetta": f"Polizza {p.numero_polizza}", "cliente": p.cliente,
+            "priorita": "alta" if t.data_effetto < oggi else "media",
+        })
+    # Rate del frazionamento ancora da emettere (nessun titolo in archivio).
+    for r in rate_previste_portafoglio(oggi - timedelta(days=GIORNI_RATE_PASSATE), oggi + timedelta(days=preavviso_rate)):
+        p = r["polizza"]
+        voci.append({
+            "tipo": "rata_prevista", "id": None, "policy_id": p.id, "data": r["data"],
+            "titolo": f"Rata {r['numero']}/{r['totali']} da far pagare · {formatta_euro(r['premio'])}",
+            "etichetta": f"Polizza {p.numero_polizza}", "cliente": p.cliente,
+            "priorita": "alta" if r["data"] < oggi else "media",
         })
     for n in Nota.query.filter(
         Nota.promemoria_il.isnot(None), Nota.promemoria_fatto.is_(False),
