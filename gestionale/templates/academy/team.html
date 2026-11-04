@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}La squadra — Accademia — Deal Combined{% endblock %}
+{% block content %}
+<div class="mb-3">
+  <h1 class="page-title"><i class="bi bi-mortarboard me-2" aria-hidden="true"></i>Accademia commerciale</h1>
+  <div class="page-subtitle">A che punto è ogni consulente nel percorso: lezioni completate, quiz superati e prossimo passo.</div>
+</div>
+{% include "academy/_nav.html" %}
+
+{% if righe %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr>
+        <th scope="col">Consulente</th>
+        <th scope="col" style="min-width: 12rem;">Lezioni</th>
+        <th scope="col" class="num">Quiz superati</th>
+        <th scope="col" class="num">Media quiz</th>
+        <th scope="col">Sta studiando</th>
+        <th scope="col">Ultima attività</th>
+      </tr></thead>
+      <tbody>
+      {% for r in righe %}
+        <tr>
+          <td><a href="{{ url_for('academy.team_member', user_id=r.utente.id) }}" class="fw-semibold">{{ r.utente.nome_visualizzato }}</a>
+            <div class="small ga-muted">{{ r.utente.ruolo_label }}</div></td>
+          <td>
+            <div class="hbar" title="{{ r.completate }} lezioni su {{ r.totale_lezioni }}">
+              <div class="hbar-track"><div class="hbar-fill" style="width: {{ ((100 * r.completate / r.totale_lezioni) | round(1)) if r.totale_lezioni else 0 }}%;"></div></div>
+              <span class="small tabular text-nowrap">{{ r.completate }}/{{ r.totale_lezioni }}</span>
+            </div>
+          </td>
+          <td class="num">{{ r.quiz_superati }}/{{ r.quiz_totali }}</td>
+          <td class="num">{{ (r.media_quiz ~ '%') if r.media_quiz is not none else '—' }}</td>
+          <td class="small">{% if r.prossima %}Settimana {{ r.prossima[0].numero }} · {{ r.prossima[1].titolo }}{% else %}<span class="text-success"><i class="bi bi-trophy" aria-hidden="true"></i> Percorso completato</span>{% endif %}</td>
+          <td class="small text-nowrap">{% if r.ultima_attivita %}{{ r.ultima_attivita | dataora_it }}{% else %}<span class="ga-muted">non ha ancora iniziato</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<p class="small ga-muted mt-3" style="max-width: 70ch;">Ogni utente vede e segna solo i propri progressi. Una media dei quiz sotto il 70% o
+  un'ultima attività lontana sono il segnale per un affiancamento o un role-play insieme.</p>
+{% else %}
+<p class="ga-muted">Nessun utente attivo. Aggiungi i consulenti dalla pagina <a href="{{ url_for('users.list_users') }}">Utenti</a>.</p>
+{% endif %}
+{% endblock %}

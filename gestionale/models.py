@@ -1746,12 +1746,14 @@ class CalendarioEvento(db.Model):
 
 
 class AcademyProgress(db.Model):
-    """Lezione dell'Accademia segnata come completata."""
+    """Lezione dell'Accademia segnata come completata da un utente."""
 
     __tablename__ = "academy_progress"
+    __table_args__ = (db.UniqueConstraint("user_id", "lezione_id", name="ux_academy_progress_utente_lezione"),)
 
     id = db.Column(db.Integer, primary_key=True)
-    lezione_id = db.Column(db.String(80), unique=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    lezione_id = db.Column(db.String(80), nullable=False)
     completata_at = db.Column(db.DateTime, default=now, nullable=False)
 
 
@@ -1761,6 +1763,7 @@ class QuizAttempt(db.Model):
     __tablename__ = "quiz_attempts"
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), index=True)
     modulo_id = db.Column(db.String(80), nullable=False, index=True)
     punteggio = db.Column(db.Integer, nullable=False)
     totale = db.Column(db.Integer, nullable=False)

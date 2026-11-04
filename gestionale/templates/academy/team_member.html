@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ r.utente.nome_visualizzato }} — Accademia — Deal Combined{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb">
+  <li class="breadcrumb-item"><a href="{{ url_for('academy.team') }}">La squadra</a></li>
+  <li class="breadcrumb-item active">{{ r.utente.nome_visualizzato }}</li>
+</ol></nav>
+<h1 class="page-title mb-1">{{ r.utente.nome_visualizzato }}</h1>
+<div class="page-subtitle mb-3">{{ r.completate }} lezioni su {{ r.totale_lezioni }} · {{ r.quiz_superati }} quiz superati su {{ r.quiz_totali }}{% if r.media_quiz is not none %} · media {{ r.media_quiz }}%{% endif %}{% if r.ultima_attivita %} · ultima attività {{ r.ultima_attivita | dataora_it }}{% endif %}</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead><tr><th scope="col">Settimana</th><th scope="col">Modulo</th><th scope="col" style="min-width: 10rem;">Lezioni</th><th scope="col">Miglior quiz</th></tr></thead>
+      <tbody>
+      {% for item in r.moduli %}
+        <tr {% if r.prossima and r.prossima[0].id == item.m.id %}class="table-active"{% endif %}>
+          <td class="num">{{ item.m.numero }}</td>
+          <td><a href="{{ url_for('academy.module', modulo_id=item.m.id) }}">{{ item.m.titolo }}</a>
+            {% if r.prossima and r.prossima[0].id == item.m.id %}<div class="small ga-muted">sta studiando: {{ r.prossima[1].titolo }}</div>{% endif %}</td>
+          <td><div class="hbar"><div class="hbar-track"><div class="hbar-fill" style="width: {{ ((100 * item.fatte / item.totale) | round(1)) if item.totale else 0 }}%;"></div></div>
+            <span class="small tabular">{{ item.fatte }}/{{ item.totale }}</span></div></td>
+          <td class="small">{% if item.quiz %}<span class="{{ 'text-success' if item.quiz.percentuale >= 70 else 'text-danger' }} fw-semibold">{{ item.quiz.percentuale }}%</span>
+            <span class="ga-muted">il {{ item.quiz.created_at | data_it }}</span>{% else %}<span class="ga-muted">—</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

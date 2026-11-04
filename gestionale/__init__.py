@@ -123,6 +123,9 @@ def _ensure_schema() -> None:
         },
     }
 
+    migrazioni["quiz_attempts"] = {
+        "user_id": "ALTER TABLE quiz_attempts ADD COLUMN user_id INTEGER REFERENCES users (id)",
+    }
     migrazioni["client_persons"] = {
         "persona_client_id": "ALTER TABLE client_persons ADD COLUMN persona_client_id INTEGER",
     }
@@ -171,6 +174,55 @@ def _ensure_schema() -> None:
 
     _migra_chiavi_notifiche()
     _migra_settore_professionisti()
+    _migra_progressi_accademia()
+
+
+def _migra_progressi_accademia() -> None:
+    """Progressi dell'Accademia per utente.
+
+    Deal Combined 2.x aveva un solo percorso per tutto il programma, con la
+    lezione unica nella tabella. Si ricostruisce la tabella con il vincolo
+    (utente, lezione); i progressi esistenti vanno al primo amministratore
+    (o, se non c'è ancora nessun utente, a chi verrà creato per primo).
+    """
+    tabelle = set(inspect(db.engine).get_table_names())
+    if "academy_progress" in tabelle:
+        colonne = {c["name"] for c in inspect(db.engine).get_columns("academy_progress")}
+        if "user_id" not in colonne:
+            for ddl in (
+                "CREATE TABLE academy_progress__nuova (id INTEGER NOT NULL PRIMARY KEY, "
+                "user_id INTEGER REFERENCES users (id) ON DELETE CASCADE, lezione_id VARCHAR(80) NOT NULL, "
+                "completata_at DATETIME NOT NULL, "
+                "CONSTRAINT ux_academy_progress_utente_lezione UNIQUE (user_id, lezione_id))",
+                "INSERT INTO academy_progress__nuova (id, user_id, lezione_id, completata_at) "
+                "SELECT id, NULL, lezione_id, completata_at FROM academy_progress",
+                "DROP TABLE academy_progress",
+                "ALTER TABLE academy_progress__nuova RENAME TO academy_progress",
+                "CREATE INDEX IF NOT EXISTS ix_academy_progress_user_id ON academy_progress (user_id)",
+            ):
+                db.session.execute(text(ddl))
+            db.session.commit()
+    assegna_progressi_senza_utente()
+
+
+def assegna_progressi_senza_utente() -> None:
+    """Lezioni e quiz senza utente (versioni precedenti) al primo amministratore."""
+    from .models import AcademyProgress, QuizAttempt, User
+
+    tabelle = set(inspect(db.engine).get_table_names())
+    if not {"academy_progress", "quiz_attempts", "users"} <= tabelle:
+        return
+    admin = User.query.filter_by(ruolo="admin").order_by(User.id).first()
+    if admin is None:
+        return
+    gia_fatte = {p.lezione_id for p in AcademyProgress.query.filter_by(user_id=admin.id)}
+    for p in AcademyProgress.query.filter(AcademyProgress.user_id.is_(None)).all():
+        if p.lezione_id in gia_fatte:
+            db.session.delete(p)
+        else:
+            p.user_id = admin.id
+    QuizAttempt.query.filter(QuizAttempt.user_id.is_(None)).update({"user_id": admin.id})
+    db.session.commit()
 
 
 def _migra_settore_professionisti() -> None:

@@ -6,4 +6,7 @@
   <li class="nav-item"><a class="nav-link {% if request.endpoint in ('academy.scenarios', 'academy.scenario') %}active{% endif %}" href="{{ url_for('academy.scenarios') }}"><i class="bi bi-people"></i> Role-play</a></li>
   <li class="nav-item"><a class="nav-link {% if request.endpoint == 'academy.techniques' %}active{% endif %}" href="{{ url_for('academy.techniques') }}"><i class="bi bi-tools"></i> Cassetta degli attrezzi</a></li>
   <li class="nav-item"><a class="nav-link {% if request.endpoint in ('academy.sheets', 'academy.sheet') %}active{% endif %}" href="{{ url_for('academy.sheets') }}"><i class="bi bi-printer"></i> Schede da stampare</a></li>
+  {% if is_admin %}
+  <li class="nav-item"><a class="nav-link {% if request.endpoint in ('academy.team', 'academy.team_member') %}active{% endif %}" href="{{ url_for('academy.team') }}"><i class="bi bi-people-fill"></i> La squadra</a></li>
+  {% endif %}
 </ul>

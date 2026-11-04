@@ -1,19 +1,23 @@
 """Accademia commerciale: percorso formativo, quiz, obiezioni, scenari e schede."""
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 
 from .. import academy as ac
-from ..models import AcademyProgress, Client, QuizAttempt, db
+from ..models import AcademyProgress, Client, QuizAttempt, User, db
+from ..security import require_admin
 
 bp = Blueprint("academy", __name__, url_prefix="/accademia")
 
 
-def _completate() -> set[str]:
-    return {p.lezione_id for p in AcademyProgress.query.all()}
+def _completate(user_id: int | None = None) -> set[str]:
+    """Lezioni completate dall'utente (di base: chi sta usando il programma)."""
+    user_id = user_id if user_id is not None else g.user.id
+    return {p.lezione_id for p in AcademyProgress.query.filter_by(user_id=user_id)}
 
 
-def _migliori_quiz() -> dict[str, QuizAttempt]:
+def _migliori_quiz(user_id: int | None = None) -> dict[str, QuizAttempt]:
+    user_id = user_id if user_id is not None else g.user.id
     migliori: dict[str, QuizAttempt] = {}
-    for t in QuizAttempt.query.order_by(QuizAttempt.created_at).all():
+    for t in QuizAttempt.query.filter_by(user_id=user_id).order_by(QuizAttempt.created_at).all():
         if t.modulo_id not in migliori or t.percentuale > migliori[t.modulo_id].percentuale:
             migliori[t.modulo_id] = t
     return migliori
@@ -49,6 +53,46 @@ def index():
     )
 
 
+def riepilogo_utente(user: User) -> dict:
+    """Avanzamento di un utente nel percorso: lezioni, quiz, modulo in corso, ultima attività."""
+    completate = _completate(user.id) & ac.lezione_ids()
+    migliori = _migliori_quiz(user.id)
+    superati = [t for t in migliori.values() if t.percentuale >= 70]
+    prossima = next(((m, lez) for m, lez in ac.tutte_le_lezioni() if lez["id"] not in completate), None)
+    date_attivita = [p.completata_at for p in AcademyProgress.query.filter_by(user_id=user.id)]
+    date_attivita += [t.created_at for t in QuizAttempt.query.filter_by(user_id=user.id)]
+    moduli = []
+    for m in ac.MODULI:
+        fatte = sum(1 for lez in m["lezioni"] if lez["id"] in completate)
+        moduli.append({"m": m, "fatte": fatte, "totale": len(m["lezioni"]), "quiz": migliori.get(m["id"])})
+    return {
+        "utente": user,
+        "completate": len(completate),
+        "totale_lezioni": len(ac.tutte_le_lezioni()),
+        "quiz_superati": len(superati),
+        "quiz_totali": len(ac.MODULI),
+        "media_quiz": round(sum(t.percentuale for t in migliori.values()) / len(migliori)) if migliori else None,
+        "prossima": prossima,
+        "ultima_attivita": max(date_attivita) if date_attivita else None,
+        "moduli": moduli,
+    }
+
+
+@bp.route("/squadra")
+def team():
+    """Per il titolare: a che punto è ogni consulente nel percorso dell'Accademia."""
+    require_admin()
+    utenti = User.query.filter_by(attivo=True).order_by(User.nome, User.username).all()
+    return render_template("academy/team.html", righe=[riepilogo_utente(u) for u in utenti], moduli=ac.MODULI)
+
+
+@bp.route("/squadra/<int:user_id>")
+def team_member(user_id):
+    require_admin()
+    utente = db.get_or_404(User, user_id)
+    return render_template("academy/team_member.html", r=riepilogo_utente(utente))
+
+
 @bp.route("/modulo/<modulo_id>")
 def module(modulo_id):
     modulo = _modulo_or_404(modulo_id)
@@ -71,11 +115,11 @@ def module(modulo_id):
 def toggle_lesson(lezione_id):
     if lezione_id not in ac.lezione_ids():
         abort(404)
-    esistente = AcademyProgress.query.filter_by(lezione_id=lezione_id).first()
+    esistente = AcademyProgress.query.filter_by(user_id=g.user.id, lezione_id=lezione_id).first()
     if esistente:
         db.session.delete(esistente)
     else:
-        db.session.add(AcademyProgress(lezione_id=lezione_id))
+        db.session.add(AcademyProgress(user_id=g.user.id, lezione_id=lezione_id))
     db.session.commit()
     modulo_id = next(m["id"] for m, lez in ac.tutte_le_lezioni() if lez["id"] == lezione_id)
     return redirect(url_for("academy.module", modulo_id=modulo_id) + f"#{lezione_id}")
@@ -87,12 +131,13 @@ def quiz(modulo_id):
     esito = None
     if request.method == "POST":
         esito = ac.valuta_quiz(modulo, request.form)
-        db.session.add(QuizAttempt(modulo_id=modulo_id, punteggio=esito["punteggio"], totale=esito["totale"]))
+        db.session.add(QuizAttempt(user_id=g.user.id, modulo_id=modulo_id,
+                                   punteggio=esito["punteggio"], totale=esito["totale"]))
         db.session.commit()
         flash(f"Quiz completato: {esito['punteggio']} risposte corrette su {esito['totale']}.",
               "success" if esito["punteggio"] * 10 >= esito["totale"] * 7 else "warning")
     tentativi = (
-        QuizAttempt.query.filter_by(modulo_id=modulo_id)
+        QuizAttempt.query.filter_by(user_id=g.user.id, modulo_id=modulo_id)
         .order_by(QuizAttempt.created_at.desc()).limit(5).all()
     )
     return render_template("academy/quiz.html", modulo=modulo, esito=esito, tentativi=tentativi)

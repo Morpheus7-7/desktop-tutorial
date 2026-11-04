@@ -118,6 +118,10 @@ def setup():
             db.session.flush()
             audit("crea", "utente", user.id, "Configurazione iniziale: creato l'amministratore", user=user)
             db.session.commit()
+            # Lezioni e quiz dell'Accademia fatti con la versione senza utenti: sono suoi.
+            from .. import assegna_progressi_senza_utente
+
+            assegna_progressi_senza_utente()
             login_user(user)
             flash("Benvenuto! Il gestionale è pronto: inizia inserendo i tuoi clienti.", "success")
             return redirect(url_for("main.dashboard"))
