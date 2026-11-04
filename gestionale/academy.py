@@ -2910,7 +2910,16 @@ SCHEDE = [
 # ----------------------------------------------------------------------
 # Assemblaggio del percorso
 # ----------------------------------------------------------------------
-_TUTTI = {m["id"]: m for m in MODULI + MODULI_EXTRA}
+from .academy_extra import (  # noqa: E402 - contenuti della versione 3.0
+    EVIDENZE_COMPLIANCE, MODULO_COMPLIANCE, OBIEZIONI_EXTRA, SCENARI_EXTRA,
+)
+
+OBIEZIONI.extend(OBIEZIONI_EXTRA)
+SCENARI.extend(SCENARI_EXTRA)
+EVIDENZE["compliance"] = EVIDENZE_COMPLIANCE
+ORDINE_MODULI.insert(ORDINE_MODULI.index("informazioni") + 1, "compliance")
+
+_TUTTI = {m["id"]: m for m in MODULI + MODULI_EXTRA + [MODULO_COMPLIANCE]}
 MODULI = [_TUTTI[mid] for mid in ORDINE_MODULI]
 for _numero, _modulo in enumerate(MODULI, start=1):
     _modulo["numero"] = _numero

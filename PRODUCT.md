@@ -10,7 +10,7 @@ web
 Una rete commerciale di consulenti assicurativi (titolare e consulenti, anche in formazione) che seguono professionisti, aziende e lavoratori dipendenti. Lo usano ogni giorno per gestire clienti, polizze, scadenze e trattative, e per formarsi con l'Accademia commerciale. Per questa rete l'Accademia è centrale quanto il gestionale.
 
 ## Product Purpose
-Tenere in un unico posto il lavoro del consulente: anagrafiche, polizze, documenti, scadenze, follow-up, pipeline delle trattative. Fa anche l'analisi automatica dei rischi dalla descrizione dell'attività del cliente, con spunti di trattativa e gap di copertura. In più offre un percorso di formazione commerciale di 16 settimane, che insegna il mestiere più che i prodotti. Funziona se nessuna scadenza viene persa, se ogni trattativa ha un prossimo passo e se i consulenti migliorano in modo misurabile.
+Tenere in un unico posto il lavoro del consulente: anagrafiche, polizze, documenti, scadenze, follow-up, pipeline delle trattative. Fa anche l'analisi automatica dei rischi dalla descrizione dell'attività del cliente, con spunti di trattativa e gap di copertura. In più offre un percorso di formazione commerciale di 17 settimane, che insegna il mestiere più che i prodotti. Funziona se nessuna scadenza viene persa, se ogni trattativa ha un prossimo passo e se i consulenti migliorano in modo misurabile.
 
 ## Positioning
 Unisce il gestionale operativo e la palestra commerciale nello stesso strumento: l'analisi dei rischi di un cliente reale diventa materiale di trattativa, e la formazione rimanda subito a pipeline, follow-up e schede stampabili. Ogni tecnica insegnata riporta il suo livello di evidenza scientifica.

@@ -196,10 +196,11 @@ e **backup** integrati.
 
 ## Accademia commerciale
 
-Dal menu **Accademia** si accede a un percorso di **16 settimane** (un modulo a
+Dal menu **Accademia** si accede a un percorso di **17 settimane** (un modulo a
 settimana) che copre psicologia della decisione, comunicazione e PNL,
-prospezione, marketing, primo contatto, raccolta delle informazioni, arte
-delle domande (SPIN, ascolto attivo), pensiero laterale e storytelling,
+prospezione, marketing, primo contatto, raccolta delle informazioni,
+correttezza e normativa in pratica (IDD, regolamenti IVASS, privacy,
+antiriciclaggio, reclami), arte delle domande (SPIN, ascolto attivo), pensiero laterale e storytelling,
 proposta e prezzo, obiezioni, negoziazione (metodo Harvard, Voss), chiusura,
 continuità della trattativa, sviluppo del portafoglio dai clienti acquisiti e
 organizzazione personale.
@@ -210,9 +211,11 @@ organizzazione personale.
   pratica professionale e quali miti evitare (es. movimenti oculari o regola
   7-38-55), con le fonti.
 - **Quiz** con correzione spiegata e storico dei tentativi (soglia 70%).
-- **Libreria delle obiezioni** con cosa nascondono, tecnica, risposta, rilancio
+- **Libreria delle obiezioni** (26, tra cui «ce l'ho con la banca», «mi copre
+  l'INAIL», «ho la convenzione dell'ordine», «sono in affitto») con cosa nascondono, tecnica, risposta, rilancio
   e spunto di pensiero laterale; **allenamento quotidiano** a flashcard.
-- **Role-play**: scenari a tre (consulente, cliente, osservatore) con trappole
+- **Role-play** (9, anche per settore: commercialista, medico ospedaliero,
+  famiglia con mutuo, negozio): scenari a tre (consulente, cliente, osservatore) con trappole
   e domande di debrief.
 - **Cassetta degli attrezzi**: le tecniche documentate con fonte e modulo.
 - **Schede da stampare**: raccolta informazioni (privato e azienda), documenti
